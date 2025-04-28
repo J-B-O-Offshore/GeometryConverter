@@ -97,7 +97,6 @@ def write_df(workbook_name, sheet_name, upper_left_address, dataframe, include_h
      include_headers (bool): Whether to include column names as headers in Excel (default is True).
      """
     logger = setup_logger()
-    logger.debug("hello")
 
     try:
         # Connect to the already open workbook
@@ -125,43 +124,49 @@ def write_df(workbook_name, sheet_name, upper_left_address, dataframe, include_h
         logger.debug(f"Error!{e}")
 
 
-def write_df_to_existing_table(workbook_name, sheet_name, table_name, dataframe):
+import xlwings as xw
+
+import xlwings as xw
+
+import xlwings as xw
+
+
+def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     """
-    Writes a DataFrame into an existing Excel table (ListObject), preserving the table formatting.
+    Replace the contents of an existing Excel table with a pandas DataFrame using xlwings.
 
     Parameters:
-    workbook_name (str): Name of the open Excel workbook (e.g. 'MyWorkbook.xlsx').
-    sheet_name (str): Name of the sheet containing the table.
-    table_name (str): Name of the Excel table (ListObject) to overwrite.
-    dataframe (pd.DataFrame): The DataFrame to write into the Excel table.
+    - workbook_name: str, name of the open Excel workbook (no path needed if open).
+    - sheet_name: str, name of the sheet containing the table.
+    - table_name: str, name of the Excel table (ListObject) to manipulate.
+    - dataframe: pandas DataFrame to replace the table's data (same number of columns).
     """
+    # Connect to the open workbook
+    wb = xw.books[workbook_name]
+    ws = wb.sheets[sheet_name]
+
+    # Find the table (ListObject)
     try:
-        # Connect to open workbook
-        wb = next((wb for wb in xw.books if wb.name.lower() == workbook_name.lower()), None)
-        if wb is None:
-            raise ValueError(f"Workbook '{workbook_name}' not found.")
-
-        sheet = next((s for s in wb.sheets if s.name.lower() == sheet_name.lower()), None)
-        if sheet is None:
-            raise ValueError(f"Sheet '{sheet_name}' not found in workbook.")
-
-        # Get the Excel table object (ListObject)
-        table = sheet.api.ListObjects(table_name)
-
-        # Resize the table to fit the new DataFrame
-        num_rows = len(dataframe)
-        num_cols = len(dataframe.columns)
-
-        # Set headers (if necessary)
-        table.HeaderRowRange.Value = [dataframe.columns.tolist()]
-
-        # Resize the data body (or clear it)
-        if num_rows == 0:
-            table.DataBodyRange.ClearContents()
-        else:
-            # Resize the table to the correct size
-            table.Resize(table.Range.Resize(num_rows + 1, num_cols))
-            table.DataBodyRange.Value = dataframe.values.tolist()
-
+        table = ws.api.ListObjects(table_name)
     except Exception as e:
-        print(f"Error writing DataFrame to Excel table: {e}")
+        raise ValueError(f"Table '{table_name}' not found in sheet '{sheet_name}'.") from e
+
+    # Get the header range and data body range
+    header_range = table.HeaderRowRange
+    data_body_range = table.DataBodyRange
+
+    # Clear the existing table data (keep headers)
+    data_body_range.ClearContents()
+
+    # Write the new DataFrame below the headers
+    start_cell = ws.range((header_range.Row + 1, header_range.Column))
+    start_cell.options(index=False, header=False).value = dataframe
+
+    # Resize the table to match new data
+    last_row = header_range.Row + dataframe.shape[0]
+    last_col = header_range.Column + dataframe.shape[1] - 1
+    new_range = ws.range(
+        (header_range.Row, header_range.Column),
+        (last_row, last_col)
+    )
+    table.Resize(new_range.api)
