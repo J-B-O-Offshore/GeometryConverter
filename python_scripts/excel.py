@@ -2,8 +2,8 @@ import xlwings as xw
 import os
 import logging
 from datetime import datetime
-
-
+import pandas as pd
+import numpy as np
 def setup_logger():
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
@@ -124,13 +124,6 @@ def write_df(workbook_name, sheet_name, upper_left_address, dataframe, include_h
         logger.debug(f"Error!{e}")
 
 
-import xlwings as xw
-
-import xlwings as xw
-
-import xlwings as xw
-
-
 def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     """
     Replace the contents of an existing Excel table with a pandas DataFrame using xlwings.
@@ -170,3 +163,153 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
         (last_row, last_col)
     )
     table.Resize(new_range.api)
+
+
+def show_message_box(workbook_name, message):
+    """
+    Displays a message box in the specified Excel workbook and returns a boolean value
+    based on the user's choice (Yes or No).
+
+    Args:
+        workbook_name (str): The name of the workbook (with .xlsm extension) that is already open.
+        message (str): The message to display in the message box.
+
+    Returns:
+        bool: True if the user clicks 'Yes', False if the user clicks 'No'.
+              Returns None if the workbook is not open or if an error occurs.
+
+    Raises:
+        KeyError: If the specified workbook is not found among the open workbooks.
+        AttributeError: If no active Excel instance is found.
+    """
+
+    # Attempt to connect to an existing Excel instance
+    try:
+        app = xw.apps.active  # Use the active Excel application instance
+    except AttributeError:
+        print("No active Excel instance found.")
+        return None
+
+    # Try to find the workbook by name
+    try:
+        wb = app.books[workbook_name]
+    except KeyError:
+        print(f"Workbook '{workbook_name}' is not open.")
+        return None
+
+    # Define the VBA code for the message box
+    vba_code = f"""
+    Function ShowMsgBox() As Boolean
+        Dim answer As Integer
+        answer = MsgBox("{message}", vbYesNo + vbQuestion, "Choice Box")
+        If answer = vbYes Then
+            ShowMsgBox = True
+        Else
+            ShowMsgBox = False
+        End If
+    End Function
+    """
+
+    # Access the VBA project and add the code
+    vb_module = wb.api.VBProject.VBComponents.Add(1)  # Add a new module
+    vb_module.CodeModule.AddFromString(vba_code)  # Add the VBA code to the module
+
+    # Run the VBA function and capture the return value
+    result = wb.macro('ShowMsgBox')()
+
+    return result
+
+def read_excel_table(workbook_name, sheet_name, table_name):
+    """
+    Read an Excel Table into a Pandas DataFrame, using the Table's header as column names.
+
+    Parameters:
+        workbook_name (str): The name of the workbook
+        sheet_name (str): The name of the sheet containing the table.
+        table_name (str): The name of the Excel Table (not the range name).
+
+    Returns:
+        pd.DataFrame: DataFrame containing the table data with correct headers.
+    """
+    wb = xw.Book(workbook_name)
+
+    sheet = wb.sheets[sheet_name]
+    table = sheet.tables[table_name]
+
+    # Read the data body into a DataFrame
+    df = table.data_body_range.options(pd.DataFrame, header=False, index=False).value
+
+    # Set the correct headers from the table's header row
+    df.columns = [h.strip() for h in table.header_row_range.value]
+
+    return df
+
+def add_unique_row(df1, df2, exclude_columns=None):
+    """
+    Adds a row from `df1` to `df2` if no equivalent row already exists,
+    with optional exclusion of specific columns from the comparison.
+
+    Two rows are considered equivalent if all non-excluded column values match,
+    treating NaN and None as equal and attempting to convert numerical values to float
+    before comparison.
+
+    Parameters
+    ----------
+    df1 : pandas.DataFrame
+        A single-row DataFrame representing the row to add.
+    df2 : pandas.DataFrame
+        The target DataFrame to which the row may be added.
+    exclude_columns : list of str, optional
+        List of column names to ignore when checking for matching rows.
+        Defaults to an empty list.
+
+    Returns
+    -------
+    df2 : pandas.DataFrame
+        The updated DataFrame after adding the row if it was unique.
+    matching_indices : list of int
+        List of indices in `df2` where matching rows were found.
+        Empty if the row was added.
+
+    Notes
+    -----
+    - Missing values (NaN, None) are treated as equivalent during comparison.
+    - If the columns of `df1` and `df2` differ, missing columns are filled with None.
+    - All values are cast to string after float conversion to ensure robust comparison.
+    """
+    if exclude_columns is None:
+        exclude_columns = []
+
+    all_columns = df1.columns.union(df2.columns)
+    df1 = df1.reindex(columns=all_columns, fill_value=None)
+    df2 = df2.reindex(columns=all_columns, fill_value=None)
+
+    # Drop excluded columns from both df1 and df2 for comparison
+    df1_comp = df1.drop(columns=exclude_columns, errors='ignore')
+    df2_comp = df2.drop(columns=exclude_columns, errors='ignore')
+
+    # Convert both DataFrames to treat NaN and None as equal and convert numerical values (including strings) to float
+    def convert_to_float(x):
+        try:
+            return float(x)
+        except (ValueError, TypeError):
+            return np.nan if pd.isna(x) else x
+
+    df1_comp = df1_comp.map(convert_to_float)
+    df2_comp = df2_comp.map(convert_to_float)
+
+    # Ensure all columns are of the same type for proper comparison
+    df1_comp = df1_comp.astype(str)
+    df2_comp = df2_comp.astype(str)
+
+    # Check for rows in df2 that match the row in df1
+    matching_rows = df2_comp[df2_comp.eq(df1_comp.values[0]).all(axis=1)]
+
+
+    if not matching_rows.empty:
+        matching_indices = matching_rows.index.tolist()
+    else:
+        df2 = pd.concat([df2, df1], ignore_index=True)
+        matching_indices = []
+
+    return df2, matching_indices

@@ -90,6 +90,7 @@ def MP_DATA(Structure_name, db_path):
     META_relevant = META.loc[META["table_name"] == Structure_name]
 
     ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, "MP_META", META_relevant)
+    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, "MP_DATA_TRUE", DATA)
     ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, "MP_DATA", DATA)
 
 
@@ -107,8 +108,10 @@ def TP_META(db_path):
     logger = ex.setup_logger()
     sheet_name_structure_loading = "BuildYourStructure"
 
-    logger.debug(db_path)
+    logger.debug(f"TP_META db path: {db_path}")
     META = load_db_table(db_path, "META")
+    logger.debug(f"META: {META.to_string()}")
+
     ex.set_dropdown_values(
         "GeometrieConverter.xlsm",
         sheet_name_structure_loading,
@@ -138,4 +141,30 @@ def TP_DATA(Structure_name, db_path):
     META_relevant = META.loc[META["table_name"] == Structure_name]
 
     ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, "TP_META", META_relevant)
+    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, "TP_DATA_TRUE", DATA)
     ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, "TP_DATA", DATA)
+
+def load_MP_data(db_path):
+    logger = ex.setup_logger()
+
+    META_DB = load_db_table(db_path, "META")
+    META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_META")
+
+    DATA_DB = load_db_table(db_path, "Data")
+
+
+    META_DB = META_DB.drop(columns=["index"])
+    META_CURR = META_CURR.drop(columns=["index"])
+
+    match = ((META_DB == META_CURR.iloc[0]).all(axis=1)).any()
+
+    if match:
+
+        print(1)
+    logger.debug(f"match: {match}")
+
+
+
+    ex.add_unique_row(META_DB, META_CURR)
+
+    return
