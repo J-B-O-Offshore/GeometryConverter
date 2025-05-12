@@ -46,7 +46,7 @@ def load_db_table(db_path, table_name):
     return df
 
 
-def MP_META(db_path):
+def load_MP_META(db_path):
     """
     Load the META table from the MP database and update the MP structures dropdown
     in the Excel workbook.
@@ -69,7 +69,7 @@ def MP_META(db_path):
     )
 
 
-def MP_DATA(Structure_name, db_path):
+def load_MP_DATA(Structure_name, db_path):
     """
     Load metadata and structure-specific data from the MP database
     and write them to the Excel workbook.
@@ -94,7 +94,7 @@ def MP_DATA(Structure_name, db_path):
     ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, "MP_DATA", DATA)
 
 
-def TP_META(db_path):
+def load_TP_META(db_path):
     """
     Load the META table from the TP database and update the TP structures dropdown
     in the Excel workbook.
@@ -120,7 +120,7 @@ def TP_META(db_path):
     )
 
 
-def TP_DATA(Structure_name, db_path):
+def load_TP_DATA(Structure_name, db_path):
     """
     Load metadata and structure-specific data from the TP database
     and write them to the Excel workbook.
@@ -144,27 +144,27 @@ def TP_DATA(Structure_name, db_path):
     ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, "TP_DATA_TRUE", DATA)
     ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, "TP_DATA", DATA)
 
-def load_MP_data(db_path):
-    logger = ex.setup_logger()
-
-    META_DB = load_db_table(db_path, "META")
-    META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_META")
-
-    DATA_DB = load_db_table(db_path, "Data")
-
-
-    META_DB = META_DB.drop(columns=["index"])
-    META_CURR = META_CURR.drop(columns=["index"])
-
-    match = ((META_DB == META_CURR.iloc[0]).all(axis=1)).any()
-
-    if match:
-
-        print(1)
-    logger.debug(f"match: {match}")
-
-
-
-    ex.add_unique_row(META_DB, META_CURR)
-
-    return
+# def save_MP_data(db_path):
+#     logger = ex.setup_logger()
+#
+#     META_DB = load_db_table(db_path, "META")
+#     META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_META")
+#
+#     DATA_DB = load_db_table(db_path, "Data")
+#
+#
+#     META_DB = META_DB.drop(columns=["index"])
+#     META_CURR = META_CURR.drop(columns=["index"])
+#
+#     match = ((META_DB == META_CURR.iloc[0]).all(axis=1)).any()
+#
+#     if match:
+#
+#         print(1)
+#     logger.debug(f"match: {match}")
+#
+#
+#
+#     ex.add_unique_row(META_DB, META_CURR)
+#
+#     return
