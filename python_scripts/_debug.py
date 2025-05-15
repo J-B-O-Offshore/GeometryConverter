@@ -10,7 +10,7 @@ sheet_name = "BuildYourStructure"
 table_name = "MP_DATA"
 message = "Duh?"
 db_path = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/databases/MP.db"
-selected_structure = "MP02"
+selected_structure = "MP07"
 Structure = "MP"
 
 class ConciveError(Exception):
@@ -45,6 +45,7 @@ def drop_db_table(db_path, table_name):
         raise ConciveError(f"Failed to drop table '{table_name}': {e}")
     finally:
         conn.close()
+
 def load_db_table(db_path, table_name):
     """
     Load a specific table from an SQLite database into a pandas DataFrame.
@@ -102,99 +103,191 @@ def create_db_table(db_path, table_name, df, if_exists='fail'):
         raise ConciveError(f"Failed to create or write to the table '{table_name}': {e}")
     finally:
         conn.close()
+def load_META(Structure, db_path):
+    """
+    Load the META table from the  database and update the structures dropdown
+    in the Excel workbook.
+
+    Args:
+        Structure (str): Name of the structure to load (MP, TP,...)
+        db_path (str): Path to the MP SQLite database.
+
+    Returns:
+        None
+    """
+    logger = ex.setup_logger()
+    sheet_name_structure_loading = "BuildYourStructure"
+
+    META = load_db_table(db_path, "META")
+    ex.set_dropdown_values(
+        "GeometrieConverter.xlsm",
+        sheet_name_structure_loading,
+        f"Dropdown_{Structure}_Structures",
+        list(META.loc[:, "table_name"].values)
+    )
+    return
+
+
+def load_DATA(Structure, Structure_name, db_path):
+    """
+    Load metadata and structure-specific data from the database
+    and write them to the Excel workbook.
+
+    Args:
+        Stucture (str): Name of the structure to load (MP, TP,...)
+        Structure_name (str): Name of the structure (table) to load.
+        db_path (str): Path to the MP SQLite database.
+
+    Returns:
+        None
+    """
+    logger = ex.setup_logger()
+    sheet_name_structure_loading = "BuildYourStructure"
+
+    META = load_db_table(db_path, "META")
+    DATA = load_db_table(db_path, Structure_name)
+
+    META_relevant = META.loc[META["table_name"] == Structure_name]
+
+    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_META_TRUE", META_relevant)
+    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_META", META_relevant)
+    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_DATA_TRUE", DATA)
+    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_DATA", DATA)
+
 
 def save_data(Structure, db_path, selected_structure):
+    """
+    Saves data from an Excel sheet and updates a database based on changes in structure metadata and data.
 
-    logger = ex.setup_logger()
+    This function loads the full metadata and data for a given structure, compares the current data with the existing data in the
+    database, and handles the saving of new data or updating existing entries in the database. The function follows a series of checks
+    to validate data, handle new entries, overwrite existing entries, and ensure data integrity.
+
+    The function performs the following:
+    1. Validates and processes the current data and metadata.
+    2. Checks if new metadata is fully populated and whether it represents a new structure or an update.
+    3. Saves the data to a new database table if the structure is new, or overwrites the existing structure if the metadata has changed.
+    4. Displays message boxes to inform the user of the progress, errors, or status of the operation.
+
+    Parameters:
+    -----------
+    Structure : str
+        The name of the structure whose data and metadata need to be saved or updated.
+    db_path : str
+        The path to the database where the data and metadata will be saved.
+    selected_structure : str
+        The name of the structure that is selected for saving or updating.
+
+    Returns:
+    --------
+    bool
+        A boolean indicating whether the data was successfully saved or updated.
+    str
+        The name of the structure after the operation (could be a new name or the same).
+    """
 
     META_FULL = load_db_table(db_path, "META")
-
     META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META")
     META_CURR_NEW = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META_NEW")
     META_DB = META_FULL.loc[META_FULL["table_name"] == selected_structure]
-
     DATA_DB = load_db_table(db_path, selected_structure)
     DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA")
 
     META_DB = META_DB.drop(columns=["index"])
     META_CURR = META_CURR.drop(columns=["index"])
-    DATA_DB = DATA_DB.astype(float)
-    DATA_CURR = DATA_CURR.astype(float)
-
-    # changetracks
-    data_changed = not(DATA_DB.equals(DATA_CURR))
-    meta_loaded_changed = not (META_DB.values == META_CURR.values).all()
+    META_FULL = META_FULL.drop(columns=["index"])
+    META_CURR_NEW = META_CURR_NEW.drop(columns=["index"])
 
 
-    meta_new_populated = (META_CURR_NEW.values != None).any()
+    def saving_logic(META_FULL, META_DB, META_CURR, META_CURR_NEW, DATA_DB, DATA_CURR):
 
-    # create new database table
+        def valid_data(data):
+            if pd.isna(data.values).any():
+                return False, data
+            try:
+                return True, data.astype(float)
+            except (ValueError, TypeError):
+                return False, data
 
-    # check, if there are values in meta_new first
-    if meta_new_populated:
-        # check if meta data is complete
-        if ~((META_CURR_NEW.values != None).all()):
-            ex.show_message_box("GeometrieConverter.xlsm", "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded Structure")
-            return False
-        # check if data has changed
-        if ~data_changed:
-            ex.show_message_box("GeometrieConverter.xlsm", "The provided data is the same as the data in the current Structure. Aborting.")
-            return False
-        # check if table name already exists
-        new_table_name = META_CURR_NEW["table_name"].values[0]
-        if new_table_name in META_DB["table_name"].values:
-            ex.show_message_box("GeometrieConverter.xlsm", "The provided table_name of the new structure is already in in the database, please pride a unique name")
-            return False
+        succes_1, DATA_DB = valid_data(DATA_DB)
+        succes_2, DATA_CURR = valid_data(DATA_CURR)
 
-        # creating new table
-        create_db_table(db_path, new_table_name, DATA_CURR)
+        if not succes_2:
+            _ = ex.show_message_box("GeometrieConverter.xlsm",
+                                    "Invalid data found in Structure data! Aborting.")
 
-        # adding meta info
-        META_FULL = pd.concat([META_FULL, META_CURR_NEW])
-        create_db_table(db_path, "META", META_FULL, if_exists='replace')
+            return False, _
 
-        ex.show_message_box("GeometrieConverter.xlsm", f"Data saved in new Database entry {new_table_name}")
+        data_changed = not (DATA_DB.equals(DATA_CURR))
+        meta_loaded_changed = not (META_DB.values == META_CURR.values).all()
+        meta_new_populated = (META_CURR_NEW.values != None).any()
 
-        return True
+        if meta_new_populated:
+            if not((META_CURR_NEW.values != None).all()):
+                _ = ex.show_message_box("GeometrieConverter.xlsm", "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded Structure")
+                return False, _
+            if not data_changed:
+                _ = ex.show_message_box("GeometrieConverter.xlsm", "The provided data is the same as the data in the current Structure. Aborting.")
+                return False, _
 
-    if meta_loaded_changed:
-        curr_table_name = META_CURR["table_name"].values[0]
+            new_table_name = META_CURR_NEW["table_name"].values[0]
+            if new_table_name in META_FULL["table_name"].values:
+                _ = ex.show_message_box("GeometrieConverter.xlsm", "The provided table_name of the new structure is already in the database, please provide a unique name")
+                return False, _
 
-        # check if meta data is complete
-        if ~((META_CURR.values != None).all()):
-            ex.show_message_box("GeometrieConverter.xlsm", "Please fully populate the Current Meta table to modify the DB entry.")
-            return False
+            create_db_table(db_path, new_table_name, DATA_CURR)
+            META_FULL = pd.concat([META_FULL, META_CURR_NEW])
+            META_FULL.insert(0, 'index', META_FULL.index.values)
+            create_db_table(db_path, "META", META_FULL, if_exists='replace')
 
-        # check if new table name is valid
-        if META_DB["table_name"].value_counts().get(curr_table_name, 0) > 1:
-            ex.show_message_box("GeometrieConverter.xlsm", f"{curr_table_name} is already taken in database, please choose a different name.")
-            return False
+            _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data saved in new Database entry {new_table_name}")
+            structure_load_after = new_table_name
+            return True, structure_load_after
 
-        # replace row in META table in db
-        META_DB.loc[META_DB["table_name"] == selected_structure] = META_CURR.iloc[0]
+        if meta_loaded_changed:
+            curr_table_name = META_CURR["table_name"].values[0]
+            if not((META_CURR.values != None).all()):
+                _ = ex.show_message_box("GeometrieConverter.xlsm", "Please fully populate the Current Meta table to modify the DB entry.")
+                return False, _
 
-        # write new table to database
-        drop_db_table(db_path, selected_structure)
-        create_db_table(db_path, curr_table_name, DATA_CURR)
+            if META_DB["table_name"].value_counts().get(curr_table_name, 0) > 1:
+                _ = ex.show_message_box("GeometrieConverter.xlsm", f"{curr_table_name} is already taken in database, please choose a different name.")
+                return False, _
 
-        ex.show_message_box("GeometrieConverter", f"Data in {selected_structure} overwriten, now named {curr_table_name}")
+            META_FULL.loc[META_FULL["table_name"] == selected_structure, :] = META_CURR.iloc[0].values
+            drop_db_table(db_path, selected_structure)
+            create_db_table(db_path, curr_table_name, DATA_CURR)
 
-        return True
+            META_FULL.insert(0, 'index', META_FULL.index.values)
+            create_db_table(db_path, "META", META_FULL, if_exists='replace')
 
-    if data_changed:
+            _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data in {selected_structure} overwriten, now named {curr_table_name}")
+            structure_load_after = META_CURR.iloc[0].values
+            return True, structure_load_after
 
-        if any(pd.isna(DATA_CURR.values)):
-            ex.show_message_box("GeometrieConverter.xlsm", f"Modified data contains invalid values, please correct")
-            return False
+        if data_changed:
+            if pd.isna(DATA_CURR.values).any():
+                _ = ex.show_message_box("GeometrieConverter.xlsm", f"Modified data contains invalid values, please correct")
+                return False, _
 
-        drop_db_table(db_path, selected_structure)
-        create_db_table(db_path, selected_structure, DATA_CURR)
+            drop_db_table(db_path, selected_structure)
+            create_db_table(db_path, selected_structure, DATA_CURR, if_exists='replace')
 
-        return True
+            _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data in current Structure saved to the database.")
 
-    ex.show_message_box("GeometrieConverter.xlsm", f"No changes detected.")
-    return False
+            structure_load_after = selected_structure
+            return True, structure_load_after
 
+        _ = ex.show_message_box("GeometrieConverter.xlsm", f"No changes detected.")
+        return False, _
+
+    saved, structure_load_after = saving_logic(META_FULL, META_DB, META_CURR, META_CURR_NEW, DATA_DB, DATA_CURR)
+
+    if saved:
+        load_META(Structure, db_path)
+        load_DATA(Structure, structure_load_after, db_path)
+
+# do that
 def save_MP_data(db_path, selected_structure):
 
     save_data("MP", db_path, selected_structure)

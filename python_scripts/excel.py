@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 import pandas as pd
 import numpy as np
+
 def setup_logger():
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
@@ -46,6 +47,9 @@ def set_dropdown_values(workbook_name, sheet_name, dropdown_name, items):
     Returns:
         True if successful, False otherwise.
     """
+
+    logger = setup_logger()
+
     try:
         for app in xw.apps:
             for wb in app.books:
@@ -54,6 +58,8 @@ def set_dropdown_values(workbook_name, sheet_name, dropdown_name, items):
                         sheet = wb.sheets[sheet_name]
                         dropdown = sheet.api.Shapes(dropdown_name).ControlFormat
                         dropdown.RemoveAllItems()
+                        logger.debug(dropdown)
+                        logger.debug(items)
                         for item in items:
                             dropdown.AddItem(item)
                         return True
@@ -165,59 +171,94 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     table.Resize(new_range.api)
 
 
-def show_message_box(workbook_name, message):
+import xlwings as xw
+
+def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation", default="vbDefaultButton1", title="Message"):
     """
-    Displays a message box in the specified Excel workbook and returns a boolean value
-    based on the user's choice (Yes or No).
+    Shows a message box in Excel with customizable buttons, icons, and default button.
 
     Args:
-        workbook_name (str): The name of the workbook (with .xlsm extension) that is already open.
-        message (str): The message to display in the message box.
+        workbook_name (str): The name of the open Excel workbook (e.g., "Book1.xlsm").
+        message (str): The message to show in the message box.
+        buttons (str): VBA button constant (e.g., "vbYesNo", "vbOKCancel", etc.).
+        icon (str): VBA icon constant (e.g., "vbExclamation", "vbInformation", "vbCritical").
+        default (str): VBA default button constant (e.g., "vbDefaultButton2").
+        title (str): Title of the message box.
 
     Returns:
-        bool: True if the user clicks 'Yes', False if the user clicks 'No'.
-              Returns None if the workbook is not open or if an error occurs.
-
-    Raises:
-        KeyError: If the specified workbook is not found among the open workbooks.
-        AttributeError: If no active Excel instance is found.
+        str: The caption of the clicked button (e.g., "Yes", "No", "Cancel"), or None on failure.
     """
+    # VBA constant mappings
+    VBA_BUTTONS = {
+        "vbOK": 0,
+        "vbOKCancel": 1,
+        "vbAbortRetryIgnore": 2,
+        "vbYesNoCancel": 3,
+        "vbYesNo": 4,
+        "vbRetryCancel": 5
+    }
 
-    # Attempt to connect to an existing Excel instance
-    try:
-        app = xw.apps.active  # Use the active Excel application instance
-    except AttributeError:
-        print("No active Excel instance found.")
-        return None
+    VBA_ICONS = {
+        "vbCritical": 16,
+        "vbQuestion": 32,
+        "vbExclamation": 48,
+        "vbInformation": 64
+    }
 
-    # Try to find the workbook by name
+    VBA_DEFAULTS = {
+        "vbDefaultButton1": 0,
+        "vbDefaultButton2": 256,
+        "vbDefaultButton3": 512,
+        "vbDefaultButton4": 768
+    }
+
+    # Map return values to button captions
+    response_map = {
+        1: "OK",
+        2: "Cancel",
+        3: "Abort",
+        4: "Retry",
+        5: "Ignore",
+        6: "Yes",
+        7: "No"
+    }
+
     try:
+        app = xw.apps.active
         wb = app.books[workbook_name]
-    except KeyError:
-        print(f"Workbook '{workbook_name}' is not open.")
+    except Exception as e:
+        print(f"Error: {e}")
         return None
 
-    # Define the VBA code for the message box
+    # Combine VBA numeric values
+    msgbox_flags = VBA_BUTTONS.get(buttons, 0) + VBA_ICONS.get(icon, 0) + VBA_DEFAULTS.get(default, 0)
+
+    # Escape double quotes in message
+    message_escaped = message.replace('"', '""')
+
+    # Prepare VBA code
     vba_code = f"""
-    Function ShowMsgBox() As Boolean
-        Dim answer As Integer
-        answer = MsgBox("{message}", vbYesNo + vbQuestion, "Choice Box")
-        If answer = vbYes Then
-            ShowMsgBox = True
-        Else
-            ShowMsgBox = False
-        End If
+    Function ShowMessageBox() As Integer
+        ShowMessageBox = MsgBox("{message_escaped}", {msgbox_flags}, "{title}")
     End Function
     """
 
-    # Access the VBA project and add the code
-    vb_module = wb.api.VBProject.VBComponents.Add(1)  # Add a new module
-    vb_module.CodeModule.AddFromString(vba_code)  # Add the VBA code to the module
+    # Inject or reuse a VBA module
+    module_name = "MsgBoxTemp"
+    vbproj = wb.api.VBProject
+    try:
+        vb_module = vbproj.VBComponents(module_name)
+    except Exception:
+        vb_module = vbproj.VBComponents.Add(1)
+        vb_module.Name = module_name
 
-    # Run the VBA function and capture the return value
-    result = wb.macro('ShowMsgBox')()
+    code_module = vb_module.CodeModule
+    code_module.DeleteLines(1, code_module.CountOfLines)
+    code_module.AddFromString(vba_code)
 
-    return result
+    # Call the macro and return user response
+    result = wb.macro("ShowMessageBox")()
+    return response_map.get(result, f"Unknown ({result})")
 
 def read_excel_table(workbook_name, sheet_name, table_name):
     """
@@ -243,6 +284,22 @@ def read_excel_table(workbook_name, sheet_name, table_name):
     df.columns = [h.strip() for h in table.header_row_range.value]
 
     return df
+def clear_excel_table_contents(workbook_name, sheet_name, table_name):
+    """
+    Clears the contents (body only) of an Excel Table without deleting the header or table structure.
+
+    Parameters:
+        workbook_name (str): The name of the workbook.
+        sheet_name (str): The name of the sheet containing the table.
+        table_name (str): The name of the Excel Table (not the range name).
+    """
+    wb = xw.Book(workbook_name)
+    sheet = wb.sheets[sheet_name]
+    table = sheet.tables[table_name]
+
+    # Clear the contents of the data body range only (not headers or total rows)
+    if table.data_body_range:
+        table.data_body_range.clear_contents()
 
 def add_unique_row(df1, df2, exclude_columns=None):
     """
