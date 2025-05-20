@@ -271,7 +271,7 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
 
     return response_map.get(result, f"Unknown ({result})")
 
-def read_excel_table(workbook_name, sheet_name, table_name):
+def read_excel_table(workbook_name, sheet_name, table_name, dtype=None):
     """
     Read an Excel Table into a Pandas DataFrame, using the Table's header as column names.
 
@@ -293,7 +293,9 @@ def read_excel_table(workbook_name, sheet_name, table_name):
 
     # Set the correct headers from the table's header row
     df.columns = [h.strip() for h in table.header_row_range.value]
-
+    # Apply dtype if specified
+    if dtype is not None:
+        df = df.astype(dtype)
     return df
 
 
@@ -384,3 +386,8 @@ def add_unique_row(df1, df2, exclude_columns=None):
         matching_indices = []
 
     return df2, matching_indices
+
+
+def call_vba_dropdown_macro(workbook_name: str, sheet_name: str, dropdown_name: str, new_value: str):
+    wb = xw.Book(workbook_name)  # Adjust path or use xw.Book.caller()
+    wb.macro('set_dropdown_value')(sheet_name, dropdown_name, new_value)

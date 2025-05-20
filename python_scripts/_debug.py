@@ -1,19 +1,7 @@
+import xlwings
 import pandas as pd
-
-import excel as ex
-
-sheet_name_structure_loading = "BuildYourStructure"
 import sqlite3
-
-#
-excel_path = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm"
-workbook_name = "GeometrieConverter.xlsm"
-sheet_name = "BuildYourStructure"
-Identifier = "MP_DATA"
-message = "Duh?"
-db_path = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/databases/MP.db"
-selected_structure = "24A535_FEED_DP-A1_L0_G0_S0"
-Structure = "MP"
+import excel as ex
 
 
 class ConciveError(Exception):
@@ -21,7 +9,10 @@ class ConciveError(Exception):
     Custom exception for errors related to database operations
     in the context of structure data handling.
     """
+
     pass
+
+log = ex.setup_logger()
 
 
 def drop_db_table(db_path, Identifier):
@@ -51,7 +42,7 @@ def drop_db_table(db_path, Identifier):
         conn.close()
 
 
-def load_db_table(db_path, Identifier):
+def load_db_table(db_path, Identifier, dtype=None):
     """
     Load a specific table from an SQLite database into a pandas DataFrame.
 
@@ -74,14 +65,18 @@ def load_db_table(db_path, Identifier):
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     table_names = [table[0] for table in cursor.fetchall()]
 
-    # if Identifier not in table_names:
-    #     raise ConciveError(f"Table '{Identifier}' does not exist in the database.")
+    if Identifier not in table_names:
+        raise ConciveError(f"Table '{Identifier}' does not exist in the database.")
 
     query = f'SELECT * FROM "{Identifier}"'
     df = pd.read_sql_query(query, conn)
     conn.close()
 
-    df.drop(columns=['index'], inplace=True)
+    if "index" in list(df.columns):
+        df.drop(columns=['index'], inplace=True)
+
+    if dtype is not None:
+        df = df.astype(dtype)
 
     return df
 
@@ -113,6 +108,89 @@ def create_db_table(db_path, Identifier, df, if_exists='fail'):
         conn.close()
 
 
+def add_db_element(db_path, Structure_data, added_masses_data, Meta_infos):
+
+    log.debug(Meta_infos.to_string())
+    META = load_db_table(db_path, "META")
+
+    Identifier = Meta_infos["Identifier"].values[0]
+    if Identifier in META["Identifier"].values:
+        _ = ex.show_message_box("GeometrieConverter.xlsm", "The provided Identifier of the new structure is already in the database, please provide a unique name")
+        return False
+
+    create_db_table(db_path, Identifier, Structure_data, if_exists='fail')
+    create_db_table(db_path, f"{Identifier}__ADDED_MASSES", added_masses_data, if_exists='fail')
+
+    META = pd.concat([META, Meta_infos], axis=0)
+    create_db_table(db_path, "META", META, if_exists='replace')
+
+    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data saved in new Database entry {Identifier}")
+
+    return True
+
+def delete_db_element(db_path, Identifier):
+    META = load_db_table(db_path, "META")
+
+    META.drop(META[META["Identifier"] == Identifier].index, inplace=True)
+
+    drop_db_table(db_path, Identifier)
+    drop_db_table(db_path, Identifier+"__ADDED_MASSES")
+
+    create_db_table(db_path, "META", META, if_exists='replace')
+    return
+
+
+def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, replace_id):
+
+    META = load_db_table(db_path, "META")
+    new_id = Meta_infos["Identifier"].values[0]
+
+    # replace data in meta
+    META.loc[META["Identifier"] == replace_id, :] = Meta_infos.iloc[0].values
+    # ex.show_message_box("GeometrieConverter.xlsm", "counts_replaceID"+str(META["Identifier"].value_counts().get(replace_id, 0)))
+    # ex.show_message_box("GeometrieConverter.xlsm", "replace id"+str(replace_id))
+    # ex.show_message_box("GeometrieConverter.xlsm", "META NEw Value"+str(Meta_infos.iloc[0].values[0]))
+    # ex.show_message_box("GeometrieConverter.xlsm", "counts_NEw Value"+str(META["Identifier"].value_counts().get(Meta_infos.iloc[0].values, 0)))
+
+
+    if META["Identifier"].value_counts().get(Meta_infos.iloc[0].values[0], 0) > 1:
+        _ = ex.show_message_box("GeometrieConverter.xlsm", f"{replace_id} is already taken in database, please choose a different name.")
+        return False
+
+    drop_db_table(db_path, replace_id)
+    drop_db_table(db_path, f"{replace_id}__ADDED_MASSES")
+
+    sucess = write_db_element_data(db_path, new_id, Structure_data, added_masses_data)
+
+    if not sucess:
+        return False
+
+    create_db_table(db_path, "META", META, if_exists="replace")
+
+    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data in {replace_id} overwriten (now named {new_id})")
+
+    return True
+
+
+def write_db_element_data(db_path, change_id, Structure_data, added_masses_data):
+    if pd.isna(Structure_data.values).any():
+        _ = ex.show_message_box("GeometrieConverter.xlsm", f"Structure data contains invalid values, please correct")
+        return False
+
+    # if pd.isna(added_masses_data.values).any():
+    #     _ = ex.show_message_box("GeometrieConverter.xlsm", f"Added Masses data contains invalid values, please correct")
+    #     return False
+
+    create_db_table(db_path, change_id, Structure_data, if_exists="replace")
+    create_db_table(db_path, change_id+"__ADDED_MASSES", added_masses_data, if_exists="replace")
+
+    return True
+
+def check_db_integrity():
+
+    return
+
+
 def load_META(Structure, db_path):
     """
     Load the META table from the  database and update the structures dropdown
@@ -135,6 +213,7 @@ def load_META(Structure, db_path):
         f"Dropdown_{Structure}_Structures",
         list(META.loc[:, "Identifier"].values)
     )
+    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_META_FULL", META)
     return
 
 
@@ -200,14 +279,16 @@ def save_data(Structure, db_path, selected_structure):
     """
 
     META_FULL = load_db_table(db_path, "META")
-    META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META")
-    META_CURR_NEW = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META_NEW")
+    META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META", dtype=str)
+    META_CURR_NEW = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META_NEW", dtype=str)
+
     META_DB = META_FULL.loc[META_FULL["Identifier"] == selected_structure]
 
-    DATA_DB = load_db_table(db_path, selected_structure)
-    DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA")
+    DATA_DB = load_db_table(db_path, selected_structure, dtype=float)
+    DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA", dtype=float)
 
     #DATA_DB = load_db_table(db_path, selected_structure)
+    MASSES_DB = load_db_table(db_path, selected_structure+"__ADDED_MASSES")
     MASSES_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES")
 
     def saving_logic(META_FULL, META_DB, META_CURR, META_CURR_NEW, DATA_DB, DATA_CURR):
@@ -227,12 +308,13 @@ def save_data(Structure, db_path, selected_structure):
                                     "Invalid data found in Structure data! Aborting.")
             return False, _
 
-        data_changed = not (DATA_DB.equals(DATA_CURR))
-        meta_loaded_changed = not (META_DB.values == META_CURR.values).all()
-        meta_new_populated = (META_CURR_NEW.values != None).any()
+        data_changed = not (DATA_DB.equals(DATA_CURR)) or not(MASSES_DB.equals(MASSES_CURR))
+        meta_loaded_changed = not (META_DB.values[0][0:-2] == META_CURR.values[0][0:-2]).all()
+        meta_new_populated = (META_CURR_NEW.values[0][0:-2] != 'None').any()
+
 
         if meta_new_populated:
-            if not ((META_CURR_NEW.values != None).all()):
+            if not ((META_CURR_NEW.values[0][0:-1] != None).all()):
                 _ = ex.show_message_box("GeometrieConverter.xlsm",
                                         "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded Structure")
                 return False, _
@@ -240,19 +322,19 @@ def save_data(Structure, db_path, selected_structure):
             sucess = add_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW)
 
             if sucess:
-                return True, META_CURR_NEW["identifier"]
+                return True, META_CURR_NEW["Identifier"]
             else:
                 return False, None
 
         if meta_loaded_changed:
-            if not ((META_CURR.values != None).all()):
+            if not ((META_CURR.values[0][0:-1] != None).all()):
                 _ = ex.show_message_box("GeometrieConverter.xlsm", "Please fully populate the Current Meta table to modify the DB entry.")
                 return False, _
 
             sucess = replace_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR, selected_structure)
 
             if sucess:
-                return True, META_CURR["identifier"].values[0]
+                return True, META_CURR["Identifier"].values[0]
             else:
                 return False, None
 
@@ -260,7 +342,7 @@ def save_data(Structure, db_path, selected_structure):
             sucess = write_db_element_data(db_path, selected_structure, DATA_CURR, MASSES_CURR)
 
             if sucess:
-                return True, META_CURR["identifier"].values[0]
+                return True, META_CURR["Identifier"].values[0]
             else:
                 return False, None
 
@@ -270,81 +352,62 @@ def save_data(Structure, db_path, selected_structure):
     saved, structure_load_after = saving_logic(META_FULL, META_DB, META_CURR, META_CURR_NEW, DATA_DB, DATA_CURR)
 
     if saved:
+
         load_META(Structure, db_path)
-        load_DATA(Structure, structure_load_after, db_path)
+
+  #      load_DATA(Structure, structure_load_after, db_path)
 
 
-# do that
+def delete_data(Structure, db_path, selected_structure):
+    answer = ex.show_message_box("GeometrieConverter.xlsm", f"Are you sure you want to delete the structure {selected_structure} from the database?", icon="vbYesNo",
+                                 buttons="vbYesNo")
+    logger = ex.setup_logger()
+    logger.debug(answer)
+    if answer == "Yes":
+        delete_db_element(db_path, selected_structure)
 
-# %% Database element handling
+        load_META(Structure, db_path)
 
-def add_db_element(db_path, Structure_data, added_masses_data, Meta_infos):
-
-    META = load_db_table(db_path, "META")
-
-    if Identifier in META["Identifier"].values:
-        _ = ex.show_message_box("GeometrieConverter.xlsm", "The provided Identifier of the new structure is already in the database, please provide a unique name")
-        return False
-
-    create_db_table(db_path, Identifier, Structure_data, if_exists='fail')
-    create_db_table(db_path, f"{Identifier}__ADDED_MASSES", added_masses_data, if_exists='fail')
-
-    META = pd.concat([META, Meta_infos], axis=1)
-    create_db_table(db_path, "META", META, if_exists='replace')
-
-    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data saved in new Database entry {Identifier}")
-
-    return True
-
-def delete_db_element():
+        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META_NEW")
+        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META_TRUE")
+        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META")
+        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA_TRUE")
+        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA")
+        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES_TRUE")
+        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES")
 
     return
 
-def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, replace_id):
 
-    META = load_db_table(db_path, "META")
-    new_id = Meta_infos["Identifier"].values[0]
+# %% MP
+def load_MP_META(db_path):
+    """
+    Load the META table from the MP database and update the MP structures dropdown
+    in the Excel workbook.
 
-    # replace data in meta
-    META.loc[META["Identifier"] == replace_id, :] = Meta_infos.iloc[0].values
+    Args:
+        db_path (str): Path to the MP SQLite database.
 
-    if META["Identifier"].value_counts().get(replace_id, 0) > 1:
-        _ = ex.show_message_box("GeometrieConverter.xlsm", f"{replace_id} is already taken in database, please choose a different name.")
-        return False
-
-    drop_db_table(db_path, replace_id)
-    drop_db_table(db_path, f"{replace_id}__ADDED_MASSES")
-
-    sucess = write_db_element_data(db_path, new_id, Structure_data, added_masses_data)
-
-    if not sucess:
-        return False
-
-    create_db_table(db_path, "META", META, if_exists="replace")
-
-    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data in {replace_id} overwriten (now named {new_id})")
-
-    return True
+    Returns:
+        None
+    """
+    load_META("MP", db_path)
 
 
-def write_db_element_data(db_path, change_id, Structure_data, added_masses_data):
-    if pd.isna(Structure_data.values).any():
-        _ = ex.show_message_box("GeometrieConverter.xlsm", f"Structure data contains invalid values, please correct")
-        return False
+def load_MP_DATA(Structure_name, db_path):
+    """
+    Load metadata and structure-specific data from the MP database
+    and write them to the Excel workbook.
 
-    if pd.isna(added_masses_data.values).any():
-        _ = ex.show_message_box("GeometrieConverter.xlsm", f"Added Masses data contains invalid values, please correct")
-        return False
+    Args:
+        Structure_name (str): Name of the structure (table) to load.
+        db_path (str): Path to the MP SQLite database.
 
-    create_db_table(db_path, change_id, Structure_data, if_exists="replace")
-    create_db_table(db_path, change_id+"__ADDED_MASSES", added_masses_data, if_exists="replace")
+    Returns:
+        None
+    """
 
-    return True
-
-def check_db_integrity():
-
-    return
-
+    load_DATA("MP", Structure_name, db_path)
 
 
 def save_MP_data(db_path, selected_structure):
@@ -353,4 +416,98 @@ def save_MP_data(db_path, selected_structure):
     return
 
 
-save_MP_data(db_path, selected_structure)
+def delete_MP_data(db_path, selected_structure):
+    delete_data("MP", db_path, selected_structure)
+
+    return
+
+
+# %% TP
+def load_TP_META(db_path):
+    """
+    Load the META table from the MP database and update the MP structures dropdown
+    in the Excel workbook.
+
+    Args:
+        db_path (str): Path to the TP SQLite database.
+
+    Returns:
+        None
+    """
+    load_META("TP", db_path)
+
+
+def load_TP_DATA(Structure_name, db_path):
+    """
+    Load metadata and structure-specific data from the TP database
+    and write them to the Excel workbook.
+
+    Args:
+        Structure_name (str): Name of the structure (table) to load.
+        db_path (str): Path to the TP SQLite database.
+
+    Returns:
+        None
+    """
+
+    load_DATA("TP", Structure_name, db_path)
+
+
+def save_TP_data(db_path, selected_structure):
+    save_data("TP", db_path, selected_structure)
+
+    return
+
+
+def delete_TP_data(db_path, selected_structure):
+    delete_data("TP", db_path, selected_structure)
+
+    return
+
+
+# %% TOWER
+def load_TOWER_META(db_path):
+    """
+    Load the META table from the MP database and update the MP structures dropdown
+    in the Excel workbook.
+
+    Args:
+        db_path (str): Path to the TOWER SQLite database.
+
+    Returns:
+        None
+    """
+    load_META("TOWER", db_path)
+
+
+def load_TOWER_DATA(Structure_name, db_path):
+    """
+    Load metadata and structure-specific data from the TOWER database
+    and write them to the Excel workbook.
+
+    Args:
+        Structure_name (str): Name of the structure (table) to load.
+        db_path (str): Path to the TOWER SQLite database.
+
+    Returns:
+        None
+    """
+
+    load_DATA("TOWER", Structure_name, db_path)
+
+
+def save_TOWER_data(db_path, selected_structure):
+    save_data("TOWER", db_path, selected_structure)
+
+    return
+
+
+def delete_TOWER_data(db_path, selected_structure):
+    delete_data("TOWER", db_path, selected_structure)
+
+    return
+
+
+
+selected_structure = "24A535_FEED_DP-A1_L0_G0_S0"
+save_MP_data("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/databases/MP.db",selected_structure)

@@ -42,13 +42,14 @@ def drop_db_table(db_path, Identifier):
         conn.close()
 
 
-def load_db_table(db_path, Identifier):
+def load_db_table(db_path, Identifier, dtype=None):
     """
     Load a specific table from an SQLite database into a pandas DataFrame.
 
     Args:
         db_path (str): Path to the SQLite database file.
         Identifier (str): Name of the table to load.
+        dtype (dict): Optional dictionary specifying column data types.
 
     Returns:
         pd.DataFrame: The table content as a pandas DataFrame.
@@ -56,27 +57,47 @@ def load_db_table(db_path, Identifier):
     Raises:
         ConciveError: If database connection fails or table does not exist.
     """
+    if not isinstance(Identifier, str):
+        raise ConciveError(f"Identifier must be a string, got {type(Identifier)}.")
+
     try:
         conn = sqlite3.connect(db_path)
     except sqlite3.Error as e:
         raise ConciveError(f"Failed to connect to the database: {e}")
 
-    cursor = conn.cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    table_names = [table[0] for table in cursor.fetchall()]
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        table_names = [table[0] for table in cursor.fetchall()]
+    except sqlite3.Error as e:
+        conn.close()
+        raise ConciveError(f"Failed to retrieve table names: {e}")
 
     if Identifier not in table_names:
-        raise ConciveError(f"Table '{Identifier}' does not exist in the database.")
+        conn.close()
+        raise ConciveError(f"Table '{Identifier}' does not exist in the database. Available tables: {table_names}")
 
-    query = f'SELECT * FROM "{Identifier}"'
-    df = pd.read_sql_query(query, conn)
-    conn.close()
+    try:
+        query = f'SELECT * FROM "{Identifier}"'
+        df = pd.read_sql_query(query, conn)
+    except Exception as e:
+        conn.close()
+        raise ConciveError(f"Failed to load table '{Identifier}': {e}")
+    finally:
+        conn.close()
 
-    if "index" in list(df.columns):
-        df.drop(columns=['index'], inplace=True)
+    # Optional: Remove 'index' column if it exists
+    if 'index' in df.columns:
+        df = df.drop(columns=['index'])
+
+    # Optional: Apply dtype conversion
+    if dtype is not None:
+        try:
+            df = df.astype(dtype)
+        except Exception as e:
+            raise ConciveError(f"Failed to apply data types {dtype}: {e}")
 
     return df
-
 
 def create_db_table(db_path, Identifier, df, if_exists='fail'):
     """
@@ -137,20 +158,19 @@ def delete_db_element(db_path, Identifier):
     return
 
 
-def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, replace_id):
+def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, old_id):
 
     META = load_db_table(db_path, "META")
     new_id = Meta_infos["Identifier"].values[0]
 
     # replace data in meta
-    META.loc[META["Identifier"] == replace_id, :] = Meta_infos.iloc[0].values
+    META.loc[META["Identifier"] == old_id, :] = Meta_infos.iloc[0].values
 
-    if META["Identifier"].value_counts().get(replace_id, 0) > 1:
-        _ = ex.show_message_box("GeometrieConverter.xlsm", f"{replace_id} is already taken in database, please choose a different name.")
+    if META["Identifier"].value_counts().get(Meta_infos.iloc[0].values[0], 0) > 1:
+        _ = ex.show_message_box("GeometrieConverter.xlsm", f"{new_id} is already taken in database, please choose a different name.")
         return False
 
-    drop_db_table(db_path, replace_id)
-    drop_db_table(db_path, f"{replace_id}__ADDED_MASSES")
+    drop_db_table(db_path, old_id)
 
     sucess = write_db_element_data(db_path, new_id, Structure_data, added_masses_data)
 
@@ -238,6 +258,8 @@ def load_DATA(Structure, Structure_name, db_path):
     ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_MASSES_TRUE", MASSES)
     ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_MASSES", MASSES)
 
+    ex.clear_excel_table_contents("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_META_NEW")
+    ex.call_vba_dropdown_macro("GeometrieConverter.xlsm", sheet_name_structure_loading, f"Dropdown_{Structure}_Structures", Structure_name)
 
 def save_data(Structure, db_path, selected_structure):
     """
@@ -271,12 +293,13 @@ def save_data(Structure, db_path, selected_structure):
     """
 
     META_FULL = load_db_table(db_path, "META")
-    META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META")
-    META_CURR_NEW = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META_NEW")
+    META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META", dtype=str)
+    META_CURR_NEW = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META_NEW", dtype=str)
+
     META_DB = META_FULL.loc[META_FULL["Identifier"] == selected_structure]
 
-    DATA_DB = load_db_table(db_path, selected_structure)
-    DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA")
+    DATA_DB = load_db_table(db_path, selected_structure, dtype=float)
+    DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA", dtype=float)
 
     #DATA_DB = load_db_table(db_path, selected_structure)
     MASSES_DB = load_db_table(db_path, selected_structure+"__ADDED_MASSES")
@@ -300,11 +323,12 @@ def save_data(Structure, db_path, selected_structure):
             return False, _
 
         data_changed = not (DATA_DB.equals(DATA_CURR)) or not(MASSES_DB.equals(MASSES_CURR))
-        meta_loaded_changed = not (META_DB.values == META_CURR.values).all()
-        meta_new_populated = (META_CURR_NEW.values[0:-1] != None).any()
+        meta_loaded_changed = not (META_DB.values[0][0:-1] == META_CURR.values[0][0:-1]).all()
+        meta_new_populated = (META_CURR_NEW.values[0][0:-2] != 'None').any()
+
 
         if meta_new_populated:
-            if not ((META_CURR_NEW.values[0:-1] != None).all()):
+            if not ((META_CURR_NEW.values[0][0:-1] != None).all()):
                 _ = ex.show_message_box("GeometrieConverter.xlsm",
                                         "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded Structure")
                 return False, _
@@ -312,12 +336,12 @@ def save_data(Structure, db_path, selected_structure):
             sucess = add_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW)
 
             if sucess:
-                return True, META_CURR_NEW["Identifier"]
+                return True, META_CURR_NEW["Identifier"].values[0]
             else:
                 return False, None
 
         if meta_loaded_changed:
-            if not ((META_CURR.values[0:-1] != None).all()):
+            if not ((META_CURR.values[0][0:-1] != None).all()):
                 _ = ex.show_message_box("GeometrieConverter.xlsm", "Please fully populate the Current Meta table to modify the DB entry.")
                 return False, _
 
@@ -345,7 +369,7 @@ def save_data(Structure, db_path, selected_structure):
 
         load_META(Structure, db_path)
 
-  #      load_DATA(Structure, structure_load_after, db_path)
+        load_DATA(Structure, structure_load_after, db_path)
 
 
 def delete_data(Structure, db_path, selected_structure):
@@ -496,3 +520,4 @@ def delete_TOWER_data(db_path, selected_structure):
     delete_data("TOWER", db_path, selected_structure)
 
     return
+
