@@ -1,0 +1,9 @@
+ID,Description,Elevation [mLAT],SCF [mm],Location,Type,Opening factor
+MP3-01-01,ATP support ring,4.60,1.10,I,n,
+MP3-01-02,ATP support stiffener (bottom),3.60,1.45,I,g,
+MP3-01-03,ATP support stiffener (rathole),4.50,1.15,I,n,
+MP9-01,Water replenishment hole,-11.88,2.00,O,o,0.852
+MP11-01,Sonar transponder cable hole,-22.75,1.56,O,o,
+MP11-02,Sonar transponder stud connector,-23.25,1.25,O,g,
+MP13-01,Water replenishment hole,-33.63,2.00,O,o,0.846
+MP14-01,IAC hole,-37.30,2.12,O,o,0.846

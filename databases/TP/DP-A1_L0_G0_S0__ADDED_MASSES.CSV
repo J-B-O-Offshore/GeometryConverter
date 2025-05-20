@@ -1,0 +1,11 @@
+ID,Description,Elevation [mLAT],SCF [mm],Location,Type,Opening factor
+TP1-01,MAP support,20.7,1.2,O,n,
+TP1-02 , Cable opening ,20.53,2.01,O,o,0.85
+TP1-03 , Access ladder support ,20.8,1.04,O,n,
+TP1-04 , Service Platform ,20.8,1.28,O,g,
+TP1-05 , Ventilation Opening ,20.1,2.01,O,o,0.85
+TP4-01, ICCP Cable opening ,11.8,2.01,O,o,0.85
+TP4-02, ICCP Cable pipe support ,11.2,1.03,O,n,
+TP4-03, ICCP Cable pipe support ,9.04,1.04,O,g,
+TP5-01,Stud Bolting Platform,6,1.25,I,g,
+TP4-04,Stud Junction Box Platform,10,1.25,I,n,

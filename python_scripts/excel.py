@@ -155,15 +155,19 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     data_body_range = table.DataBodyRange
 
     # Clear the existing table data (keep headers)
-    data_body_range.ClearContents()
+    if data_body_range is not None:
+        data_body_range.ClearContents()
+
+    # Remove the index to avoid it being written to Excel
+    df_clean = dataframe.reset_index(drop=True)
 
     # Write the new DataFrame below the headers
     start_cell = ws.range((header_range.Row + 1, header_range.Column))
-    start_cell.options(index=False, header=False).value = dataframe
+    start_cell.options(index=False, header=False).value = df_clean
 
     # Resize the table to match new data
-    last_row = header_range.Row + dataframe.shape[0]
-    last_col = header_range.Column + dataframe.shape[1] - 1
+    last_row = header_range.Row + df_clean.shape[0]
+    last_col = header_range.Column + df_clean.shape[1] - 1
     new_range = ws.range(
         (header_range.Row, header_range.Column),
         (last_row, last_col)
@@ -173,9 +177,11 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
 
 import xlwings as xw
 
+
+
 def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation", default="vbDefaultButton1", title="Message"):
     """
-    Shows a message box in Excel with customizable buttons, icons, and default button.
+    Shows a message box in Excel by injecting VBA code dynamically and calling it.
 
     Args:
         workbook_name (str): The name of the open Excel workbook (e.g., "Book1.xlsm").
@@ -188,7 +194,7 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
     Returns:
         str: The caption of the clicked button (e.g., "Yes", "No", "Cancel"), or None on failure.
     """
-    # VBA constant mappings
+
     VBA_BUTTONS = {
         "vbOK": 0,
         "vbOKCancel": 1,
@@ -212,7 +218,6 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
         "vbDefaultButton4": 768
     }
 
-    # Map return values to button captions
     response_map = {
         1: "OK",
         2: "Cancel",
@@ -223,41 +228,47 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
         7: "No"
     }
 
-    try:
-        app = xw.apps.active
-        wb = app.books[workbook_name]
-    except Exception as e:
-        print(f"Error: {e}")
-        return None
+    if not isinstance(message, str):
+        raise TypeError(f"Expected message to be a string, but got {type(message).__name__}")
 
-    # Combine VBA numeric values
+    app = xw.apps.active
+    wb = app.books[workbook_name]
+
     msgbox_flags = VBA_BUTTONS.get(buttons, 0) + VBA_ICONS.get(icon, 0) + VBA_DEFAULTS.get(default, 0)
 
     # Escape double quotes in message
     message_escaped = message.replace('"', '""')
 
-    # Prepare VBA code
     vba_code = f"""
     Function ShowMessageBox() As Integer
         ShowMessageBox = MsgBox("{message_escaped}", {msgbox_flags}, "{title}")
     End Function
     """
 
-    # Inject or reuse a VBA module
     module_name = "MsgBoxTemp"
+
     vbproj = wb.api.VBProject
+
+    # Check if module exists, otherwise add it
     try:
         vb_module = vbproj.VBComponents(module_name)
     except Exception:
-        vb_module = vbproj.VBComponents.Add(1)
+        vb_module = vbproj.VBComponents.Add(1)  # 1 = standard module
         vb_module.Name = module_name
 
     code_module = vb_module.CodeModule
-    code_module.DeleteLines(1, code_module.CountOfLines)
+
+    # Delete existing code
+    count_lines = code_module.CountOfLines
+    if count_lines > 0:
+        code_module.DeleteLines(1, count_lines)
+
+    # Add new VBA code
     code_module.AddFromString(vba_code)
 
-    # Call the macro and return user response
+    # Run the VBA function
     result = wb.macro("ShowMessageBox")()
+
     return response_map.get(result, f"Unknown ({result})")
 
 def read_excel_table(workbook_name, sheet_name, table_name):
@@ -284,6 +295,8 @@ def read_excel_table(workbook_name, sheet_name, table_name):
     df.columns = [h.strip() for h in table.header_row_range.value]
 
     return df
+
+
 def clear_excel_table_contents(workbook_name, sheet_name, table_name):
     """
     Clears the contents (body only) of an Excel Table without deleting the header or table structure.
@@ -300,6 +313,7 @@ def clear_excel_table_contents(workbook_name, sheet_name, table_name):
     # Clear the contents of the data body range only (not headers or total rows)
     if table.data_body_range:
         table.data_body_range.clear_contents()
+
 
 def add_unique_row(df1, df2, exclude_columns=None):
     """
