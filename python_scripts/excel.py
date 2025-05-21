@@ -155,7 +155,7 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     data_body_range = table.DataBodyRange
 
     # Clear the existing table data (keep headers)
-    if data_body_range is not None:
+    if data_body_range is not None and data_body_range.Rows.Count > 0:
         data_body_range.ClearContents()
 
     # Remove the index to avoid it being written to Excel
