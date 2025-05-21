@@ -179,7 +179,7 @@ def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, o
 
     create_db_table(db_path, "META", META, if_exists="replace")
 
-    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data in {replace_id} overwriten (now named {new_id})")
+    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data in {old_id} overwriten (now named {new_id})")
 
     return True
 

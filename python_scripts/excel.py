@@ -178,7 +178,6 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
 import xlwings as xw
 
 
-
 def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation", default="vbDefaultButton1", title="Message"):
     """
     Shows a message box in Excel by injecting VBA code dynamically and calling it.
