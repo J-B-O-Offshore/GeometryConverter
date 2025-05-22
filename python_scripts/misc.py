@@ -50,12 +50,13 @@ def assemble_structure(rho):
     sucess_TP, TP_DATA = check_convert_structure(TP_DATA, "TP")
     sucess_TOWER, TOWER_DATA = check_convert_structure(TOWER_DATA, "TOWER")
 
-    MP_DATA.insert(0, "type", "MP")
-    TP_DATA.insert(0, "type", "TP")
-    TOWER_DATA.insert(0, "type", "TOWER")
-
     if not all([sucess_MP, sucess_TP, sucess_TOWER]):
         return
+
+
+    MP_DATA.insert(0, "Affiliation", "MP")
+    TP_DATA.insert(0, "Affiliation", "TP")
+    TOWER_DATA.insert(0, "Affiliation", "TOWER")
 
     # Extract ranges
     range_MP = MP_DATA["Top [mLAT]"].to_list() + list([MP_DATA["Bottom [mLAT]"].values[-1]])
@@ -67,11 +68,10 @@ def assemble_structure(rho):
         return
     WHOLE_STRUCTURE = MP_DATA
 
-    # Add weight column:
-    MP_DATA["weight [t]"] = calc_weight(rho, MP_DATA["t [mm]"].values/1000, MP_DATA["Top [mLAT]"].values, MP_DATA["Bottom [mLAT]"].values, MP_DATA["D, top [m]"].values, MP_DATA["D, bottom [m]"].values)/1000
-    TP_DATA["weight [t]"] = calc_weight(rho, TP_DATA["t [mm]"].values/1000, TP_DATA["Top [mLAT]"].values, TP_DATA["Bottom [mLAT]"].values, TP_DATA["D, top [m]"].values, TP_DATA["D, bottom [m]"].values)/1000
-    TOWER_DATA["weight [t]"] = calc_weight(rho, TOWER_DATA["t [mm]"].values/1000, TOWER_DATA["Top [mLAT]"].values, TOWER_DATA["Bottom [mLAT]"].values, TOWER_DATA["D, top [m]"].values, TOWER_DATA["D, bottom [m]"].values)/1000
-
+    # Add Weight column:
+    MP_DATA["Weight [t]"] = calc_weight(rho, MP_DATA["t [mm]"].values/1000, MP_DATA["Top [mLAT]"].values, MP_DATA["Bottom [mLAT]"].values, MP_DATA["D, top [m]"].values, MP_DATA["D, bottom [m]"].values)/1000
+    TP_DATA["Weight [t]"] = calc_weight(rho, TP_DATA["t [mm]"].values/1000, TP_DATA["Top [mLAT]"].values, TP_DATA["Bottom [mLAT]"].values, TP_DATA["D, top [m]"].values, TP_DATA["D, bottom [m]"].values)/1000
+    TOWER_DATA["Weight [t]"] = calc_weight(rho, TOWER_DATA["t [mm]"].values/1000, TOWER_DATA["Top [mLAT]"].values, TOWER_DATA["Bottom [mLAT]"].values, TOWER_DATA["D, top [m]"].values, TOWER_DATA["D, bottom [m]"].values)/1000
 
     # Assemble MP TP
     if range_MP[0] > range_TP[-1]:
@@ -91,7 +91,7 @@ def assemble_structure(rho):
     else:
         ex.show_message_box("GeometrieConverter.xlsm", f"The MP and the TP are fitting together perfectly")
 
-        WHOLE_STRUCTURE = pd.concat([TP_DATA,WHOLE_STRUCTURE], axis=0)
+        WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
 
     # Add Tower
     tower_offset = WHOLE_STRUCTURE["Top [mLAT]"].values[0] - TOWER_DATA["Bottom [mLAT]"].values[-1]
@@ -105,6 +105,21 @@ def assemble_structure(rho):
     WHOLE_STRUCTURE.insert(0, "Section", WHOLE_STRUCTURE.index.values + 1)
     ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "WHOLE_STRUCTURE", WHOLE_STRUCTURE)
 
-    return
+    # ADDED MASSES
 
-assemble_structure(7000)
+    MP_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_MASSES")
+    TP_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_MASSES")
+    TOWER_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_MASSES")
+
+    TOWER_MASSES["Elevation [mLAT]"] = TOWER_MASSES["Elevation [mLAT]"] + tower_offset
+
+    MP_MASSES.insert(0, "Affiliation", "MP")
+    TP_MASSES.insert(0, "Affiliation", "TP")
+    TOWER_MASSES.insert(0, "Affiliation", "TOWER")
+
+    ALL_MASSES = pd.concat([MP_MASSES, TP_MASSES, TOWER_MASSES], axis=0)
+    ALL_MASSES.sort_values(inplace=True, ascending=False, axis=0, by=["Elevation [mLAT]"])
+
+    ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
+
+    return
