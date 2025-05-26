@@ -20,7 +20,7 @@ def check_convert_structure(df: pd.DataFrame, Structure):
         ex.show_message_box("GeometrieConverter.xlsm", "The MP Table containes invalid data (nan or non numerical)")
 
     # check, if sections are on top of each other
-    height_diff = (df["Top [mLAT]"].values[1:] - df["Bottom [mLAT]"].values[:-1]) == 0
+    height_diff = (df["Top [m]"].values[1:] - df["Bottom [m]"].values[:-1]) == 0
 
     if not all(height_diff):
         missaligned_sections = [int(df.iloc[i, 0]) for i, value in enumerate(height_diff) if not value]
@@ -58,10 +58,10 @@ def assemble_structure(rho):
 
     def interpolate_node(df, height):
 
-        if len(df.loc[(df["Top [mLAT]"] == height) | (df["Bottom [mLAT]"] == height)].index) > 0:
+        if len(df.loc[(df["Top [m]"] == height) | (df["Bottom [m]"] == height)].index) > 0:
             return df
         
-        id_inter = df.loc[(df["Top [mLAT]"] > height) & (df["Bottom [mLAT]"] < height)].index
+        id_inter = df.loc[(df["Top [m]"] > height) & (df["Bottom [m]"] < height)].index
         if len(id_inter) == 0:
             print("interpolation not possible, outside bounds")
             return None
@@ -75,16 +75,16 @@ def assemble_structure(rho):
         new_row.loc[0, "t [mm]"] = df.loc[id_inter, "t [mm]"]
 
         # height
-        new_row.loc[0, "Top [mLAT]"] = height
-        new_row.loc[0, "Bottom [mLAT]"] = df.loc[id_inter, "Bottom [mLAT]"]
+        new_row.loc[0, "Top [m]"] = height
+        new_row.loc[0, "Bottom [m]"] = df.loc[id_inter, "Bottom [m]"]
 
         # diameter
-        inter_x_rel = (height-df.loc[id_inter, "Bottom [mLAT]"])/(df.loc[id_inter, "Top [mLAT]"] - df.loc[id_inter, "Bottom [mLAT]"])
+        inter_x_rel = (height-df.loc[id_inter, "Bottom [m]"])/(df.loc[id_inter, "Top [m]"] - df.loc[id_inter, "Bottom [m]"])
         d_inter = (df.loc[id_inter, "D, top [m]"] - df.loc[id_inter, "D, bottom [m]"]) * inter_x_rel + df.loc[id_inter, "D, bottom [m]"]
         new_row.loc[0, "D, top [m]"] = d_inter
         new_row.loc[0, "D, bottom [m]"] = df.loc[id_inter, "D, bottom [m]"]
 
-        df.loc[id_inter, "Bottom [mLAT]"] = height
+        df.loc[id_inter, "Bottom [m]"] = height
 
         df = pd.concat([df.iloc[:id_inter+1], new_row, df.iloc[id_inter+1:]]).reset_index(drop=True)
 
@@ -108,8 +108,8 @@ def assemble_structure(rho):
     TOWER_DATA.insert(0, "Affiliation", "TOWER")
 
     # Extract ranges
-    range_MP = MP_DATA["Top [mLAT]"].to_list() + list([MP_DATA["Bottom [mLAT]"].values[-1]])
-    range_TP = TP_DATA["Top [mLAT]"].to_list() + list([TP_DATA["Bottom [mLAT]"].values[-1]])
+    range_MP = MP_DATA["Top [m]"].to_list() + list([MP_DATA["Bottom [m]"].values[-1]])
+    range_TP = TP_DATA["Top [m]"].to_list() + list([TP_DATA["Bottom [m]"].values[-1]])
 
     # check MP TP connection
     if range_MP[0] < range_TP[-1]:
@@ -118,9 +118,9 @@ def assemble_structure(rho):
     WHOLE_STRUCTURE = MP_DATA
 
     # Add Weight column:
-    #MP_DATA["Weight [t]"] = calc_weight(rho, MP_DATA["t [mm]"].values/1000, MP_DATA["Top [mLAT]"].values, MP_DATA["Bottom [mLAT]"].values, MP_DATA["D, top [m]"].values, MP_DATA["D, bottom [m]"].values)/1000
-    #TP_DATA["Weight [t]"] = calc_weight(rho, TP_DATA["t [mm]"].values/1000, TP_DATA["Top [mLAT]"].values, TP_DATA["Bottom [mLAT]"].values, TP_DATA["D, top [m]"].values, TP_DATA["D, bottom [m]"].values)/1000
-    #TOWER_DATA["Weight [t]"] = calc_weight(rho, TOWER_DATA["t [mm]"].values/1000, TOWER_DATA["Top [mLAT]"].values, TOWER_DATA["Bottom [mLAT]"].values, TOWER_DATA["D, top [m]"].values, TOWER_DATA["D, bottom [m]"].values)/1000
+    #MP_DATA["Weight [t]"] = calc_weight(rho, MP_DATA["t [mm]"].values/1000, MP_DATA["Top [m]"].values, MP_DATA["Bottom [m]"].values, MP_DATA["D, top [m]"].values, MP_DATA["D, bottom [m]"].values)/1000
+    #TP_DATA["Weight [t]"] = calc_weight(rho, TP_DATA["t [mm]"].values/1000, TP_DATA["Top [m]"].values, TP_DATA["Bottom [m]"].values, TP_DATA["D, top [m]"].values, TP_DATA["D, bottom [m]"].values)/1000
+    #TOWER_DATA["Weight [t]"] = calc_weight(rho, TOWER_DATA["t [mm]"].values/1000, TOWER_DATA["Top [m]"].values, TOWER_DATA["Bottom [m]"].values, TOWER_DATA["D, top [m]"].values, TOWER_DATA["D, bottom [m]"].values)/1000
 
     # Assemble MP TP
     MP_top = range_MP[0]
@@ -136,10 +136,10 @@ def assemble_structure(rho):
 
             TP_DATA = interpolate_node(TP_DATA, MP_top)
            # SKIRT = pd.DataFrame(columns=TP_DATA.columns)
-            SKIRT = TP_DATA.loc[TP_DATA["Top [mLAT]"] <= MP_top]
+            SKIRT = TP_DATA.loc[TP_DATA["Top [m]"] <= MP_top]
             SKIRT["Affiliation"] = "SKIRT"
             SKIRT = SKIRT.drop("Section", axis=1)
-            skirt_weight = calc_weight(rho, SKIRT["t [mm]"].values / 1000, SKIRT["Top [mLAT]"].values, SKIRT["Bottom [mLAT]"].values, SKIRT["D, top [m]"].values,
+            skirt_weight = calc_weight(rho, SKIRT["t [mm]"].values / 1000, SKIRT["Top [m]"].values, SKIRT["Bottom [m]"].values, SKIRT["D, top [m]"].values,
                         SKIRT["D, bottom [m]"].values) / 1000
             skirt_weight = sum(skirt_weight)
 
@@ -147,7 +147,7 @@ def assemble_structure(rho):
 
 
             # cut TP
-            TP_DATA = TP_DATA.loc[TP_DATA["Bottom [mLAT]"] >= MP_top]
+            TP_DATA = TP_DATA.loc[TP_DATA["Bottom [m]"] >= MP_top]
             WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
 
             ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "SKIRT", SKIRT)
@@ -158,9 +158,9 @@ def assemble_structure(rho):
         WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
 
     # Add Tower
-    tower_offset = WHOLE_STRUCTURE["Top [mLAT]"].values[0] - TOWER_DATA["Bottom [mLAT]"].values[-1]
-    TOWER_DATA["Top [mLAT]"] = TOWER_DATA["Top [mLAT]"] + tower_offset
-    TOWER_DATA["Bottom [mLAT]"] = TOWER_DATA["Bottom [mLAT]"] + tower_offset
+    tower_offset = WHOLE_STRUCTURE["Top [m]"].values[0] - TOWER_DATA["Bottom [m]"].values[-1]
+    TOWER_DATA["Top [m]"] = TOWER_DATA["Top [m]"] + tower_offset
+    TOWER_DATA["Bottom [m]"] = TOWER_DATA["Bottom [m]"] + tower_offset
 
     WHOLE_STRUCTURE = pd.concat([TOWER_DATA, WHOLE_STRUCTURE], axis=0)
 
@@ -175,17 +175,41 @@ def assemble_structure(rho):
     TP_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_MASSES")
     TOWER_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_MASSES")
 
-    TOWER_MASSES["Elevation [mLAT]"] = TOWER_MASSES["Elevation [mLAT]"] + tower_offset
+    TOWER_MASSES["Elevation [m]"] = TOWER_MASSES["Elevation [m]"] + tower_offset
 
     MP_MASSES.insert(0, "Affiliation", "MP")
     TP_MASSES.insert(0, "Affiliation", "TP")
     TOWER_MASSES.insert(0, "Affiliation", "TOWER")
 
     ALL_MASSES = pd.concat([MP_MASSES, TP_MASSES, TOWER_MASSES], axis=0)
-    ALL_MASSES.sort_values(inplace=True, ascending=False, axis=0, by=["Elevation [mLAT]"])
+    ALL_MASSES.sort_values(inplace=True, ascending=False, axis=0, by=["Elevation [m]"])
 
     ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
 
     return
 
-assemble_structure(7000)
+def move_structure(displ, Structure):
+    displ = float(displ)
+    META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META", dtype=str)
+    DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA", dtype=float)
+    MASSES_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES")
+
+    META_CURR.loc[:, "height reference"] = None
+    DATA_CURR.loc[:, "Top [m]"] = DATA_CURR.loc[:, "Top [m]"] + displ
+    DATA_CURR.loc[:, "Bottom [m]"] = DATA_CURR.loc[:, "Bottom [m]"] + displ
+    MASSES_CURR.loc[:, "Elevation [m]"] = MASSES_CURR.loc[:, "Elevation [m]"] + displ
+
+    ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META", META_CURR)
+    ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA", DATA_CURR)
+    ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES", MASSES_CURR)
+
+def move_structure_MP(displ):
+
+    move_structure(displ, "MP")
+
+    return
+def move_structure_TP(displ):
+
+    move_structure(displ, "TP")
+
+    return
