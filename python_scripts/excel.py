@@ -129,6 +129,35 @@ def write_df(workbook_name, sheet_name, upper_left_address, dataframe, include_h
         print(f"Error writing DataFrame to Excel: {e}")
         logger.debug(f"Error!{e}")
 
+def write_value(workbook_name, sheet_name, cell_or_named_range, value):
+    """
+    Writes a single value to a specific cell or named range in an already open Excel workbook.
+
+    Parameters:
+    workbook_name (str): Name of the open Excel workbook (e.g. 'GeometrieConverter.xlsx').
+    sheet_name (str): Name of the sheet within the workbook.
+    cell_or_named_range (str): Excel address (e.g., 'B2') or a named range where the value should be written.
+    value (any): The value to write into the cell.
+    """
+    logger = setup_logger()
+
+    try:
+        # Connect to the already open workbook
+        wb = xw.books[workbook_name]
+        sheet = wb.sheets[sheet_name]
+
+        # Try to resolve the named range or cell address
+        try:
+            target_range = wb.names[cell_or_named_range].refers_to_range
+        except KeyError:
+            target_range = sheet.range(cell_or_named_range)
+
+        # Write the single value
+        target_range.value = value
+
+    except Exception as e:
+        print(f"Error writing value to Excel: {e}")
+        logger.debug(f"Error! {e}")
 
 def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     """
@@ -270,6 +299,7 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
 
     return response_map.get(result, f"Unknown ({result})")
 
+
 def read_excel_table(workbook_name, sheet_name, table_name, dtype=None):
     """
     Read an Excel Table into a Pandas DataFrame, using the Table's header as column names.
@@ -297,6 +327,34 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None):
         df = df.astype(dtype)
     return df
 
+
+from pathlib import Path
+
+def read_excel_range(path, sheet_name, cell_range, dtype=None):
+    """
+    Read a specific Excel range into a Pandas DataFrame, using the first row as headers.
+
+    Parameters:
+        path (str or Path): Full path to the Excel workbook.
+        sheet_name (str): The name of the sheet containing the range.
+        cell_range (str): The Excel range to read (e.g., "B14:L30").
+        dtype (dict or type, optional): Data type(s) to apply to the DataFrame.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the range data with correct headers.
+    """
+    path = Path(path)
+    app = xw.App(visible=False)
+    try:
+        wb = app.books.open(str(path))
+        sheet = wb.sheets[sheet_name]
+        data = sheet.range(cell_range).options(pd.DataFrame, header=1, index=False).value
+        if dtype is not None:
+            data = data.astype(dtype)
+    finally:
+        wb.close()
+        app.quit()
+    return data
 
 def clear_excel_table_contents(workbook_name, sheet_name, table_name):
     """

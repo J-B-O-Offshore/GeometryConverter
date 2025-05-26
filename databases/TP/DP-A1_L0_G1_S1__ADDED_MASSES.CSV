@@ -1,9 +1,6 @@
-ID,Description,Elevation [mLAT],SCF [mm],Location,Type,Opening factor
-TP1-01,MAP support,20,1.2,O,g,
-TP1-02, Cable opening ,19.5,2,O,o,0.85
-TP1-03,Bolting Platform,20,1.25,I,g,
-TP2-01,Stud Junction Box Platform,15.73,1.25,I,g,
-TP3-01, Ventilation Opening ,12.5,2,O,o,0.85
-TP3-01, ICCP Cable opening ,12.5,2,O,o,0.85
-TP3-02, ICCP Cable pipe support ,12,1.02,O,n,
-TP4-01, ICCP Cable pipe support ,8.5,1,O,g,
+Elevation [mLAT],Mass [kg],commment
+21.47,30000,TP-sided flange to tower
+20.7,20000,Service Platform
+20.1,5000,Bolting Platform
+14,5000,Junction Box Platform
+6.1,200,Internal Access System

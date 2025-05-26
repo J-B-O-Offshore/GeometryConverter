@@ -12,6 +12,7 @@ def valid_data(data):
     except (ValueError, TypeError):
         return False, data
 
+
 def check_convert_structure(df: pd.DataFrame, Structure):
 
     success, df = valid_data(df)
@@ -28,6 +29,7 @@ def check_convert_structure(df: pd.DataFrame, Structure):
 
     return success, df
 
+
 def assemble_structure(rho):
     def calc_weight(rho, t, z_top, z_bot, d_top, d_bot):
         h = abs(z_top - z_bot)
@@ -39,6 +41,54 @@ def assemble_structure(rho):
                 - (d2 - 2 * t) ** 2
         )
         return rho * volume
+
+    def insert_row(df, idx, row):
+        """
+        Insert a row at the given index in a DataFrame.
+
+        Parameters:
+        - df: pd.DataFrame
+        - idx: int, position to insert the new row
+        - row: dict or pd.Series, row to insert
+
+        Returns:
+        - pd.DataFrame with the new row inserted
+        """
+        return
+
+    def interpolate_node(df, height):
+
+        if len(df.loc[(df["Top [mLAT]"] == height) | (df["Bottom [mLAT]"] == height)].index) > 0:
+            return df
+        
+        id_inter = df.loc[(df["Top [mLAT]"] > height) & (df["Bottom [mLAT]"] < height)].index
+        if len(id_inter) == 0:
+            print("interpolation not possible, outside bounds")
+            return None
+        if len(id_inter) > 1:
+            print("interpolation not possible, structure not consecutive")
+            return None
+        id_inter = id_inter[0]
+
+        new_row = pd.DataFrame(columns=df.columns)
+        new_row.loc[0, "Affiliation"] = "TP"
+        new_row.loc[0, "t [mm]"] = df.loc[id_inter, "t [mm]"]
+
+        # height
+        new_row.loc[0, "Top [mLAT]"] = height
+        new_row.loc[0, "Bottom [mLAT]"] = df.loc[id_inter, "Bottom [mLAT]"]
+
+        # diameter
+        inter_x_rel = (height-df.loc[id_inter, "Bottom [mLAT]"])/(df.loc[id_inter, "Top [mLAT]"] - df.loc[id_inter, "Bottom [mLAT]"])
+        d_inter = (df.loc[id_inter, "D, top [m]"] - df.loc[id_inter, "D, bottom [m]"]) * inter_x_rel + df.loc[id_inter, "D, bottom [m]"]
+        new_row.loc[0, "D, top [m]"] = d_inter
+        new_row.loc[0, "D, bottom [m]"] = df.loc[id_inter, "D, bottom [m]"]
+
+        df.loc[id_inter, "Bottom [mLAT]"] = height
+
+        df = pd.concat([df.iloc[:id_inter+1], new_row, df.iloc[id_inter+1:]]).reset_index(drop=True)
+
+        return df
 
     # load structure Data
     MP_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_DATA")
@@ -52,7 +102,6 @@ def assemble_structure(rho):
 
     if not all([sucess_MP, sucess_TP, sucess_TOWER]):
         return
-
 
     MP_DATA.insert(0, "Affiliation", "MP")
     TP_DATA.insert(0, "Affiliation", "TP")
@@ -69,12 +118,14 @@ def assemble_structure(rho):
     WHOLE_STRUCTURE = MP_DATA
 
     # Add Weight column:
-    MP_DATA["Weight [t]"] = calc_weight(rho, MP_DATA["t [mm]"].values/1000, MP_DATA["Top [mLAT]"].values, MP_DATA["Bottom [mLAT]"].values, MP_DATA["D, top [m]"].values, MP_DATA["D, bottom [m]"].values)/1000
-    TP_DATA["Weight [t]"] = calc_weight(rho, TP_DATA["t [mm]"].values/1000, TP_DATA["Top [mLAT]"].values, TP_DATA["Bottom [mLAT]"].values, TP_DATA["D, top [m]"].values, TP_DATA["D, bottom [m]"].values)/1000
-    TOWER_DATA["Weight [t]"] = calc_weight(rho, TOWER_DATA["t [mm]"].values/1000, TOWER_DATA["Top [mLAT]"].values, TOWER_DATA["Bottom [mLAT]"].values, TOWER_DATA["D, top [m]"].values, TOWER_DATA["D, bottom [m]"].values)/1000
+    #MP_DATA["Weight [t]"] = calc_weight(rho, MP_DATA["t [mm]"].values/1000, MP_DATA["Top [mLAT]"].values, MP_DATA["Bottom [mLAT]"].values, MP_DATA["D, top [m]"].values, MP_DATA["D, bottom [m]"].values)/1000
+    #TP_DATA["Weight [t]"] = calc_weight(rho, TP_DATA["t [mm]"].values/1000, TP_DATA["Top [mLAT]"].values, TP_DATA["Bottom [mLAT]"].values, TP_DATA["D, top [m]"].values, TP_DATA["D, bottom [m]"].values)/1000
+    #TOWER_DATA["Weight [t]"] = calc_weight(rho, TOWER_DATA["t [mm]"].values/1000, TOWER_DATA["Top [mLAT]"].values, TOWER_DATA["Bottom [mLAT]"].values, TOWER_DATA["D, top [m]"].values, TOWER_DATA["D, bottom [m]"].values)/1000
 
     # Assemble MP TP
-    if range_MP[0] > range_TP[-1]:
+    MP_top = range_MP[0]
+    TP_bot = range_TP[-1]
+    if MP_top > TP_bot:
         result = ex.show_message_box("GeometrieConverter.xlsm", f"The MP and the TP are overlapping by {-range_TP[-1] + range_MP[0]}m. Combine stiffness etc as grouted connection (yes) or add as skirt (no)?",  buttons="vbYesNo", icon="vbYesNo",)
 
         if result == "Yes":
@@ -83,10 +134,23 @@ def assemble_structure(rho):
                                          f"under construction...")
         else:
 
+            TP_DATA = interpolate_node(TP_DATA, MP_top)
+           # SKIRT = pd.DataFrame(columns=TP_DATA.columns)
+            SKIRT = TP_DATA.loc[TP_DATA["Top [mLAT]"] <= MP_top]
+            SKIRT["Affiliation"] = "SKIRT"
+            SKIRT = SKIRT.drop("Section", axis=1)
+            skirt_weight = calc_weight(rho, SKIRT["t [mm]"].values / 1000, SKIRT["Top [mLAT]"].values, SKIRT["Bottom [mLAT]"].values, SKIRT["D, top [m]"].values,
+                        SKIRT["D, bottom [m]"].values) / 1000
+            skirt_weight = sum(skirt_weight)
+
+            ex.write_value("GeometrieConverter.xlsm", "StructureOverview", "SKIRT_MASS", skirt_weight)
 
 
-            ex.show_message_box("GeometrieConverter.xlsm",
-                                         f"under construction...")
+            # cut TP
+            TP_DATA = TP_DATA.loc[TP_DATA["Bottom [mLAT]"] >= MP_top]
+            WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
+
+            ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "SKIRT", SKIRT)
 
     else:
         ex.show_message_box("GeometrieConverter.xlsm", f"The MP and the TP are fitting together perfectly")
@@ -123,3 +187,5 @@ def assemble_structure(rho):
     ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
 
     return
+
+assemble_structure(7000)
