@@ -9,76 +9,64 @@ import numpy as np
 
 
 def export_JBOOST(txt_path):
-    from typing import Tuple, Optional
-
-    def _convert_to_rad(value: float, unit: str) -> float:
-        """Convert deflection from mm/m or degrees to radians."""
-        if unit == "deg":
-            return np.deg2rad(value)
-        elif unit == "mm/m":
-            return np.arctan(value / 1000)
-        else:
-            raise ValueError(f"Unsupported unit '{unit}'. Use 'deg' or 'mm/m'.")
-
-    def _compute_line(z: pd.Series, angle_rad: float, base_z: float) -> pd.Series:
-        """Compute the deflection line based on angle and base z level."""
-        return np.sin(angle_rad) * (z - base_z)
-
-    def calculate_deflection(
-            NODES: pd.DataFrame,
-            defl_MP: Tuple[float, str],
-            defl_Tower: Tuple[float, str],
-            defl_TP: Optional[Tuple[float, str]] = None
-    ) -> pd.Series:
+    def calculate_deflection(NODES: pd.DataFrame, defl_MP: Tuple[float, str], defl_Tower: Tuple[float, str], defl_TP=None):
         """
-        Calculate deflection values based on given tilt angles.
+        Calculate p from vertical deflections.
 
         Parameters:
-        - NODES: DataFrame with columns ["z", "Affiliation"]
-        - defl_MP, defl_Tower, defl_TP: Tuples (value, unit), where unit is "deg" or "mm/m"
+        - NODES: DataFrame containing structure nodes (expected columns: z, Affiliation with TOWER or MP and optional TP or GROUTED).
+        - defl_MP: Tuple containing (value, unit) unit: "mm/m" or "deg" for MP deflection.
+        - defl_Tower: Tuple containing (value, unit) unit: "mm/m" or "deg" forTower deflection.
 
         Returns:
-        - pd.Series of deflection values
+        - Series with calculated deflection values.
         """
-        affiliations = NODES["Affiliation"]
-        z = NODES["z"]
-        base_z = z.iloc[-1]
-
-        # Convert all given angles to radians
-        angle_MP = _convert_to_rad(*defl_MP)
-        angle_Tower = _convert_to_rad(*defl_Tower)
-        angle_TP = _convert_to_rad(*defl_TP) if defl_TP else None
-
-        if angle_TP is None and "TP" in affiliations.values:
-            raise ValueError("defl_TP must be provided if 'TP' is present in Affiliation.")
-
-        # Compute initial deflection lines
-        line_MP = _compute_line(z, angle_MP, base_z)
-        line_Tower = _compute_line(z, angle_Tower, base_z)
-        line_TP = _compute_line(z, angle_TP, base_z) if angle_TP else None
-
-        # Initialize DEFL column
-        NODES["DEFL"] = 0.0
-
-        # Assign MP deflection
-        mask_MP = affiliations == "MP"
-        NODES.loc[mask_MP, "DEFL"] = line_MP[mask_MP]
-
-        if angle_TP is not None:
-            mask_TP = affiliations == "TP"
-            TP_offset = line_MP[mask_MP].iloc[0] - line_TP[mask_MP].iloc[0]
-            NODES.loc[mask_TP, "DEFL"] = line_TP[mask_TP] + TP_offset
-
-            mask_TOWER = affiliations == "TOWER"
-            TOWER_offset = NODES.loc[mask_TP, "DEFL"].iloc[0] - line_Tower[mask_TP].iloc[0]
-            NODES.loc[mask_TOWER, "DEFL"] = line_Tower[mask_TOWER] + TOWER_offset
+        if defl_MP[1] == "deg":
+            defl_MP_deg = defl_MP[0] * np.pi/180
+        elif defl_MP[1] == "mm/m":
+            defl_MP_deg = np.arctan(0.001 * defl_MP[0]) * np.pi/180
         else:
-            mask_TOWER = affiliations == "TOWER"
-            TOWER_offset = line_MP[mask_MP].iloc[0] - line_Tower[mask_MP].iloc[0]
-            NODES.loc[mask_TOWER, "DEFL"] = line_Tower[mask_TOWER] + TOWER_offset
+            raise ValueError("defl_MP[1] has to be deg or mm/m!")
 
-        return NODES["DEFL"]
+        if defl_Tower[1] == "deg":
+            defl_Tower_deg = defl_Tower[0] * np.pi/180
+        elif defl_Tower[1] == "mm/m":
+            defl_Tower_deg = np.arctan(0.001 * defl_Tower[0]) * np.pi/180
+        else:
+            raise ValueError("defl_Tower[1] has to be deg or mm/m!")
 
+        if defl_TP is not None:
+            if defl_TP[1] == "deg":
+                defl_TP_deg = defl_TP[0] * np.pi/180
+            elif defl_TP[1] == "mm/m":
+                defl_TP_deg = np.arctan(0.001 * defl_TP[0]) * np.pi/180
+            else:
+                raise ValueError("defl_Tower[1] has to be deg or mm/m!")
+
+            line_TP = np.sin(defl_TP_deg) * (NODES["z"] - NODES.loc[NODES.index[-1], "z"])
+
+        else:
+            if "TP" in NODES["Affiliation"].unique():
+                raise ValueError("defl_TP has to be defined, as TP is in NODES Affiliation column")
+
+        line_MP = np.sin(defl_MP_deg) * (NODES["z"] - NODES.loc[NODES.index[-1], "z"])
+
+        line_TOWER = np.sin(defl_Tower_deg) * (NODES["z"] - NODES.loc[NODES.index[-1], "z"])
+
+        # construct line
+        NODES["DEFL"] = 0.0
+        NODES.loc[NODES["Affiliation"] == "MP", "DEFL"] = line_MP.loc[NODES["Affiliation"] == "MP"]
+
+        if defl_TP is not None:
+            line_TP_new = line_TP - line_TP.loc[NODES["Affiliation"] == "MP"].iloc[0] + line_MP.loc[NODES["Affiliation"] == "MP"].iloc[0]
+            NODES.loc[NODES["Affiliation"] == "TP", "DEFL"] = line_TP_new.loc[NODES["Affiliation"] == "TP"]
+
+            line_TOWER_new = line_TOWER - line_TOWER.loc[NODES["Affiliation"] == "TP"].iloc[0] + NODES.loc[NODES["Affiliation"] == "TP", "DEFL"].iloc[0]
+            NODES.loc[NODES["Affiliation"] == "TOWER", "DEFL"] = line_TOWER_new.loc[NODES["Affiliation"] == "TOWER"]
+
+        else:
+            line_TOWER_new = line_TOWER - line_TOWER.loc[NODES["Affiliation"] == "MP"].iloc[0] + line_MP.loc[NODES["Affiliation"] == "MP"].iloc[0]
+            NODES.loc[NODES["Affiliation"] == "TOWER", "DEFL"] = line_TOWER_new.loc[NODES["Affiliation"] == "TP"]
 
     text = ""
     NODES = []
@@ -131,7 +119,7 @@ def export_JBOOST(txt_path):
             NODES.loc[below_idx, "pMass"] += m_below
             NODES.loc[above_idx, "pMass"] += m_above
 
-    calculate_deflection(NODES, (0.75, "deg"), (5, "mm/m"), defl_TP=(0, "deg"))
+    calculate_deflection(NODES, (0.75, "deg"), (5, "mm/m"), defl_TP=(0.5, "deg"))
 
     #Intertia
     GEOMETRY["pInertia"] = 0
