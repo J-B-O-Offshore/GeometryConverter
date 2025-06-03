@@ -9,8 +9,6 @@ import numpy as np
 
 
 def export_JBOOST(txt_path):
-    from typing import Tuple, Optional
-
     def _convert_to_rad(value: float, unit: str) -> float:
         """Convert deflection from mm/m or degrees to radians."""
         if unit == "deg":
@@ -79,7 +77,6 @@ def export_JBOOST(txt_path):
 
         return NODES["DEFL"]
 
-
     text = ""
     NODES = []
     GEOMETRY = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "WHOLE_STRUCTURE")
@@ -131,7 +128,7 @@ def export_JBOOST(txt_path):
             NODES.loc[below_idx, "pMass"] += m_below
             NODES.loc[above_idx, "pMass"] += m_above
 
-    calculate_deflection(NODES, (0.75, "deg"), (5, "mm/m"), defl_TP=(0, "deg"))
+    calculate_deflection(NODES, (0.75, "deg"), (5, "mm/m"), defl_TP=(0.5, "deg"))
 
     #Intertia
     GEOMETRY["pInertia"] = 0
