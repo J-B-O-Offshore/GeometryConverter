@@ -13,20 +13,23 @@ def valid_data(data):
     except (ValueError, TypeError):
         return False, data
 
-
-def check_convert_structure(df: pd.DataFrame, Structure):
-    success, df = valid_data(df)
-    if not success:
-        ex.show_message_box("GeometrieConverter.xlsm", "The MP Table containes invalid data (nan or non numerical)")
-
+def sanity_check_structure(df):
     # check, if sections are on top of each other
     height_diff = (df["Top [m]"].values[1:] - df["Bottom [m]"].values[:-1]) == 0
-
     if not all(height_diff):
         missaligned_sections = [int(df.iloc[i, 0]) for i, value in enumerate(height_diff) if not value]
-        ex.show_message_box("GeometrieConverter.xlsm", f"The MP Table Sections are overlapping or have space in between at Section(s): {missaligned_sections} ")
-        success = False
+        ex.show_message_box("GeometrieConverter.xlsm", f"The {Table} Table Sections are overlapping or have space in between at Section(s): {missaligned_sections} ")
+        return False
+    else:
+        return True
 
+def check_convert_structure(df: pd.DataFrame, Table):
+    success, df = valid_data(df)
+    if not success:
+        ex.show_message_box("GeometrieConverter.xlsm", f"The {Table} Table containes invalid data (nan or non numerical)")
+        return success, df
+
+    success = sanity_check_structure
     return success, df
 
 
