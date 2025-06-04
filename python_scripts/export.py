@@ -3,25 +3,12 @@ import pandas as pd
 import sqlite3
 import excel as ex
 import misc as mc
-from typing import Tuple
+from typing import Tuple, Optional
 
 import numpy as np
 
 
 def export_JBOOST(txt_path):
-    def _convert_to_rad(value: float, unit: str) -> float:
-        """Convert deflection from mm/m or degrees to radians."""
-        if unit == "deg":
-            return np.deg2rad(value)
-        elif unit == "mm/m":
-            return np.arctan(value / 1000)
-        else:
-            raise ValueError(f"Unsupported unit '{unit}'. Use 'deg' or 'mm/m'.")
-
-    def _compute_line(z: pd.Series, angle_rad: float, base_z: float) -> pd.Series:
-        """Compute the deflection line based on angle and base z level."""
-        return np.sin(angle_rad) * (z - base_z)
-
     def calculate_deflection(
             NODES: pd.DataFrame,
             defl_MP: Tuple[float, str],
@@ -38,6 +25,20 @@ def export_JBOOST(txt_path):
         Returns:
         - pd.Series of deflection values
         """
+
+        def _convert_to_rad(value: float, unit: str) -> float:
+            """Convert deflection from mm/m or degrees to radians."""
+            if unit == "deg":
+                return np.deg2rad(value)
+            elif unit == "mm/m":
+                return np.arctan(value / 1000)
+            else:
+                raise ValueError(f"Unsupported unit '{unit}'. Use 'deg' or 'mm/m'.")
+
+        def _compute_line(z: pd.Series, angle_rad: float, base_z: float) -> pd.Series:
+            """Compute the deflection line based on angle and base z level."""
+            return np.sin(angle_rad) * (z - base_z)
+
         affiliations = NODES["Affiliation"]
         z = NODES["z"]
         base_z = z.iloc[-1]
@@ -77,88 +78,125 @@ def export_JBOOST(txt_path):
 
         return NODES["DEFL"]
 
-    text = ""
-    NODES = []
+    def create_JBOOST_struct(GEOMETRY,  defl_MP, delf_TOWER, MASSES=None, defl_TP=None,  ModelName="Struct", EModul="2.10E+11", fyk="355", poisson="0.3", dens="7850", addMass=0, member_id=1):
+        text = ""
+        NODES_txt = []
+        ELEMENTS_txt = []
+        # Data loading
+        N_Elem = len(GEOMETRY)
+        N_Nodes = len(GEOMETRY) + 1
+
+        # Nodes
+        NODES = pd.DataFrame({
+            "z": pd.concat([
+                GEOMETRY["Top [m]"],
+                pd.Series([GEOMETRY["Bottom [m]"].iloc[-1]])
+            ], ignore_index=True)
+        })
+        nodes = [501 + i for i in range(N_Nodes)]
+        nodes.reverse()
+        NODES["node"] = nodes
+        NODES["pInertia"] = 0
+        NODES["pMass"] = 0.0
+        NODES["Affiliation"] = "NOT DEFINDED"
+        NODES.loc[NODES.index[:-1], "Affiliation"] = GEOMETRY.iloc[:]["Affiliation"]
+        NODES.loc[NODES.index[-1], "Affiliation"] = GEOMETRY.iloc[-1]["Affiliation"]
+
+        if MASSES is not None:
+            # distribute Masses on Nodes
+            for idx in MASSES.index:
+                z_Mass = MASSES.loc[idx, "Elevation [m]"]
+
+                # if Mass is on node
+                if float(z_Mass) in [float(indx) for indx in NODES.loc[:, "z"]]:
+                    NODES.loc[idx, "pMass"] = MASSES.loc[idx, "Mass [kg]"]
+
+                # if not, distribution on neibhoring nodes
+                else:
+                    below_idx = NODES[NODES['z'] <= z_Mass].index.min()
+                    above_idx = NODES[NODES['z'] > z_Mass].index.max()
+
+                    dist_below_rel = (z_Mass - NODES.loc[below_idx, "z"]) / (NODES.loc[above_idx, "z"] - NODES.loc[below_idx, "z"])
+                    dist_above_rel = (NODES.loc[above_idx, "z"] - z_Mass) / (NODES.loc[above_idx, "z"] - NODES.loc[below_idx, "z"])
+
+                    m_below = MASSES.loc[idx, "Mass [kg]"] * dist_below_rel
+                    m_above = MASSES.loc[idx, "Mass [kg]"] * dist_above_rel
+
+                    NODES.loc[below_idx, "pMass"] += m_below
+                    NODES.loc[above_idx, "pMass"] += m_above
+
+        calculate_deflection(NODES, defl_MP, delf_TOWER, defl_TP=defl_TP)
+
+        # Intertia
+        GEOMETRY["pInertia"] = 0
+
+        NODES = NODES.iloc[::-1].reset_index(drop=True)
+        for idx, node in NODES.iterrows():
+            temp = ("os_FeNode{model=ModelName" "\t" +
+                    ",node=" + str(int(node["node"])) + "\t" +
+                    ",x=0" "\t" +
+                    ",y=0" "\t" +
+                    ",z=" + f"{round(node['z'], 2):05.2f}" + "\t" +
+                    ",pMass=" + f"{node['pMass']:06.0f}" + "\t" +
+                    ",pInertia=" + str(node["pInertia"]) + "\t" +
+                    ",pOutOfVertically=" + f"{round(node['DEFL'], 3):06.3f}" + "}")
+            NODES_txt.append(temp)
+
+        # Elements
+
+        elements = []
+        for i in range(len(NODES) - 1):
+            startnode = NODES.loc[i, "node"]
+            endnode = NODES.loc[i + 1, "node"]
+            diameter = (GEOMETRY.loc[i, "D, top [m]"] + GEOMETRY.loc[i, "D, bottom [m]"]) / 2
+            t_wall = GEOMETRY.loc[i, "t [mm]"] / 1000
+
+            elements.append({"elem_id": i + 1, "startnode": startnode, "endnode": endnode, "diameter": diameter, "t_wall": t_wall})
+        ELEM = pd.DataFrame(elements)
+
+        for idx, elem in ELEM.iterrows():
+            temp = ("os_FeElem{model=ModelName\t"
+                    ",elem_id=" + f"{elem['elem_id']:03.0f}" + "\t" +
+                    ",startnode=" + f"{elem['startnode']:03.0f}" + "\t" +
+                    ",endnode=" + f"{elem['endnode']:03.0f}" + "\t" +
+                    ",diameter=" + f"{round(elem['diameter'], 2):02.2f}" + "\t" +
+                    ",t_wall=" + f"{round(elem['t_wall'], 3):.3f}" + "\t" +
+                    ",EModul=" + str(EModul) + "\t" +
+                    ",fky=" + str(fyk) + "\t" +
+                    ",poisson=" + str(poisson) + "\t" +
+                    ",dens=" + str(dens) + "\t" +
+                    ",addMass=" + str(addMass) + "\t" +
+                    ",member_id=" + str(member_id) + "\t" +
+                    "}")
+            ELEMENTS_txt.append(temp)
+
+        text = ("--Input for JBOOST generated by Excel\n" +
+                "--    Definition Modelname\n"
+                'local	ModelName="' + ModelName + '"\n' +
+                "--    Definition der FE-Knoten\n" +
+                "\n".join(NODES_txt) + "\n\n" +
+                "--Definition der FE-Elemente- Zusatzmassen in kg / m" + "\n" +
+                "\n".join(ELEMENTS_txt) + "\n"
+                )
+        return text
+
     GEOMETRY = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "WHOLE_STRUCTURE")
     MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "ALL_ADDED_MASSES")
     MARINE_GROWTH = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "MARINE_GROWTH")
 
+    # check Geometry
     sucess_GEOMETRY = mc.sanity_check_structure(GEOMETRY)
-
     if not sucess_GEOMETRY:
         return
 
-    N_Elem = len(GEOMETRY)
-    N_Nodes = len(GEOMETRY) + 1
+    text = create_JBOOST_struct(GEOMETRY,  (0.75, "deg"), (5, "mm/m"), MASSES=MASSES, defl_TP=(0.5, "deg"),  ModelName="Struct", EModul="2.10E+11", fyk="355", poisson="0.3", dens="7850", addMass=0, member_id=1)
 
-    NODES = pd.DataFrame({
-        "z": pd.concat([
-            GEOMETRY["Top [m]"],
-            pd.Series([GEOMETRY["Bottom [m]"].iloc[-1]])
-        ], ignore_index=True)
-    })
-    nodes = [501+i for i in range(N_Nodes)]
-    nodes.reverse()
-    NODES["node"] = nodes
-    NODES["pInertia"] = 0
-    NODES["pMass"] = 0.0
-    NODES["Affiliation"] = "NOT DEFINDED"
-    NODES.loc[NODES.index[:-1], "Affiliation"] = GEOMETRY.iloc[:]["Affiliation"]
-    NODES.loc[NODES.index[-1], "Affiliation"] = GEOMETRY.iloc[-1]["Affiliation"]
-
-    # distribute Masses on Nodes
-    for idx in MASSES.index:
-        z_Mass = MASSES.loc[idx, "Elevation [m]"]
-
-        # if Mass is on node
-        if float(z_Mass) in [float(indx) for indx in NODES.loc[:, "z"]]:
-            NODES.loc[idx, "pMass"] = MASSES.loc[idx, "Mass [kg]"]
-
-        # if not, distribution on neibhoring nodes
-        else:
-            below_idx = NODES[NODES['z'] <= z_Mass].index.min()
-            above_idx = NODES[NODES['z'] > z_Mass].index.max()
-
-            dist_below_rel = (z_Mass - NODES.loc[below_idx, "z"])/(NODES.loc[above_idx, "z"] - NODES.loc[below_idx, "z"])
-            dist_above_rel = (NODES.loc[above_idx, "z"] - z_Mass)/(NODES.loc[above_idx, "z"] - NODES.loc[below_idx, "z"])
-
-            m_below = MASSES.loc[idx, "Mass [kg]"] * dist_below_rel
-            m_above = MASSES.loc[idx, "Mass [kg]"] * dist_above_rel
-
-            NODES.loc[below_idx, "pMass"] += m_below
-            NODES.loc[above_idx, "pMass"] += m_above
-
-    calculate_deflection(NODES, (0.75, "deg"), (5, "mm/m"), defl_TP=(0.5, "deg"))
-
-    #Intertia
-    GEOMETRY["pInertia"] = 0
-
-    pMass = [0 for i in enumerate(range(N_Nodes))]
-    pIntertia = [0 for i in enumerate(range(N_Nodes))]
-    pOutOfVertically = [0 for i in enumerate(range(N_Nodes))]
-
-    for node, _ in enumerate(range(N_Nodes, -1, -1)):
-        temp = ("os_FeNode{model=ModelName"
-                     ", node=" + str(501+node) +
-                     ",	x=0"
-                     ", y=0"
-                     ", z=" + str(GEOMETRY.iloc[node]["Top [m]"]) +
-                     ", pMass=" + str(pMass[node]) +
-                     ", pInertia" + str(pIntertia[node]) +
-                     ", pOutOfVertically" + str(pOutOfVertically[node]) + "}")
-        NODES.append(temp)
-
-
-
-
-    with open(txt_path,'w') as file:
+    with open(txt_path, 'w') as file:
         file.write(text)
-
-
 
     return
 
 
-txt_path = "struct.txt"
+txt_path = "struct.lua"
 
 export_JBOOST(txt_path)
