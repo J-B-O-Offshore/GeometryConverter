@@ -1,8 +1,7 @@
-import xlwings
-import pandas as pd
-import sqlite3
-import excel as ex
 import numpy as np
+import pandas as pd
+
+import excel as ex
 
 
 def valid_data(data):
@@ -13,15 +12,17 @@ def valid_data(data):
     except (ValueError, TypeError):
         return False, data
 
+
 def sanity_check_structure(df):
     # check, if sections are on top of each other
     height_diff = (df["Top [m]"].values[1:] - df["Bottom [m]"].values[:-1]) == 0
     if not all(height_diff):
         missaligned_sections = [int(df.iloc[i, 0]) for i, value in enumerate(height_diff) if not value]
-        ex.show_message_box("GeometrieConverter.xlsm", f"The {Table} Table Sections are overlapping or have space in between at Section(s): {missaligned_sections} ")
+        ex.show_message_box("GeometrieConverter.xlsm", f"The Sections are overlapping or have space in between at Section(s): {missaligned_sections} ")
         return False
     else:
         return True
+
 
 def check_convert_structure(df: pd.DataFrame, Table):
     success, df = valid_data(df)
@@ -66,11 +67,11 @@ def center_of_mass_hollow_frustum(d1, d2, z_bot, z_top, t):
 
     # Volume and center of mass for solid frustum
     def volume(r1, r2, h):
-        return (np.pi * h / 3) * (r1**2 + r1*r2 + r2**2)
+        return (np.pi * h / 3) * (r1 ** 2 + r1 * r2 + r2 ** 2)
 
     def com_z_rel(r1, r2, h):
-        num = r1**2 + 2*r1*r2 + 3*r2**2
-        den = r1**2 + r1*r2 + r2**2
+        num = r1 ** 2 + 2 * r1 * r2 + 3 * r2 ** 2
+        den = r1 ** 2 + r1 * r2 + r2 ** 2
         return h * num / (4 * den)
 
     # Compute relative center of mass (from bottom), then convert to absolute z
@@ -98,10 +99,10 @@ def calc_weight(rho, t, z_top, z_bot, d_top, d_bot):
     d2 = d_bot
 
     volume = (1 / 3) * np.pi * h / 4 * (
-        d1**2 + d1 * d2 + d2**2
-        - (d1 - 2 * t) ** 2
-        - (d1 - 2 * t) * (d2 - 2 * t)
-        - (d2 - 2 * t) ** 2
+            d1 ** 2 + d1 * d2 + d2 ** 2
+            - (d1 - 2 * t) ** 2
+            - (d1 - 2 * t) * (d2 - 2 * t)
+            - (d2 - 2 * t) ** 2
     )
 
     return rho * volume
@@ -142,10 +143,20 @@ def interpolate_node(df, height):
 
 
 def assemble_structure(rho):
+    def all_same_ignoring_none(*values):
+        non_none = [v for v in values if v is not None]
+        return len(non_none) <= 1 or all(v == non_none[0] for v in non_none)
+
     # load structure Data
     MP_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_DATA")
     TP_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_DATA")
     TOWER_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_DATA")
+
+    MP_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_META")
+    TP_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_META")
+    TOWER_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_META")
+
+    STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
 
     # Quality Checks/Warings of single datasets, if any fail fataly, abort
     sucess_MP, MP_DATA = check_convert_structure(MP_DATA, "MP")
@@ -154,6 +165,20 @@ def assemble_structure(rho):
 
     if not all([sucess_MP, sucess_TP, sucess_TOWER]):
         return
+
+    WL_ref_MP = MP_META.loc[0, "height reference"]
+    WL_ref_MT = TP_META.loc[0, "height reference"]
+    WL_ref_TOWER = TOWER_META.loc[0, "height reference"]
+
+    if not all_same_ignoring_none(WL_ref_MP, WL_ref_MT, WL_ref_TOWER):
+        answer = ex.show_message_box("GeometrieConverter.xlsm",
+                                     f"Warning, not all height references are the same (MP: {WL_ref_MP}, TP: {WL_ref_MT}, TOWER: {WL_ref_TOWER}). Assable anyway?",
+                                     buttons="vbYesNo", icon="warning")
+        if answer == "No":
+            return
+    else:
+        STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"] = [v for v in [WL_ref_MP, WL_ref_MT, WL_ref_TOWER] if v is not None][0]
+    # if MP_META
 
     MP_DATA.insert(0, "Affiliation", "MP")
     TP_DATA.insert(0, "Affiliation", "TP")
@@ -194,11 +219,12 @@ def assemble_structure(rho):
             SKIRT.loc[:, "Affiliation"] = "SKIRT"
             SKIRT = SKIRT.drop("Section", axis=1)
             skirt_weights = calc_weight(rho, SKIRT["t [mm]"].values / 1000, SKIRT["Top [m]"].values, SKIRT["Bottom [m]"].values, SKIRT["D, top [m]"].values,
-                                       SKIRT["D, bottom [m]"].values) / 1000
-            skirt_heihgts = center_of_mass_hollow_frustum(SKIRT["D, bottom [m]"].values, SKIRT["D, top [m]"].values, SKIRT["Bottom [m]"], SKIRT["Top [m]"].values, SKIRT["t [mm]"].values / 1000)
+                                        SKIRT["D, bottom [m]"].values) / 1000
+            skirt_heihgts = center_of_mass_hollow_frustum(SKIRT["D, bottom [m]"].values, SKIRT["D, top [m]"].values, SKIRT["Bottom [m]"], SKIRT["Top [m]"].values,
+                                                          SKIRT["t [mm]"].values / 1000)
             skirt_weight = sum(skirt_weights)
 
-            skirt_center_of_mass = sum([m * h for m, h in zip(list(skirt_weights), list(skirt_heihgts))])/skirt_weight
+            skirt_center_of_mass = sum([m * h for m, h in zip(list(skirt_weights), list(skirt_heihgts))]) / skirt_weight
 
             # cut TP
             TP_DATA = TP_DATA.loc[TP_DATA["Bottom [m]"] >= MP_top]
@@ -246,6 +272,7 @@ def assemble_structure(rho):
     ALL_MASSES.sort_values(inplace=True, ascending=False, axis=0, by=["Elevation [m]"])
 
     ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
+    ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
 
     return
 
@@ -276,3 +303,6 @@ def move_structure_TP(displ):
     move_structure(displ, "TP")
 
     return
+
+
+
