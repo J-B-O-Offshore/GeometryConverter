@@ -109,6 +109,40 @@ def calc_weight(rho, t, z_top, z_bot, d_top, d_bot):
 
 
 def interpolate_node(df, height):
+    """
+    Inserts an interpolated node into a structural DataFrame at a specified height.
+
+    If the height already exists as a "Top [m]" or "Bottom [m]" value, the original DataFrame is returned.
+    Otherwise, if the height lies within exactly one segment (i.e., between "Top [m]" and "Bottom [m]" of a single row),
+    a new row is inserted by interpolating the diameter at that height. The original segment is split accordingly.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        DataFrame containing structural node information with columns such as:
+        - "Top [m]"
+        - "Bottom [m]"
+        - "D, top [m]"
+        - "D, bottom [m]"
+        - "t [mm]"
+        - optionally: "Affiliation"
+    height : float
+        The height (in meters) at which to interpolate a new node.
+
+    Returns
+    -------
+    pandas.DataFrame or None
+        Updated DataFrame with the interpolated node inserted, or None if:
+        - the height is outside the bounds of the structure, or
+        - multiple segments contain the height (i.e., structure is not consecutive at that height).
+
+    Notes
+    -----
+    - If interpolation is successful, the original segment is split, with the lower part ending at the new height,
+      and a new row inserted on top with interpolated diameter.
+    - The "Affiliation" of the new row is copied from the original row if the column exists.
+    - No checks are made for column types or values; ensure input DataFrame is clean and valid.
+    """
     if len(df.loc[(df["Top [m]"] == height) | (df["Bottom [m]"] == height)].index) > 0:
         return df
 
@@ -122,25 +156,29 @@ def interpolate_node(df, height):
     id_inter = id_inter[0]
 
     new_row = pd.DataFrame(columns=df.columns)
-    new_row.loc[0, "Affiliation"] = "TP"
+
+    if "Affiliation" in df.columns:
+        new_row.loc[0, "Affiliation"] = df.loc[id_inter, "Affiliation"]
+
     new_row.loc[0, "t [mm]"] = df.loc[id_inter, "t [mm]"]
 
     # height
     new_row.loc[0, "Top [m]"] = height
     new_row.loc[0, "Bottom [m]"] = df.loc[id_inter, "Bottom [m]"]
 
-    # diameter
+    # diameter interpolation
     inter_x_rel = (height - df.loc[id_inter, "Bottom [m]"]) / (df.loc[id_inter, "Top [m]"] - df.loc[id_inter, "Bottom [m]"])
     d_inter = (df.loc[id_inter, "D, top [m]"] - df.loc[id_inter, "D, bottom [m]"]) * inter_x_rel + df.loc[id_inter, "D, bottom [m]"]
     new_row.loc[0, "D, top [m]"] = d_inter
     new_row.loc[0, "D, bottom [m]"] = df.loc[id_inter, "D, bottom [m]"]
 
+    # update original segment
     df.loc[id_inter, "Bottom [m]"] = height
 
+    # insert new row
     df = pd.concat([df.iloc[:id_inter + 1], new_row, df.iloc[id_inter + 1:]]).reset_index(drop=True)
 
     return df
-
 
 def assemble_structure(rho):
     def all_same_ignoring_none(*values):
@@ -157,6 +195,10 @@ def assemble_structure(rho):
     TOWER_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_META")
 
     STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
+    STRUCTURE_META.loc[:, "Value"] = ""
+    # STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"] = ""
+    # STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Water level", "Value"] = ""
+    # STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed_", "Value"] = ""
 
     # Quality Checks/Warings of single datasets, if any fail fataly, abort
     sucess_MP, MP_DATA = check_convert_structure(MP_DATA, "MP")
@@ -178,6 +220,8 @@ def assemble_structure(rho):
             return
     else:
         STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"] = [v for v in [WL_ref_MP, WL_ref_MT, WL_ref_TOWER] if v is not None][0]
+        ex.show_message_box("GeometrieConverter.xlsm",
+                            f"Height references are the same or not defined. (MP: {WL_ref_MP}, TP: {WL_ref_MT}, TOWER: {WL_ref_TOWER}).")
     # if MP_META
 
     MP_DATA.insert(0, "Affiliation", "MP")
@@ -303,6 +347,5 @@ def move_structure_TP(displ):
     move_structure(displ, "TP")
 
     return
-
 
 
