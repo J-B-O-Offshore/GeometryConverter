@@ -149,10 +149,10 @@ def interpolate_node(df, height):
     id_inter = df.loc[(df["Top [m]"] > height) & (df["Bottom [m]"] < height)].index
     if len(id_inter) == 0:
         print("interpolation not possible, outside bounds")
-        return None
+        return df
     if len(id_inter) > 1:
         print("interpolation not possible, structure not consecutive")
-        return None
+        return df
     id_inter = id_inter[0]
 
     new_row = pd.DataFrame(columns=df.columns)
@@ -196,9 +196,7 @@ def assemble_structure(rho):
 
     STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
     STRUCTURE_META.loc[:, "Value"] = ""
-    # STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"] = ""
-    # STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Water level", "Value"] = ""
-    # STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed_", "Value"] = ""
+
 
     # Quality Checks/Warings of single datasets, if any fail fataly, abort
     sucess_MP, MP_DATA = check_convert_structure(MP_DATA, "MP")
@@ -208,9 +206,10 @@ def assemble_structure(rho):
     if not all([sucess_MP, sucess_TP, sucess_TOWER]):
         return
 
-    WL_ref_MP = MP_META.loc[0, "height reference"]
-    WL_ref_MT = TP_META.loc[0, "height reference"]
-    WL_ref_TOWER = TOWER_META.loc[0, "height reference"]
+    # Height Reference handling
+    WL_ref_MP = MP_META.loc[0, "Height Reference"]
+    WL_ref_MT = TP_META.loc[0, "Height Reference"]
+    WL_ref_TOWER = TOWER_META.loc[0, "Height Reference"]
 
     if not all_same_ignoring_none(WL_ref_MP, WL_ref_MT, WL_ref_TOWER):
         answer = ex.show_message_box("GeometrieConverter.xlsm",
@@ -222,8 +221,10 @@ def assemble_structure(rho):
         STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"] = [v for v in [WL_ref_MP, WL_ref_MT, WL_ref_TOWER] if v is not None][0]
         ex.show_message_box("GeometrieConverter.xlsm",
                             f"Height references are the same or not defined. (MP: {WL_ref_MP}, TP: {WL_ref_MT}, TOWER: {WL_ref_TOWER}).")
-    # if MP_META
 
+    # waterdepth handling
+    if MP_META.loc[0, "Water Depth [m]"] is not None:
+        STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"] = - float(MP_META.loc[0, "Water Depth [m]"])
     MP_DATA.insert(0, "Affiliation", "MP")
     TP_DATA.insert(0, "Affiliation", "TP")
     TOWER_DATA.insert(0, "Affiliation", "TOWER")
@@ -327,7 +328,7 @@ def move_structure(displ, Structure):
     DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA", dtype=float)
     MASSES_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES")
 
-    META_CURR.loc[:, "height reference"] = None
+    META_CURR.loc[:, "Height Reference"] = None
     DATA_CURR.loc[:, "Top [m]"] = DATA_CURR.loc[:, "Top [m]"] + displ
     DATA_CURR.loc[:, "Bottom [m]"] = DATA_CURR.loc[:, "Bottom [m]"] + displ
     MASSES_CURR.loc[:, "Elevation [m]"] = MASSES_CURR.loc[:, "Elevation [m]"] + displ

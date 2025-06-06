@@ -107,6 +107,7 @@ def add_node(df, z_new):
 
     return df_updated
 
+
 def interpolate_with_neighbors(data):
     """
     Linearly interpolates None or NaN values in a list using only their immediate known left and right neighbors.
@@ -146,16 +147,19 @@ def interpolate_with_neighbors(data):
             i += 1
     return result
 
+
 def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=None, ModelName="Struct", EModul="2.10E+11", fyk="355", poisson="0.3", dens="7850", addMass=0,
-                         member_id=1, create_node_tolerance=0.1):
-    text = ""
+                         member_id=1, create_node_tolerance=0.1, seabed_level=None):
     NODES_txt = []
     ELEMENTS_txt = []
-    # Data loading
-    N_Elem = len(GEOMETRY)
-    N_Nodes = len(GEOMETRY) + 1
+    elements = []
+
+    if seabed_level is not None:
+        GEOMETRY = mc.interpolate_node(GEOMETRY, seabed_level)
+    GEOMETRY = GEOMETRY.loc[GEOMETRY["Bottom [m]"] >= seabed_level]
 
     # Nodes
+    N_Nodes = len(GEOMETRY) + 1
     NODES = pd.DataFrame({
         "z": pd.concat([
             GEOMETRY["Top [m]"],
@@ -189,10 +193,13 @@ def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=Non
                 NODES.loc[in_tolerance[0], "pMassName"] += MASSES.loc[idx, "comment"] + " "
             # if not, create new nodes
             else:
-                NODES = add_node(NODES, z_Mass)
-                NODES.loc[NODES["z"] == z_Mass, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
-                NODES.loc[NODES["z"] == z_Mass, "pMassName"] = MASSES.loc[idx, "comment"]
-                GEOMETRY = mc.interpolate_node(GEOMETRY, z_Mass)
+                if z_Mass >= GEOMETRY.loc[:, "Bottom [m]"].values[-1]:
+                    NODES = add_node(NODES, z_Mass)
+                    NODES.loc[NODES["z"] == z_Mass, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
+                    NODES.loc[NODES["z"] == z_Mass, "pMassName"] = MASSES.loc[idx, "comment"]
+                    GEOMETRY = mc.interpolate_node(GEOMETRY, z_Mass)
+                else:
+                    print(f"Warning! Mass {MASSES.loc[idx, 'comment']} not added, it is below the seabed level!")
 
     # fill deflection values for newly inserted Nodes
     NODES.loc[:, "DEFL"] = interpolate_with_neighbors(NODES.loc[:, "DEFL"].values)
@@ -200,7 +207,10 @@ def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=Non
     # Intertia
     GEOMETRY["pInertia"] = 0
 
+    # Revert Node order
     NODES = NODES.iloc[::-1].reset_index(drop=True)
+
+    # construct Node lines
     for idx, node in NODES.iterrows():
         temp = ("os_FeNode{model=ModelName" "\t" +
                 ",node=" + str(int(node["node"])) + "\t" +
@@ -211,6 +221,7 @@ def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=Non
                 ",pInertia=" + str(node["pInertia"]) + "\t" +
                 ",pOutOfVertically=" + f"{round(node['DEFL'], 3):06.3f}" + "}")
 
+        # write comment about pointmasses
         if node["pMassName"] != "":
             if node["Affiliation"] == "ADDED_FOR_MASS":
                 temp += f"--added node for pointmass '{node['pMassName']}'"
@@ -219,8 +230,6 @@ def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=Non
         NODES_txt.append(temp)
 
     # Elements
-
-    elements = []
     for i in range(len(NODES) - 1):
         startnode = NODES.loc[i, "node"]
         endnode = NODES.loc[i + 1, "node"]
@@ -228,6 +237,7 @@ def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=Non
         t_wall = GEOMETRY.loc[i, "t [mm]"] / 1000
 
         elements.append({"elem_id": i + 1, "startnode": startnode, "endnode": endnode, "diameter": diameter, "t_wall": t_wall})
+
     ELEM = pd.DataFrame(elements)
 
     for idx, elem in ELEM.iterrows():
@@ -264,7 +274,7 @@ def export_JBOOST(lua_path):
     MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "ALL_ADDED_MASSES")
     MARINE_GROWTH = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "MARINE_GROWTH")
     PARAMETERS = ex.read_excel_table("GeometrieConverter.xlsm", "ExportStructure", "JBOOST_PARAMETER")
-
+    STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
     # check Geometry
     sucess_GEOMETRY = mc.sanity_check_structure(GEOMETRY)
     if not sucess_GEOMETRY:
@@ -282,7 +292,8 @@ def export_JBOOST(lua_path):
                                 dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "dens", "Value"].values[0],
                                 addMass=0,
                                 member_id=1,
-                                create_node_tolerance=PARAMETERS.loc[PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m] :", "Value"].values[0])
+                                create_node_tolerance=PARAMETERS.loc[PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[0],
+                                seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0])
 
     lua_path = os.path.join(lua_path, PARAMETERS.loc[PARAMETERS["Parameter"] == "ModelName", "Value"].values[0] + ".lua")
     with open(lua_path, 'w') as file:
