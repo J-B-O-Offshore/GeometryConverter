@@ -180,6 +180,7 @@ def interpolate_node(df, height):
 
     return df
 
+
 def assemble_structure(rho):
     def all_same_ignoring_none(*values):
         non_none = [v for v in values if v is not None]
@@ -275,10 +276,10 @@ def assemble_structure(rho):
             TP_DATA = TP_DATA.loc[TP_DATA["Bottom [m]"] >= MP_top]
             WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
 
-            SKIRT_POINTMASS = pd.DataFrame(columns=["Affiliation", "Elevation [m]", "Mass [kg]", "comment"], index=[0])
+            SKIRT_POINTMASS = pd.DataFrame(columns=["Affiliation", "Elevation [m]", "Mass [t]", "comment"], index=[0])
             SKIRT_POINTMASS.loc[:, "Affiliation"] = "SKIRT"
             SKIRT_POINTMASS.loc[:, "Elevation [m]"] = skirt_center_of_mass
-            SKIRT_POINTMASS.loc[:, "Mass [kg]"] = skirt_weight
+            SKIRT_POINTMASS.loc[:, "Mass [t]"] = skirt_weight
             SKIRT_POINTMASS.loc[:, "comment"] = "Skirt"
 
             ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "SKIRT", SKIRT)
