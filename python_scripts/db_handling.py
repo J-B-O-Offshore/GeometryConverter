@@ -560,3 +560,26 @@ def delete_TOWER_data(db_path, selected_structure):
     delete_data("TOWER", db_path, selected_structure)
 
     return
+
+# %% RNA
+def load_RNA_DATA(db_path):
+
+    sheet_name_structure_loading = "BuildYourStructure"
+
+    data = load_db_table(db_path, "data")
+    ex.set_dropdown_values(
+        "GeometrieConverter.xlsm",
+        sheet_name_structure_loading,
+        f"Dropdown_RNA_Structures",
+        list(data.loc[:, "Identifier"].values)
+    )
+    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"RNA_DATA", data)
+    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"RNA_DATA_TRUE", data)
+
+
+def save_RNA_data(db_path, selected_structure):
+    DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"RNA_DATA", dtype=str)
+
+    create_db_table(db_path, "data", DATA_CURR, if_exists='replace')
+
+    return

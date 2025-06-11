@@ -181,7 +181,7 @@ def add_element(df, height):
     return df
 
 
-def assemble_structure(rho):
+def assemble_structure(rho, RNA_config):
     def all_same_ignoring_none(*values):
         non_none = [v for v in values if v is not None]
         return len(non_none) <= 1 or all(v == non_none[0] for v in non_none)
@@ -190,6 +190,7 @@ def assemble_structure(rho):
     MP_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_DATA")
     TP_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_DATA")
     TOWER_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_DATA")
+    RNA_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "RNA_DATA")
 
     MP_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_META")
     TP_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_META")
@@ -198,7 +199,6 @@ def assemble_structure(rho):
     STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
     STRUCTURE_META.loc[:, "Value"] = ""
 
-
     # Quality Checks/Warings of single datasets, if any fail fataly, abort
     sucess_MP, MP_DATA = check_convert_structure(MP_DATA, "MP")
     sucess_TP, TP_DATA = check_convert_structure(TP_DATA, "TP")
@@ -206,6 +206,19 @@ def assemble_structure(rho):
 
     if not all([sucess_MP, sucess_TP, sucess_TOWER]):
         return
+
+    # RNA
+    if RNA_config is "":
+        ex.show_message_box("GeometrieConverter.xlsm",
+                            f"Caution, no RNA selected")
+    else:
+        if not RNA_config in RNA_DATA["Identifier"].values:
+            ex.show_message_box("GeometrieConverter.xlsm",
+                                f"Choosen RNA not in RNA dropdown menu. Aborting")
+            return None
+        else:
+            RNA = RNA_DATA.loc[RNA_DATA["Identifier"] == RNA_config, :]
+            ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "RNA", RNA)
 
     # Height Reference handling
     WL_ref_MP = MP_META.loc[0, "Height Reference"]
@@ -249,6 +262,7 @@ def assemble_structure(rho):
     # Assemble MP TP
     MP_top = range_MP[0]
     TP_bot = range_TP[-1]
+
     if MP_top > TP_bot:
         result = ex.show_message_box("GeometrieConverter.xlsm",
                                      f"The MP and the TP are overlapping by {-range_TP[-1] + range_MP[0]}m. Combine stiffness etc as grouted connection (yes) or add as skirt (no)?",

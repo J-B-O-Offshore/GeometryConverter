@@ -224,9 +224,9 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, defl_T
     GEOMETRY = pd.concat([pd.DataFrame({'Affiliation': 'TOWER', 'Top [m]': z_RNA, 'Bottom [m]': MP_top, 'D, top [m]': D_MP_top, 'D, bottom [m]': D_MP_top,
                                      't [mm]': t_MP_top}, index=[-1]), GEOMETRY], ignore_index=True, axis=0)
 
-    NODES.loc[NODES["z"] == z_RNA, "pMass"] += RNA.loc[0, "Mass [t]"]*1000
+    NODES.loc[NODES["z"] == z_RNA, "pMass"] += RNA.loc[0, "Mass [kg]"]
     NODES.loc[NODES["z"] == z_RNA, "pMassName"] = f"RNA {RNA.loc[0, 'Identifier']}"
-    NODES.loc[NODES["z"] == z_RNA, "pInertia"] = RNA.loc[0, 'Inertia [kg·m²]']
+    NODES.loc[NODES["z"] == z_RNA, "pInertia"] = RNA.loc[0, 'Inertia [kg m^2]']
 
     # fill deflection values for newly inserted Nodes
     NODES.loc[:, "DEFL"] = interpolate_with_neighbors(NODES.loc[:, "DEFL"].values)
@@ -301,6 +301,12 @@ def export_JBOOST(lua_path):
     PARAMETERS = ex.read_excel_table("GeometrieConverter.xlsm", "ExportStructure", "JBOOST_PARAMETER")
     STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
     RNA = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "RNA")
+    RNA.dropna(how="all", axis=0, inplace=True)
+
+    if len(RNA) == 0:
+        ex.show_message_box("GeometrieConverter.xlsm",
+                            f"Please define RNA parameters. Aborting")
+        return
 
     # check Geometry
     sucess_GEOMETRY = mc.sanity_check_structure(GEOMETRY)
