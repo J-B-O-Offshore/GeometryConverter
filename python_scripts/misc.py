@@ -108,7 +108,7 @@ def calc_weight(rho, t, z_top, z_bot, d_top, d_bot):
     return rho * volume
 
 
-def interpolate_node(df, height):
+def add_element(df, height):
     """
     Inserts an interpolated node into a structural DataFrame at a specified height.
 
@@ -260,7 +260,7 @@ def assemble_structure(rho):
                                 f"under construction...")
         else:
 
-            TP_DATA = interpolate_node(TP_DATA, MP_top)
+            TP_DATA = add_element(TP_DATA, MP_top)
             SKIRT = TP_DATA.loc[TP_DATA["Top [m]"] <= MP_top]
             SKIRT.loc[:, "Affiliation"] = "SKIRT"
             SKIRT = SKIRT.drop("Section", axis=1)

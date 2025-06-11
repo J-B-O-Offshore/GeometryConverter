@@ -50,9 +50,6 @@ def calculate_deflection(
 
     angle_Tower = angle_TP + angle_Tower
 
-    if angle_TP is None and "TP" in affiliations.values:
-        raise ValueError("defl_TP must be provided if 'TP' is present in Affiliation.")
-
     # Compute initial deflection lines
     line_MP = _compute_line(z, angle_MP, base_z)
     line_Tower = _compute_line(z, angle_Tower, base_z)
@@ -63,15 +60,15 @@ def calculate_deflection(
 
     # Assign MP deflection
     mask_MP = affiliations == "MP"
-    NODES.loc[mask_MP, "DEFL"] = line_MP[mask_MP]
+    NODES.loc[mask_MP, "DEFL"] = pd.Series(line_MP[mask_MP], dtype="float64")
 
     mask_TP = affiliations == "TP"
     TP_offset = line_MP[mask_MP].iloc[0] - line_TP[mask_MP].iloc[0]
-    NODES.loc[mask_TP, "DEFL"] = line_TP[mask_TP] + TP_offset
+    NODES.loc[mask_TP, "DEFL"] = pd.Series(line_MP[mask_MP], dtype="float64") + TP_offset
 
     mask_TOWER = affiliations == "TOWER"
     TOWER_offset = NODES.loc[mask_TP, "DEFL"].iloc[0] - line_Tower[mask_TP].iloc[0]
-    NODES.loc[mask_TOWER, "DEFL"] = line_Tower[mask_TOWER] + TOWER_offset
+    NODES.loc[mask_TOWER, "DEFL"] = pd.Series(line_MP[mask_MP], dtype="float64") + TOWER_offset
 
 
     return NODES["DEFL"]
@@ -110,25 +107,21 @@ def add_node(df, z_new):
 
 def interpolate_with_neighbors(data):
     """
-    Linearly interpolates None or NaN values in a list using only their immediate known left and right neighbors.
-
-    A sequence of consecutive None or NaN values is only interpolated if:
-    - There is a non-None/non-NaN value immediately before the sequence (on the left), and
-    - There is a non-None/non-NaN value immediately after the sequence (on the right).
-
-    The interpolation is linear and uses only the two bounding values.
-    If either neighbor is missing (e.g., at the start or end of the list), the missing values are left unchanged.
+    Linearly interpolates internal None/NaN values with neighbors and extrapolates
+    at the beginning and end using the first/last two known values.
 
     Parameters:
-        data (list of float, None, or NaN): The input list with numeric values and missing entries.
+        data (list of float, None, or NaN): The input list.
 
     Returns:
-        list of float or None: A new list with interpolated values where possible.
+        list of float or None: List with interpolated and extrapolated values.
     """
     def is_missing(x):
         return x is None or (isinstance(x, float) and math.isnan(x))
 
     result = data[:]
+
+    # --- First: Interpolate values with two known neighbors ---
     i = 0
     while i < len(result):
         if is_missing(result[i]):
@@ -145,19 +138,34 @@ def interpolate_with_neighbors(data):
                     result[j] = left + frac * (right - left)
         else:
             i += 1
+
+    # --- Then: Extrapolate missing values at the start ---
+    first_known_idx = next((i for i, x in enumerate(result) if not is_missing(x)), None)
+    if first_known_idx is not None and first_known_idx >= 2:
+        val1 = result[first_known_idx]
+        val2 = result[first_known_idx + 1]
+        for i in range(first_known_idx - 1, -1, -1):
+            result[i] = val1 - (first_known_idx - i) * (val2 - val1)
+
+    # --- Extrapolate missing values at the end ---
+    last_known_idx = next((i for i in reversed(range(len(result))) if not is_missing(result[i])), None)
+    if last_known_idx is not None and last_known_idx <= len(result) - 3:
+        val1 = result[last_known_idx]
+        val2 = result[last_known_idx - 1]
+        for i in range(last_known_idx + 1, len(result)):
+            result[i] = val1 + (i - last_known_idx) * (val1 - val2)
+
     return result
 
-
-def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=None, ModelName="Struct", EModul="2.10E+11", fyk="355", poisson="0.3", dens="7850", addMass=0,
+def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, defl_TP=None, ModelName="Struct", EModul="2.10E+11", fyk="355", poisson="0.3", dens="7850", addMass=0,
                          member_id=1, create_node_tolerance=0.1, seabed_level=None):
     NODES_txt = []
     ELEMENTS_txt = []
     elements = []
 
     if seabed_level is not None:
-        GEOMETRY = mc.interpolate_node(GEOMETRY, seabed_level)
+        GEOMETRY = mc.add_element(GEOMETRY, seabed_level)
     GEOMETRY = GEOMETRY.loc[GEOMETRY["Bottom [m]"] >= seabed_level]
-
     # Nodes
     N_Nodes = len(GEOMETRY) + 1
     NODES = pd.DataFrame({
@@ -179,6 +187,11 @@ def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=Non
     # calculate deflection
     calculate_deflection(NODES, defl_MP, defl_TP, delf_TOWER)
 
+    # insert Node at WL
+    if not 0 in NODES["z"].values:
+        NODES = add_node(NODES, 0)
+        GEOMETRY = mc.add_element(GEOMETRY, 0)
+
     # distribute Masses, create new Node if in between
     if MASSES is not None:
         # distribute Masses on Nodes
@@ -197,15 +210,26 @@ def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=Non
                     NODES = add_node(NODES, z_Mass)
                     NODES.loc[NODES["z"] == z_Mass, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
                     NODES.loc[NODES["z"] == z_Mass, "pMassName"] = MASSES.loc[idx, "comment"]
-                    GEOMETRY = mc.interpolate_node(GEOMETRY, z_Mass)
+                    GEOMETRY = mc.add_element(GEOMETRY, z_Mass)
                 else:
-                    print(f"Warning! Mass {MASSES.loc[idx, 'comment']} not added, it is below the seabed level!")
+                    print(f"Warning! Mass '{MASSES.loc[idx, 'comment']}' not added, it is below the seabed level!")
+
+    # add RNA
+    MP_top = NODES.iloc[0, :].loc["z"]
+    D_MP_top = GEOMETRY.iloc[0, :].loc["D, top [m]"]
+    t_MP_top = GEOMETRY.iloc[0, :].loc["t [mm]"]
+
+    z_RNA = MP_top + RNA.loc[0, "Offset TT_COG [m]"]
+    NODES = add_node(NODES, z_RNA)
+    GEOMETRY = pd.concat([pd.DataFrame({'Affiliation': 'TOWER', 'Top [m]': z_RNA, 'Bottom [m]': MP_top, 'D, top [m]': D_MP_top, 'D, bottom [m]': D_MP_top,
+                                     't [mm]': t_MP_top}, index=[-1]), GEOMETRY], ignore_index=True, axis=0)
+
+    NODES.loc[NODES["z"] == z_RNA, "pMass"] += RNA.loc[0, "Mass [t]"]*1000
+    NODES.loc[NODES["z"] == z_RNA, "pMassName"] = f"RNA {RNA.loc[0, 'Identifier']}"
+    NODES.loc[NODES["z"] == z_RNA, "pInertia"] = RNA.loc[0, 'Inertia [kg·m²]']
 
     # fill deflection values for newly inserted Nodes
     NODES.loc[:, "DEFL"] = interpolate_with_neighbors(NODES.loc[:, "DEFL"].values)
-
-    # Intertia
-    GEOMETRY["pInertia"] = 0
 
     # Revert Node order
     NODES = NODES.iloc[::-1].reset_index(drop=True)
@@ -236,9 +260,10 @@ def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=Non
         diameter = (GEOMETRY.loc[i, "D, top [m]"] + GEOMETRY.loc[i, "D, bottom [m]"]) / 2
         t_wall = GEOMETRY.loc[i, "t [mm]"] / 1000
 
-        elements.append({"elem_id": i + 1, "startnode": startnode, "endnode": endnode, "diameter": diameter, "t_wall": t_wall})
+        elements.append({"elem_id": i + 1, "startnode": startnode, "endnode": endnode, "diameter": diameter, "t_wall": t_wall, "dens": dens})
 
     ELEM = pd.DataFrame(elements)
+    ELEM.loc[ELEM.index[-1], "dens"] = 1.0
 
     for idx, elem in ELEM.iterrows():
         temp = ("os_FeElem{model=ModelName\t"
@@ -250,7 +275,7 @@ def create_JBOOST_struct(GEOMETRY, defl_MP, delf_TOWER, MASSES=None, defl_TP=Non
                 ",EModul=" + str(EModul) + "\t" +
                 ",fky=" + str(fyk) + "\t" +
                 ",poisson=" + str(poisson) + "\t" +
-                ",dens=" + str(dens) + "\t" +
+                ",dens=" + str(elem['dens']) + "\t" +
                 ",addMass=" + str(addMass) + "\t" +
                 ",member_id=" + str(member_id) + "\t" +
                 "}")
@@ -275,12 +300,15 @@ def export_JBOOST(lua_path):
     MARINE_GROWTH = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "MARINE_GROWTH")
     PARAMETERS = ex.read_excel_table("GeometrieConverter.xlsm", "ExportStructure", "JBOOST_PARAMETER")
     STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
+    RNA = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "RNA")
+
     # check Geometry
     sucess_GEOMETRY = mc.sanity_check_structure(GEOMETRY)
     if not sucess_GEOMETRY:
         return
 
     text = create_JBOOST_struct(GEOMETRY,
+                                RNA,
                                 (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Value"].values[0], PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Unit"].values[0]),
                                 (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Value"].values[0], PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Unit"].values[0]),
                                 MASSES=MASSES,
