@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 import excel as ex
-
+import re
 
 def valid_data(data):
     if pd.isna(data.values).any():
@@ -195,7 +195,6 @@ def assemble_structure(rho, RNA_config):
     MP_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_META")
     TP_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_META")
     TOWER_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_META")
-
     STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
     STRUCTURE_META.loc[:, "Value"] = ""
 
@@ -208,7 +207,7 @@ def assemble_structure(rho, RNA_config):
         return
 
     # RNA
-    if RNA_config is "":
+    if RNA_config == "":
         ex.show_message_box("GeometrieConverter.xlsm",
                             f"Caution, no RNA selected")
     else:
@@ -242,6 +241,7 @@ def assemble_structure(rho, RNA_config):
     MP_DATA.insert(0, "Affiliation", "MP")
     TP_DATA.insert(0, "Affiliation", "TP")
     TOWER_DATA.insert(0, "Affiliation", "TOWER")
+
 
     # Extract ranges
     range_MP = MP_DATA["Top [m]"].to_list() + list([MP_DATA["Bottom [m]"].values[-1]])
@@ -332,7 +332,13 @@ def assemble_structure(rho, RNA_config):
     ALL_MASSES.sort_values(inplace=True, ascending=False, axis=0, by=["Elevation [m]"])
 
     ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
-    ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
+
+    # #hubheight handling
+    # if RNA.loc[0, "Offset TT to HH [m]"] is not None:
+    #     STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Hubheight ", "Value"] = float(RNA.loc[0, "Offset TT to HH [m]"]+WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE.index[0], "Top [m]"])
+    #
+    # ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
+    #
 
     return
 

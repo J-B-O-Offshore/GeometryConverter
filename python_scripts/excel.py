@@ -308,23 +308,37 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None):
         workbook_name (str): The name of the workbook
         sheet_name (str): The name of the sheet containing the table.
         table_name (str): The name of the Excel Table (not the range name).
+        dtype (type or dict): Optional dtype to cast columns to.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data with correct headers.
     """
-    wb = xw.Book(workbook_name)
 
+    wb = xw.Book(workbook_name)
     sheet = wb.sheets[sheet_name]
     table = sheet.tables[table_name]
 
-    # Read the data body into a DataFrame
-    df = table.data_body_range.options(pd.DataFrame, header=False, index=False).value
+    data_range = table.data_body_range
+    headers = [h.strip() if isinstance(h, str) else str(h) for h in table.header_row_range.value]
 
-    # Set the correct headers from the table's header row
-    df.columns = [h.strip() for h in table.header_row_range.value]
-    # Apply dtype if specified
-    if dtype is not None:
+    if dtype == str:
+        raw_data = [
+            [cell.api.Text for cell in row]
+            for row in data_range.rows
+        ]
+    else:
+        raw_data = data_range.value
+        if not isinstance(raw_data[0], (list, tuple)):
+            raw_data = [raw_data]
+
+    df = pd.DataFrame(raw_data, columns=headers)
+
+    if dtype is not None and dtype != str:
         df = df.astype(dtype)
+    elif isinstance(dtype, dict):
+        for col, col_dtype in dtype.items():
+            df[col] = df[col].astype(col_dtype)
+
     return df
 
 
