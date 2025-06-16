@@ -377,14 +377,14 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, defl_T
     D_MP_top = GEOMETRY.iloc[0, :].loc["D, top [m]"]
     t_MP_top = GEOMETRY.iloc[0, :].loc["t [mm]"]
 
-    z_RNA = MP_top + RNA.loc[0, "Offset TT_COG [m]"]
+    z_RNA = MP_top + RNA.loc[0, "Vertical Offset TT to HH [m]"]
     NODES = add_node(NODES, z_RNA)
     GEOMETRY = pd.concat([pd.DataFrame({'Affiliation': 'TOWER', 'Top [m]': z_RNA, 'Bottom [m]': MP_top, 'D, top [m]': D_MP_top, 'D, bottom [m]': D_MP_top,
                                         't [mm]': t_MP_top}, index=[-1]), GEOMETRY], ignore_index=True, axis=0)
 
-    NODES.loc[NODES["z"] == z_RNA, "pMass"] += RNA.loc[0, "Mass [kg]"]
+    NODES.loc[NODES["z"] == z_RNA, "pMass"] += RNA.loc[0, "Mass of RNA [kg]"]
     NODES.loc[NODES["z"] == z_RNA, "pMassName"] = f"RNA {RNA.loc[0, 'Identifier']}"
-    NODES.loc[NODES["z"] == z_RNA, "pInertia"] = RNA.loc[0, 'Inertia [kg m^2]']
+    NODES.loc[NODES["z"] == z_RNA, "pInertia"] = (RNA.loc[0, 'Inertia of RNA fore-aft @COG [kg m^2]'] + RNA.loc[0, 'Inertia of RNA side-side @COG [kg m^2]'])/2
 
     # fill deflection values for newly inserted Nodes
     NODES.loc[:, "DEFL"] = interpolate_with_neighbors(NODES.loc[:, "DEFL"].values)
@@ -676,6 +676,7 @@ def export_JBOOST(jboost_path):
 
         if config_data["h_hub"] == 'auto':
             resolve_auto_value("Hubheight", "h_hub", "Hubheight")
+
         if config_data["h_refwindspeed"] == 'auto':
             config_data["h_refwindspeed"] = config_data["h_hub"]
 
@@ -716,7 +717,7 @@ def export_JBOOST(jboost_path):
                                            EModul=PARAMETERS.loc[PARAMETERS["Parameter"] == "EModul", "Value"].values[0],
                                            fyk="355",
                                            poisson="0.3",
-                                           dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "dens", "Value"].values[0],
+                                           dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "Steel Density", "Value"].values[0],
                                            addMass=0,
                                            member_id=1,
                                            create_node_tolerance=PARAMETERS.loc[PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[0],
@@ -740,6 +741,3 @@ def export_JBOOST(jboost_path):
     ex.show_message_box("GeometrieConverter.xlsm", f"JBOOST Structure {PARAMETERS.loc[PARAMETERS['Parameter'] == 'ModelName', 'Value'].values[0]} saved sucessfully at {jboost_path}")
 
     return
-
-
-export_JBOOST(".")
