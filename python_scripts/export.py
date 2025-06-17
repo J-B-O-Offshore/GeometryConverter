@@ -10,6 +10,131 @@ import math
 import re
 
 
+# %% helpers
+
+def add_node(df, z_new):
+    """
+    Add a new node at the specified height `z_new` to the DataFrame `df`.
+
+    Parameters:
+    - df (pd.DataFrame): Original node DataFrame.
+    - z_new (float): Height at which to add the new node.
+
+    Returns:
+    - pd.DataFrame: Updated DataFrame with new node added and reindexed.
+    """
+    # Create a new node row
+    new_node = pd.DataFrame([{
+        'z': z_new,
+        'node': 0,  # placeholder
+        'pInertia': 0,
+        'pMass': 0.0,
+        'Affiliation': 'ADDED_FOR_MASS'
+    }])
+
+    # Append and sort by height (descending)
+    df_updated = pd.concat([df, new_node], ignore_index=True)
+    df_updated = df_updated.sort_values(by='z', ascending=False).reset_index(drop=True)
+
+    # Reassign node numbers: highest z gets highest node number
+    max_node = df_updated['node'].max() + 1  # ensure uniqueness if original node numbers are reused
+    df_updated['node'] = list(range(max_node, max_node - len(df_updated), -1))
+
+    return df_updated
+
+
+def check_values(df: pd.DataFrame, columns=None, mode='missing') -> list[str]:
+    """
+    Check for missing or present values in specified columns of a DataFrame.
+
+    Parameters:
+    - df (pd.DataFrame): The DataFrame to check.
+    - columns (list, optional): List of column names to check. Defaults to all columns.
+    - mode (str): 'missing' to check for NaN/None values, 'present' to check for any present values.
+
+    Returns:
+    - list[str]: A list of error message strings describing the found issues.
+    """
+    if columns is None:
+        columns = df.columns
+    else:
+        missing_cols = [col for col in columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"The following columns are not in the DataFrame: {missing_cols}")
+
+    error_messages = []
+
+    for col in columns:
+        if mode == 'missing':
+            mask = df[col].isna()
+            if mask.any():
+                for idx in df.index[mask]:
+                    error_messages.append(f"Missing value in column '{col}' at index {idx}")
+        elif mode == 'present':
+            mask = ~df[col].isna()
+            if mask.any():
+                for idx in df.index[mask]:
+                    error_messages.append(f"Unexpected value in column '{col}' at index {idx}: {df.at[idx, col]!r}")
+        else:
+            raise ValueError("Invalid mode. Use 'missing' or 'present'.")
+
+    return error_messages
+
+
+def interpolate_with_neighbors(data):
+    """
+    Linearly interpolates internal None/NaN values with neighbors and extrapolates
+    at the beginning and end using the first/last two known values.
+
+    Parameters:
+        data (list of float, None, or NaN): The input list.
+
+    Returns:
+        list of float or None: List with interpolated and extrapolated values.
+    """
+
+    def is_missing(x):
+        return x is None or (isinstance(x, float) and math.isnan(x))
+
+    result = data[:]
+
+    # --- First: Interpolate values with two known neighbors ---
+    i = 0
+    while i < len(result):
+        if is_missing(result[i]):
+            start = i
+            while i < len(result) and is_missing(result[i]):
+                i += 1
+            end = i
+            if 0 < start and end < len(result) and not is_missing(result[start - 1]) and not is_missing(result[end]):
+                left = result[start - 1]
+                right = result[end]
+                n = end - start + 1
+                for j in range(start, end):
+                    frac = (j - start + 1) / n
+                    result[j] = left + frac * (right - left)
+        else:
+            i += 1
+
+    # --- Then: Extrapolate missing values at the start ---
+    first_known_idx = next((i for i, x in enumerate(result) if not is_missing(x)), None)
+    if first_known_idx is not None and first_known_idx >= 2:
+        val1 = result[first_known_idx]
+        val2 = result[first_known_idx + 1]
+        for i in range(first_known_idx - 1, -1, -1):
+            result[i] = val1 - (first_known_idx - i) * (val2 - val1)
+
+    # --- Extrapolate missing values at the end ---
+    last_known_idx = next((i for i in reversed(range(len(result))) if not is_missing(result[i])), None)
+    if last_known_idx is not None and last_known_idx <= len(result) - 3:
+        val1 = result[last_known_idx]
+        val2 = result[last_known_idx - 1]
+        for i in range(last_known_idx + 1, len(result)):
+            result[i] = val1 + (i - last_known_idx) * (val1 - val2)
+
+    return result
+
+
 def read_lua_values(file_path, keys):
     """
     Extracts specified key-value pairs from a Lua file.
@@ -100,6 +225,8 @@ def write_lua_variables(lua_string, variables):
     return "\n".join(lines)
 
 
+# %% functions
+
 def calculate_deflection(
         NODES: pd.DataFrame,
         defl_MP: Tuple[float, str],
@@ -163,91 +290,6 @@ def calculate_deflection(
     NODES.loc[mask_TOWER, "DEFL"] = pd.Series(line_MP[mask_MP], dtype="float64") + TOWER_offset
 
     return NODES["DEFL"]
-
-
-def add_node(df, z_new):
-    """
-    Add a new node at the specified height `z_new` to the DataFrame `df`.
-
-    Parameters:
-    - df (pd.DataFrame): Original node DataFrame.
-    - z_new (float): Height at which to add the new node.
-
-    Returns:
-    - pd.DataFrame: Updated DataFrame with new node added and reindexed.
-    """
-    # Create a new node row
-    new_node = pd.DataFrame([{
-        'z': z_new,
-        'node': 0,  # placeholder
-        'pInertia': 0,
-        'pMass': 0.0,
-        'Affiliation': 'ADDED_FOR_MASS'
-    }])
-
-    # Append and sort by height (descending)
-    df_updated = pd.concat([df, new_node], ignore_index=True)
-    df_updated = df_updated.sort_values(by='z', ascending=False).reset_index(drop=True)
-
-    # Reassign node numbers: highest z gets highest node number
-    max_node = df_updated['node'].max() + 1  # ensure uniqueness if original node numbers are reused
-    df_updated['node'] = list(range(max_node, max_node - len(df_updated), -1))
-
-    return df_updated
-
-
-def interpolate_with_neighbors(data):
-    """
-    Linearly interpolates internal None/NaN values with neighbors and extrapolates
-    at the beginning and end using the first/last two known values.
-
-    Parameters:
-        data (list of float, None, or NaN): The input list.
-
-    Returns:
-        list of float or None: List with interpolated and extrapolated values.
-    """
-
-    def is_missing(x):
-        return x is None or (isinstance(x, float) and math.isnan(x))
-
-    result = data[:]
-
-    # --- First: Interpolate values with two known neighbors ---
-    i = 0
-    while i < len(result):
-        if is_missing(result[i]):
-            start = i
-            while i < len(result) and is_missing(result[i]):
-                i += 1
-            end = i
-            if 0 < start and end < len(result) and not is_missing(result[start - 1]) and not is_missing(result[end]):
-                left = result[start - 1]
-                right = result[end]
-                n = end - start + 1
-                for j in range(start, end):
-                    frac = (j - start + 1) / n
-                    result[j] = left + frac * (right - left)
-        else:
-            i += 1
-
-    # --- Then: Extrapolate missing values at the start ---
-    first_known_idx = next((i for i, x in enumerate(result) if not is_missing(x)), None)
-    if first_known_idx is not None and first_known_idx >= 2:
-        val1 = result[first_known_idx]
-        val2 = result[first_known_idx + 1]
-        for i in range(first_known_idx - 1, -1, -1):
-            result[i] = val1 - (first_known_idx - i) * (val2 - val1)
-
-    # --- Extrapolate missing values at the end ---
-    last_known_idx = next((i for i in reversed(range(len(result))) if not is_missing(result[i])), None)
-    if last_known_idx is not None and last_known_idx <= len(result) - 3:
-        val1 = result[last_known_idx]
-        val2 = result[last_known_idx - 1]
-        for i in range(last_known_idx + 1, len(result)):
-            result[i] = val1 + (i - last_known_idx) * (val1 - val2)
-
-    return result
 
 
 def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, defl_TP=None, ModelName="Struct", EModul="2.10E+11", fyk="355", poisson="0.3", dens="7850", addMass=0,
@@ -384,7 +426,7 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, defl_T
 
     NODES.loc[NODES["z"] == z_RNA, "pMass"] += RNA.loc[0, "Mass of RNA [kg]"]
     NODES.loc[NODES["z"] == z_RNA, "pMassName"] = f"RNA {RNA.loc[0, 'Identifier']}"
-    NODES.loc[NODES["z"] == z_RNA, "pInertia"] = (RNA.loc[0, 'Inertia of RNA fore-aft @COG [kg m^2]'] + RNA.loc[0, 'Inertia of RNA side-side @COG [kg m^2]'])/2
+    NODES.loc[NODES["z"] == z_RNA, "pInertia"] = (RNA.loc[0, 'Inertia of RNA fore-aft @COG [kg m^2]'] + RNA.loc[0, 'Inertia of RNA side-side @COG [kg m^2]']) / 2
 
     # fill deflection values for newly inserted Nodes
     NODES.loc[:, "DEFL"] = interpolate_with_neighbors(NODES.loc[:, "DEFL"].values)
@@ -450,7 +492,8 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, defl_T
     return text
 
 
-def create_JBOOST_proj(Parameters, marine_growth=None, modelname="struct.lua", runFEModul=True, runFrequencyModul=False, runHindcastValidation=False, wavefile="wave.lua", windfile="wind."):
+def create_JBOOST_proj(Parameters, marine_growth=None, modelname="struct.lua", runFEModul=True, runFrequencyModul=False, runHindcastValidation=False, wavefile="wave.lua",
+                       windfile="wind."):
     """
        Generates a Lua-based project file text for JBOOST simulations based on input parameters and configuration flags.
 
@@ -610,14 +653,167 @@ os_PlotResultsGraph([[Result_JBOOST_Graph]])
 
     # marine growth
     if marine_growth is not None:
-        marine_text = ["os_OceanMG{"+f"id=HD, topMGsection = {row['Top [m]']},   bottomMGsection = {row['Bottom [m]']},    t={row['Marine Growth [mm]']/1000}" + "} -- marine growth layer spec." for _, row in marine_growth.iterrows()]
+        marine_text = [
+            "os_OceanMG{" + f"id=HD, topMGsection = {row['Top [m]']},   bottomMGsection = {row['Bottom [m]']},    t={row['Marine Growth [mm]'] / 1000}" + "} -- marine growth layer spec."
+            for _, row in marine_growth.iterrows()]
         marine_text = "\n".join(marine_text)
         Proj_text = Proj_text.replace("?MARINE_GROWTH", marine_text)
-
 
     return Proj_text
 
 
+def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
+    """
+    Generate a WLGen input file text based on structural and geometric input data.
+
+    Parameters
+    ----------
+    APPURTANCES : pd.DataFrame
+        Table containing appurtenance data. Required columns:
+        'Top [m]', 'Bottom [m]', 'Mass [kg]', 'Diameter [m]', 'Orientation [°]',
+        'Surface roughness [m]', 'Distance Axis to Axis', 'Gap between surfaces', 'comment'.
+    ADDITIONAL_MASSES : pd.DataFrame
+        Table of additional point masses. Required columns:
+        'Top [m]', 'Bottom [m]', 'Mass [kg]', 'comment'.
+    MP : pd.DataFrame
+        Monopile section data. Required columns:
+        'D, bottom [m]', 'D, top [m]', 't [mm]', 'Bottom [m]', 'Top [m]'.
+    TP : pd.DataFrame
+        Transition piece section data. Same format as MP.
+    MARINE_GROWTH : pd.DataFrame
+        Marine growth parameters. Required columns:
+        'Bottom [m]', 'Top [m]', 'Marine Growth [mm]', 'Density  [kg/m^3]', 'Surface Roughness [m]'.
+
+    Returns
+    -------
+    tuple[str, str]
+        A tuple where the first item is the generated WLGen text if successful,
+        and the second item is an error message (empty string if successful).
+        If an error occurs, the first item is False.
+    """
+    def check_values(df, columns):
+        return [col for col in columns if df[col].isnull().any()]
+
+    input_checks = [
+        # For APPURTANCES: exclude mutually exclusive fields from missing value check
+        (APPURTANCES, [
+            "Top [m]", "Bottom [m]", "Mass [kg]",
+            "Diameter [m]", "Orientation [°]", "Surface roughness [m]", "comment"
+        ], "APPURTANCES"),
+        (ADDITIONAL_MASSES, ["Top [m]", "Bottom [m]", "Mass [kg]", "comment"], "ADDITIONAL_MASSES"),
+        (MP, ["D, bottom [m]", "D, top [m]", "t [mm]", "Bottom [m]", "Top [m]"], "MP"),
+        (TP, ["D, bottom [m]", "D, top [m]", "t [mm]", "Bottom [m]", "Top [m]"], "TP"),
+        (MARINE_GROWTH, [
+            "Bottom [m]", "Top [m]", "Marine Growth [mm]",
+            "Density  [kg/m^3]", "Surface Roughness [m]"
+        ], "MARINE_GROWTH"),
+    ]
+
+    for df, required_cols, name in input_checks:
+        missing_cols = [col for col in required_cols if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns in {name}:\n" + "\n".join(missing_cols)
+
+        missing_vals = check_values(df, required_cols)
+        if missing_vals:
+            return False, f"Missing values in {name}:\n" + "\n".join(missing_vals)
+
+    # Additional check: ensure APPURTANCES has the mutually exclusive columns
+    for col in ["Distance Axis to Axis", "Gap between surfaces"]:
+        if col not in APPURTANCES.columns:
+            return False, f"Missing required column '{col}' in APPURTANCES."
+
+    # Now validate mutual exclusivity per row
+    err_list = []
+    for idx, row in APPURTANCES.iterrows():
+        row_num = idx + 1
+        axis_to_axis = row["Distance Axis to Axis"]
+        gap_between = row["Gap between surfaces"]
+
+        if pd.isna(axis_to_axis) and pd.isna(gap_between):
+            err_list.append(f"Row {row_num}: Define either 'Distance Axis to Axis' or 'Gap between surfaces'.")
+        elif not pd.isna(axis_to_axis) and not pd.isna(gap_between):
+            err_list.append(f"Row {row_num}: Define only one of 'Distance Axis to Axis' or 'Gap between surfaces', not both.")
+
+    if err_list:
+        return False, "Geometry specification issues in APPURTANCES:\n" + "\n".join(err_list)
+
+    # === STRING GENERATION ===
+    Data_MonopileSections = [
+        ("Data_MonopileSections{" +
+         f" diameter_bot =  {row['D, bottom [m]']:01.3f}, " +
+         f" diameter_top = {row['D, top [m]']:01.3f}, " +
+         f" wall_thickness = {(row['t [mm]'] / 1000):01.3f}, " +
+         f" z_bot = {row['Bottom [m]']:01.3f}, " +
+         f" z_top = {row['Top [m]']:01.3f}, " +
+         " surface_roughness = 0, " +
+         "}") for _, row in MP.iterrows()
+    ]
+
+    Data_TransitionPieceSections = [
+        ("Data_TransitionPieceSections{" +
+         f" diameter_bot =  {row['D, bottom [m]']:01.3f}, " +
+         f" diameter_top = {row['D, top [m]']:01.3f}, " +
+         f" wall_thickness = {(row['t [mm]'] / 1000):01.3f}, " +
+         f" z_bot = {row['Bottom [m]']:01.3f}, " +
+         f" z_top = {row['Top [m]']:01.3f}, " +
+         " surface_roughness = 0, " +
+         "}") for _, row in TP.iterrows()
+    ]
+
+    Data_Masses_Monopile_TransitionPiece = [
+        ("Data_Masses_Monopile_TransitionPiece{" +
+         f" id = \"{row['comment']}\", " +
+         f" z =  {((row['Top [m]'] + row['Bottom [m]']) / 2):01.3f}, " +
+         f" mass =  {row['Mass [kg]']:01.1f}, " +
+         "}") for _, row in ADDITIONAL_MASSES.iterrows()
+    ]
+
+    Data_Appurtenances = []
+    for _, row in APPURTANCES.iterrows():
+        parts = [
+            f" id = \"{row['comment']}\"",
+            f" z_bot = {row['Bottom [m]']:01.3f}",
+            f" z_top = {row['Top [m]']:01.3f}",
+            f" diameter = {row['Diameter [m]']:01.3f}",
+            f" orientation = {row['Orientation [°]']:01.3f}",
+            f" mass = {row['Mass [kg]']:01.1f}",
+            f" surface_roughness = {row['Surface roughness [m]']:01.3f}"
+        ]
+        if pd.notna(row['Gap between surfaces']):
+            parts.insert(6, f" gap_between_surfaces = {row['Gap between surfaces']}")
+        if pd.notna(row['Distance Axis to Axis']):
+            parts.insert(6, f" distance_axis_to_axis = {row['Distance Axis to Axis']}")
+        Data_Appurtenances.append(" Data_Appurtenances{" + ", ".join(parts) + " }")
+
+    Data_MarineGrowth = [
+        ("Data_MarineGrowth{" +
+         f" z_bot = \"{row['Bottom [m]']}\", " +
+         f" z_top =  {row['Top [m]']:01.3f}, " +
+         f" thickness =  {(row['Marine Growth [mm]']/1000):01.3f}, " +
+         f" density =  {row['Density  [kg/m^3]']:01.0f}, " +
+         f" surface_roughness =  {row['Surface Roughness [m]']:01.3f}, " +
+         "}") for _, row in MARINE_GROWTH.iterrows()
+    ]
+
+    text = (
+        "--Input for WLGen generated by Excel\n\n"
+        "--data for monopile sections: vertical positions z_bot and z_top are relative to design water level. Dimensions in meters.\n"
+        + "\n".join(Data_MonopileSections) + "\n\n"
+        "--data for transition-piece sections: vertical positions z_bot and z_top are relative to design water level. Dimensions in meters.\n"
+        + "\n".join(Data_TransitionPieceSections) + "\n\n"
+        "--data for additional masses: vertical positions z are relative to design water level.\n"
+        + "\n".join(Data_Masses_Monopile_TransitionPiece) + "\n\n"
+        "--data for appurtenances: vertical positions z_bot and z_top are relative to design water level. Dimensions in meters, with the exception of orientation in degree from North and mass in kg.\n"
+        + "\n".join(Data_Appurtenances) + "\n\n"
+        "--data for marine growth: thickness up to defined vertical positions, relative to design water level, both in meters. The thickness is zero above the last given vertical position. Density in kg/m3.\n"
+        + "\n".join(Data_MarineGrowth)
+    )
+
+    return text, ""
+
+
+# %% macros
 def export_JBOOST(jboost_path):
     jboost_path = os.path.abspath(jboost_path)
     GEOMETRY = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "WHOLE_STRUCTURE")
@@ -730,14 +926,50 @@ def export_JBOOST(jboost_path):
         if not os.path.exists(path_config):
             os.mkdir(path_config)
 
-        path_proj = os.path.join(path_config, config_name+".lua")
-        path_struct = os.path.join(path_config, Model_name+".lua")
+        path_proj = os.path.join(path_config, config_name + ".lua")
+        path_struct = os.path.join(path_config, Model_name + ".lua")
 
         with open(path_proj, 'w') as file:
             file.write(proj_text)
         with open(path_struct, 'w') as file:
             file.write(struct_text)
 
-    ex.show_message_box("GeometrieConverter.xlsm", f"JBOOST Structure {PARAMETERS.loc[PARAMETERS['Parameter'] == 'ModelName', 'Value'].values[0]} saved sucessfully at {jboost_path}")
+    ex.show_message_box("GeometrieConverter.xlsm",
+                        f"JBOOST Structure {PARAMETERS.loc[PARAMETERS['Parameter'] == 'ModelName', 'Value'].values[0]} saved sucessfully at {jboost_path}")
 
     return
+
+
+def export_WLGen(WLGen_path):
+    APPURTANCES_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "WLGen", "APPURTANCES")
+    STRUCTURE = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "WHOLE_STRUCTURE")
+    STRUCTURE = STRUCTURE.drop(columns=["Section", "local Section"])
+    MARINE_GROWTH = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "MARINE_GROWTH")
+    STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
+
+    APPURTANCES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "WL", :]
+    ADDITIONAL_MASSES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "AM", :]
+
+    # cut of below waterline
+    z_wl = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0]
+    STRUCTURE = mc.add_element(STRUCTURE, z_new=z_wl)
+    STRUCTURE = STRUCTURE[STRUCTURE["Bottom [m]"] >= z_wl]
+    # only take MP and TP
+    MP = STRUCTURE.loc[STRUCTURE.loc[:, "Affiliation"] == "MP", :]
+    TP = STRUCTURE.loc[STRUCTURE.loc[:, "Affiliation"] == "TP", :]
+
+    text, msg = create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH)
+
+    # Feedback to user
+    if not text:
+        ex.show_message_box("GeometrieConverter.xlsm", f"WLGen Structure could not be created: {msg}")
+    else:
+        model_name = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0] + ".lua"
+        WLGen_path = os.path.abspath(os.path.join(WLGen_path, model_name))
+
+        with open(WLGen_path, 'w') as file:
+            file.write(text)
+        ex.show_message_box("GeometrieConverter.xlsm", f"WLGen Structure created successfully and saved at {WLGen_path}.")
+    return
+
+

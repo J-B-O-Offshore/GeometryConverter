@@ -207,7 +207,11 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
 import xlwings as xw
 
 
-def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation", default="vbDefaultButton1", title="Message"):
+import xlwings as xw
+import textwrap
+
+def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation",
+                     default="vbDefaultButton1", title="Message"):
     """
     Shows a message box in Excel by injecting VBA code dynamically and calling it.
 
@@ -264,20 +268,29 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
 
     msgbox_flags = VBA_BUTTONS.get(buttons, 0) + VBA_ICONS.get(icon, 0) + VBA_DEFAULTS.get(default, 0)
 
-    # Escape double quotes in message
-    message_escaped = message.replace('"', '""')
+    # --- Prepare message for VBA ---
+    message_escaped = (
+        message.replace('"', '""')      # Escape quotes
+               .replace('\t', '" & vbTab & "')  # Replace tabs
+               .replace('\n', '" & vbNewLine & "')  # Replace newlines
+    )
 
+    # Split into safe chunks to avoid line overflow in VBA
+    max_chunk_length = 900
+    chunks = textwrap.wrap(message_escaped, max_chunk_length)
+    message_vba = ' & _\n    '.join(f'"{chunk}"' for chunk in chunks)
+
+    # --- VBA code injection ---
     vba_code = f"""
     Function ShowMessageBox() As Integer
-        ShowMessageBox = MsgBox("{message_escaped}", {msgbox_flags}, "{title}")
+        ShowMessageBox = MsgBox({message_vba}, {msgbox_flags}, "{title}")
     End Function
     """
 
     module_name = "MsgBoxTemp"
-
     vbproj = wb.api.VBProject
 
-    # Check if module exists, otherwise add it
+    # Add or get the module
     try:
         vb_module = vbproj.VBComponents(module_name)
     except Exception:
@@ -286,15 +299,13 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
 
     code_module = vb_module.CodeModule
 
-    # Delete existing code
+    # Clear old code and insert new
     count_lines = code_module.CountOfLines
     if count_lines > 0:
         code_module.DeleteLines(1, count_lines)
-
-    # Add new VBA code
     code_module.AddFromString(vba_code)
 
-    # Run the VBA function
+    # Run the function
     result = wb.macro("ShowMessageBox")()
 
     return response_map.get(result, f"Unknown ({result})")

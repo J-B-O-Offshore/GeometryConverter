@@ -108,7 +108,7 @@ def calc_weight(rho, t, z_top, z_bot, d_top, d_bot):
     return rho * volume
 
 
-def add_element(df, height):
+def add_element(df, z_new):
     """
     Inserts an interpolated node into a structural DataFrame at a specified height.
 
@@ -143,10 +143,10 @@ def add_element(df, height):
     - The "Affiliation" of the new row is copied from the original row if the column exists.
     - No checks are made for column types or values; ensure input DataFrame is clean and valid.
     """
-    if len(df.loc[(df["Top [m]"] == height) | (df["Bottom [m]"] == height)].index) > 0:
+    if len(df.loc[(df["Top [m]"] == z_new) | (df["Bottom [m]"] == z_new)].index) > 0:
         return df
 
-    id_inter = df.loc[(df["Top [m]"] > height) & (df["Bottom [m]"] < height)].index
+    id_inter = df.loc[(df["Top [m]"] > z_new) & (df["Bottom [m]"] < z_new)].index
     if len(id_inter) == 0:
         print("interpolation not possible, outside bounds")
         return df
@@ -163,17 +163,17 @@ def add_element(df, height):
     new_row.loc[0, "t [mm]"] = df.loc[id_inter, "t [mm]"]
 
     # height
-    new_row.loc[0, "Top [m]"] = height
+    new_row.loc[0, "Top [m]"] = z_new
     new_row.loc[0, "Bottom [m]"] = df.loc[id_inter, "Bottom [m]"]
 
     # diameter interpolation
-    inter_x_rel = (height - df.loc[id_inter, "Bottom [m]"]) / (df.loc[id_inter, "Top [m]"] - df.loc[id_inter, "Bottom [m]"])
+    inter_x_rel = (z_new - df.loc[id_inter, "Bottom [m]"]) / (df.loc[id_inter, "Top [m]"] - df.loc[id_inter, "Bottom [m]"])
     d_inter = (df.loc[id_inter, "D, top [m]"] - df.loc[id_inter, "D, bottom [m]"]) * inter_x_rel + df.loc[id_inter, "D, bottom [m]"]
     new_row.loc[0, "D, top [m]"] = d_inter
     new_row.loc[0, "D, bottom [m]"] = df.loc[id_inter, "D, bottom [m]"]
 
     # update original segment
-    df.loc[id_inter, "Bottom [m]"] = height
+    df.loc[id_inter, "Bottom [m]"] = z_new
 
     # insert new row
     df = pd.concat([df.iloc[:id_inter + 1], new_row, df.iloc[id_inter + 1:]]).reset_index(drop=True)
