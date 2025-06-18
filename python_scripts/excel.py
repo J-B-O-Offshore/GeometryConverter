@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 import pandas as pd
 import numpy as np
-
+import re
 def setup_logger():
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
@@ -128,6 +128,7 @@ def write_df(workbook_name, sheet_name, upper_left_address, dataframe, include_h
     except Exception as e:
         print(f"Error writing DataFrame to Excel: {e}")
         logger.debug(f"Error!{e}")
+
 
 def write_value(workbook_name, sheet_name, cell_or_named_range, value):
     """
@@ -365,31 +366,56 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None):
 
 from pathlib import Path
 
-def read_excel_range(path, sheet_name, cell_range, dtype=None):
+
+def read_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
     """
-    Read a specific Excel range into a Pandas DataFrame, using the first row as headers.
+    Read a specific Excel range or cell from an Excel file.
 
     Parameters:
         path (str or Path): Full path to the Excel workbook.
         sheet_name (str): The name of the sheet containing the range.
-        cell_range (str): The Excel range to read (e.g., "B14:L30").
+        cell_range (str): Excel reference (e.g., "B14:L30", "F", "F10").
         dtype (dict or type, optional): Data type(s) to apply to the DataFrame.
+        use_header (bool): If True, use the first row of the range as column headers.
 
     Returns:
-        pd.DataFrame: DataFrame containing the range data with correct headers.
+        pd.DataFrame or single value: Depending on input range.
     """
     path = Path(path)
     app = xw.App(visible=False)
     try:
         wb = app.books.open(str(path))
         sheet = wb.sheets[sheet_name]
-        data = sheet.range(cell_range).options(pd.DataFrame, header=1, index=False).value
-        if dtype is not None:
+
+        # Case 1: Single cell like "F10"
+        if re.fullmatch(r"[A-Z]+[0-9]+", cell_range, re.IGNORECASE):
+            value = sheet.range(cell_range).value
+            return value
+
+        # Case 2: Single column like "F"
+        elif re.fullmatch(r"[A-Z]+", cell_range, re.IGNORECASE):
+            col = cell_range.upper()
+            last_row = sheet.range(f"{col}1048576").end("up").row  # Find last used row in column
+            cell_range = f"{col}1:{col}{last_row}"
+
+        # Case 3: Range like "B14:L30"
+        if use_header:
+            data = sheet.range(cell_range).options(pd.DataFrame, header=1, index=False).value
+        else:
+            values = sheet.range(cell_range).value
+            if values is None:
+                data = pd.DataFrame()
+            else:
+                data = pd.DataFrame(values)
+                data.columns = [f"Column{i+1}" for i in range(data.shape[1])]
+
+        if dtype is not None and not data.empty:
             data = data.astype(dtype)
     finally:
         wb.close()
         app.quit()
     return data
+
 
 def clear_excel_table_contents(workbook_name, sheet_name, table_name):
     """
