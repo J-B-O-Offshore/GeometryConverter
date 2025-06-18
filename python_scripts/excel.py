@@ -159,9 +159,12 @@ def write_value(workbook_name, sheet_name, cell_or_named_range, value):
         print(f"Error writing value to Excel: {e}")
         logger.debug(f"Error! {e}")
 
+
 def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     """
     Replace the contents of an existing Excel table with a pandas DataFrame using xlwings.
+
+    If the DataFrame is empty, the table is cleared but not resized or filled with rows.
 
     Parameters:
     - workbook_name: str, name of the open Excel workbook (no path needed if open).
@@ -183,18 +186,22 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     header_range = table.HeaderRowRange
     data_body_range = table.DataBodyRange
 
-    # Clear the existing table data (keep headers)
+    # Clear existing table data (keep headers)
     if data_body_range is not None and data_body_range.Rows.Count > 0:
         data_body_range.ClearContents()
 
-    # Remove the index to avoid it being written to Excel
+    # If the DataFrame is empty, return early after clearing
+    if dataframe.empty:
+        return
+
+    # Clean DataFrame to avoid writing the index
     df_clean = dataframe.reset_index(drop=True)
 
     # Write the new DataFrame below the headers
     start_cell = ws.range((header_range.Row + 1, header_range.Column))
     start_cell.options(index=False, header=False).value = df_clean
 
-    # Resize the table to match new data
+    # Resize the table to match the new data
     last_row = header_range.Row + df_clean.shape[0]
     last_col = header_range.Column + df_clean.shape[1] - 1
     new_range = ws.range(
@@ -202,7 +209,6 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
         (last_row, last_col)
     )
     table.Resize(new_range.api)
-
 
 import xlwings as xw
 
@@ -332,6 +338,9 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None):
     data_range = table.data_body_range
     headers = [h.strip() if isinstance(h, str) else str(h) for h in table.header_row_range.value]
 
+    if data_range is None:
+        return pd.DataFrame(columns=headers)
+
     if dtype == str:
         raw_data = [
             [cell.api.Text for cell in row]
@@ -339,6 +348,8 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None):
         ]
     else:
         raw_data = data_range.value
+        if not isinstance(raw_data, (list, tuple)):
+            raw_data = [raw_data]
         if not isinstance(raw_data[0], (list, tuple)):
             raw_data = [raw_data]
 
@@ -351,7 +362,6 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None):
             df[col] = df[col].astype(col_dtype)
 
     return df
-
 
 from pathlib import Path
 

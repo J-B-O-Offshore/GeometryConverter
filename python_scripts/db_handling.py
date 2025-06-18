@@ -128,23 +128,64 @@ def create_db_table(db_path, Identifier, df, if_exists='fail'):
         conn.close()
 
 
-def add_db_element(db_path, Structure_data, added_masses_data, Meta_infos):
-    log.debug(Meta_infos.to_string())
-    META = load_db_table(db_path, "META")
+def add_db_element(db_path, Structure_data, added_masses_data, Meta_values):
+    """
+    Adds a new structure entry to the database using the provided data.
 
-    Identifier = Meta_infos["Identifier"].values[0]
-    if Identifier in META["Identifier"].values:
-        _ = ex.show_message_box("GeometrieConverter.xlsm", "The provided Identifier of the new structure is already in the database, please provide a unique name")
+    Parameters:
+    -----------
+    db_path : str
+        Path to the SQLite database.
+    Structure_data : pd.DataFrame
+        Main structure data to be saved under a new table named after the Identifier.
+    added_masses_data : pd.DataFrame
+        Additional mass data to be saved under a new table named '{Identifier}__ADDED_MASSES'.
+    Meta_values : list
+        List of metadata values in the correct order. This must match the order of columns
+        in the existing 'META' table in the database: "Identifier,	Project ID,	Phase,	Structure ID,	Water Depth,	Height Reference,	comments"
+
+    Notes:
+    ------
+    - The column names from the 'META' table are treated as the master schema.
+    - The length of `Meta_values` must match the number of columns in 'META'.
+    - The value for the 'Identifier' column is used to determine the new table name.
+    - A warning will be shown and the operation aborted if the identifier already exists
+      in the database or if the length of `Meta_values` is incorrect.
+    """
+    # Load existing META table and schema
+    META = load_db_table(db_path, "META")
+    meta_columns = META.columns.tolist()
+
+    Meta_values = list(Meta_values)
+
+    if len(Meta_values) != len(meta_columns):
+        ex.show_message_box(
+            "GeometrieConverter.xlsm",
+            f"The number of provided metadata values ({len(Meta_values)}) does not match the required number of columns ({len(meta_columns)})."
+        )
         return False
 
+    Identifier = Meta_values[0]
+
+    if Identifier in META["Identifier"].values:
+        ex.show_message_box(
+            "GeometrieConverter.xlsm",
+            "The provided Identifier of the new structure is already in the database. Please provide a unique name."
+        )
+        return False
+
+    # Convert list to DataFrame with correct columns
+    Meta_infos = pd.DataFrame([Meta_values], columns=meta_columns)
+
+    # Save structure and mass data
     create_db_table(db_path, Identifier, Structure_data, if_exists='fail')
     create_db_table(db_path, f"{Identifier}__ADDED_MASSES", added_masses_data, if_exists='fail')
 
-    META = pd.concat([META, Meta_infos], axis=0)
+    # Append new metadata row and save
+    META = pd.concat([META, Meta_infos], ignore_index=True)
     create_db_table(db_path, "META", META, if_exists='replace')
 
-    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data saved in new Database entry {Identifier}")
-
+    ex.show_message_box("GeometrieConverter.xlsm", f"Data saved in new Database entry '{Identifier}'")
     return True
 
 
@@ -161,7 +202,7 @@ def delete_db_element(db_path, Identifier):
 
 
 def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, old_id):
-    META = load_db_table(db_path, "META")
+    META = load_db_table(db_path, "META", dtype=str)
     new_id = Meta_infos["Identifier"].values[0]
 
     # replace data in meta
@@ -312,15 +353,20 @@ def save_data(Structure, db_path, selected_structure):
 
         data_changed = not (DATA_DB.equals(DATA_CURR)) or not (MASSES_DB.equals(MASSES_CURR))
         meta_loaded_changed = not (META_DB.values[0][0:-1] == META_CURR.values[0][0:-1]).all()
-        meta_new_populated = (META_CURR_NEW.values[0][0:-2] != 'None').any()
+
+        # check, if values are in META_NEW
+        if META_CURR_NEW.empty:
+            meta_new_populated = False
+        else:
+            meta_new_populated = (META_CURR_NEW.values[0][:-1] != '').any()
 
         if meta_new_populated:
-            if not ((META_CURR_NEW.values[0][0:-2] != "None").all()):
+            if ((META_CURR_NEW.values[0][0:-1] == '').any()):
                 _ = ex.show_message_box("GeometrieConverter.xlsm",
                                         "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded Structure")
                 return False, _
 
-            sucess = add_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW)
+            sucess = add_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW.values[0])
 
             if sucess:
                 return True, META_CURR_NEW["Identifier"].values[0]
@@ -356,6 +402,9 @@ def save_data(Structure, db_path, selected_structure):
     DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA", dtype=float)
     MASSES_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES")
 
+    META_CURR = META_CURR[~(META_CURR == "").all(axis=1)]
+    META_CURR_NEW = META_CURR_NEW[~(META_CURR_NEW == "").all(axis=1)]
+
     DATA_CURR = DATA_CURR.dropna(how='all')
     MASSES_CURR = MASSES_CURR.dropna(how='all')
 
@@ -366,12 +415,12 @@ def save_data(Structure, db_path, selected_structure):
         saved, structure_load_after = saving_logic(META_FULL, META_DB, META_CURR, META_CURR_NEW, DATA_DB, DATA_CURR, MASSES_DB, MASSES_CURR)
 
     else:
-        if not ((META_CURR_NEW.values[0][0:-2] != "None").all()):
+        if (len(META_CURR_NEW)==0) or ((META_CURR_NEW.values[0][0:-2] == '').all()):
             _ = ex.show_message_box("GeometrieConverter.xlsm",
                                     "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded Structure")
             return
         else:
-            saved = add_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW)
+            saved = add_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW.values[0])
             structure_load_after = META_CURR_NEW["Identifier"].values[0]
 
     if saved:
@@ -583,3 +632,5 @@ def save_RNA_data(db_path, selected_structure):
     create_db_table(db_path, "data", DATA_CURR, if_exists='replace')
 
     return
+
+#save_MP_data("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/databases/MP.db", "")
