@@ -18,7 +18,7 @@ class ConciveError(Exception):
 log = ex.setup_logger()
 
 
-def drop_db_table(db_path, Identifier):
+def drop_db_table(excel_filename, db_path, Identifier):
     """
     Drops (deletes) a table from an SQLite database.
 
@@ -43,7 +43,7 @@ def drop_db_table(db_path, Identifier):
         conn = sqlite3.connect(db_path)
     except sqlite3.Error as e:
         ex.show_message_box(
-            "GeometrieConverter.xlsm",
+            excel_filename,
             f"Failed to connect to the database '{db_path}'.\nPython Error: {e}"
         )
         return False
@@ -53,7 +53,7 @@ def drop_db_table(db_path, Identifier):
         conn.commit()
     except sqlite3.Error as e:
         ex.show_message_box(
-            "GeometrieConverter.xlsm",
+            excel_filename,
             f"Failed to drop table '{Identifier}'.\nPython Error: {e}"
         )
         return False
@@ -121,7 +121,7 @@ def load_db_table(db_path, Identifier, dtype=None):
     return df
 
 
-def create_db_table(db_path, Identifier, df, if_exists='fail'):
+def create_db_table(excel_filename, db_path, Identifier, df, if_exists='fail'):
     """
     Creates or appends to a table in an SQLite database from a pandas DataFrame.
 
@@ -150,7 +150,7 @@ def create_db_table(db_path, Identifier, df, if_exists='fail'):
         conn = sqlite3.connect(db_path)
     except sqlite3.Error as e:
         ex.show_message_box(
-            "GeometrieConverter.xlsm",
+            excel_filename,
             f"Failed to connect to the database '{db_path}'.\nPython Error: {e}"
         )
         return False
@@ -159,7 +159,7 @@ def create_db_table(db_path, Identifier, df, if_exists='fail'):
         df.to_sql(Identifier, conn, if_exists=if_exists, index=False)
     except Exception as e:
         ex.show_message_box(
-            "GeometrieConverter.xlsm",
+            excel_filename,
             f"Failed to create or write to table '{Identifier}'.\nPython Error: {e}"
         )
         return False
@@ -169,7 +169,7 @@ def create_db_table(db_path, Identifier, df, if_exists='fail'):
     return True
 
 
-def add_db_element(db_path, Structure_data, added_masses_data, Meta_values):
+def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, Meta_values):
     """
     Adds a new structure entry to the database using the provided data.
 
@@ -201,7 +201,7 @@ def add_db_element(db_path, Structure_data, added_masses_data, Meta_values):
 
     if len(Meta_values) != len(meta_columns):
         ex.show_message_box(
-            "GeometrieConverter.xlsm",
+            excel_filename,
             f"The number of provided metadata values ({len(Meta_values)}) does not match the expected number of columns ({len(meta_columns)})."
         )
         return False
@@ -209,7 +209,7 @@ def add_db_element(db_path, Structure_data, added_masses_data, Meta_values):
     Identifier = Meta_values[0]
     if Identifier in META["Identifier"].values:
         ex.show_message_box(
-            "GeometrieConverter.xlsm",
+            excel_filename,
             "The provided Identifier already exists in the database. Please provide a unique name."
         )
         return False
@@ -218,23 +218,23 @@ def add_db_element(db_path, Structure_data, added_masses_data, Meta_values):
     Meta_infos = pd.DataFrame([Meta_values], columns=meta_columns)
 
     # Save structure data
-    if not create_db_table(db_path, Identifier, Structure_data, if_exists='fail'):
+    if not create_db_table(excel_filename, db_path, Identifier, Structure_data, if_exists='fail'):
         return False
 
     # Save added masses data
-    if not create_db_table(db_path, f"{Identifier}__ADDED_MASSES", added_masses_data, if_exists='fail'):
+    if not create_db_table(excel_filename, db_path, f"{Identifier}__ADDED_MASSES", added_masses_data, if_exists='fail'):
         return False
 
     # Append new metadata row and save updated META table
     META = pd.concat([META, Meta_infos], ignore_index=True)
-    if not create_db_table(db_path, "META", META, if_exists='replace'):
+    if not create_db_table(excel_filename, db_path, "META", META, if_exists='replace'):
         return False
 
-    ex.show_message_box("GeometrieConverter.xlsm", f"Data saved in new database entry '{Identifier}'.")
+    ex.show_message_box(excel_filename, f"Data saved in new database entry '{Identifier}'.")
     return True
 
 
-def delete_db_element(db_path, Identifier):
+def delete_db_element(excel_filename, db_path, Identifier):
     """
     Deletes an existing structure and its associated tables from the database.
 
@@ -261,7 +261,7 @@ def delete_db_element(db_path, Identifier):
 
     if Identifier not in META["Identifier"].values:
         ex.show_message_box(
-            "GeometrieConverter.xlsm",
+            excel_filename,
             f"No entry found for Identifier '{Identifier}' in the database."
         )
         return False
@@ -269,18 +269,18 @@ def delete_db_element(db_path, Identifier):
     # Remove the identifier row from META
     META = META[META["Identifier"] != Identifier]
 
-    if not drop_db_table(db_path, Identifier):
+    if not drop_db_table(excel_filename, db_path, Identifier):
         return False
-    if not drop_db_table(db_path, f"{Identifier}__ADDED_MASSES"):
+    if not drop_db_table(excel_filename, db_path, f"{Identifier}__ADDED_MASSES"):
         return False
-    if not create_db_table(db_path, "META", META, if_exists='replace'):
+    if not create_db_table(excel_filename, db_path, "META", META, if_exists='replace'):
         return False
 
-    ex.show_message_box("GeometrieConverter.xlsm", f"Deleted structure '{Identifier}' from the database.")
+    ex.show_message_box(excel_filename, f"Deleted structure '{Identifier}' from the database.")
     return True
 
 
-def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, old_id):
+def replace_db_element(excel_filename, db_path, Structure_data, added_masses_data, Meta_infos, old_id):
     """
     Replaces an existing structure entry in the database with updated data and metadata.
 
@@ -313,7 +313,7 @@ def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, o
 
     # Check for existing entry and valid update
     if old_id not in META["Identifier"].values:
-        ex.show_message_box("GeometrieConverter.xlsm", f"No existing entry found for '{old_id}' in the database.")
+        ex.show_message_box(excel_filename, f"No existing entry found for '{old_id}' in the database.")
         return False
 
     # Replace row in META
@@ -321,29 +321,29 @@ def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, o
 
     # Ensure no duplicate Identifiers after update
     if META["Identifier"].value_counts().get(new_id, 0) > 1:
-        ex.show_message_box("GeometrieConverter.xlsm", f"The identifier '{new_id}' is already used more than once. Please choose a unique name.")
+        ex.show_message_box(excel_filename, f"The identifier '{new_id}' is already used more than once. Please choose a unique name.")
         return False
 
     # Save new data
-    if not hardwrite_db_element_data(db_path, new_id, Structure_data, added_masses_data):
+    if not hardwrite_db_element_data(excel_filename, db_path, new_id, Structure_data, added_masses_data):
         return False
 
     # Drop old tables if identifier was changed
     if new_id != old_id:
-        if not drop_db_table(db_path, old_id):
+        if not drop_db_table(excel_filename, db_path, old_id):
             return False
-        if not drop_db_table(db_path, f"{old_id}__ADDED_MASSES"):
+        if not drop_db_table(excel_filename, db_path, f"{old_id}__ADDED_MASSES"):
             return False
 
     # Save updated META table
-    if not create_db_table(db_path, "META", META, if_exists="replace"):
+    if not create_db_table(excel_filename, db_path, "META", META, if_exists="replace"):
         return False
 
-    ex.show_message_box("GeometrieConverter.xlsm", f"Data for '{old_id}' successfully replaced with new entry '{new_id}'.")
+    ex.show_message_box(excel_filename, f"Data for '{old_id}' successfully replaced with new entry '{new_id}'.")
     return True
 
 
-def hardwrite_db_element_data(db_path, change_id, Structure_data, added_masses_data):
+def hardwrite_db_element_data(excel_filename, db_path, change_id, Structure_data, added_masses_data):
     """
     Replaces the structure and added masses tables in the database with new data.
 
@@ -369,13 +369,13 @@ def hardwrite_db_element_data(db_path, change_id, Structure_data, added_masses_d
     - A warning is shown if invalid (NaN) values are detected in `Structure_data`.
     """
     if pd.isna(Structure_data.values).any():
-        ex.show_message_box("GeometrieConverter.xlsm", "Structure data contains invalid (NaN) values. Please correct them before proceeding.")
+        ex.show_message_box(excel_filename, "Structure data contains invalid (NaN) values. Please correct them before proceeding.")
         return False
 
-    if not create_db_table(db_path, change_id, Structure_data, if_exists="replace"):
+    if not create_db_table(excel_filename, db_path, change_id, Structure_data, if_exists="replace"):
         return False
 
-    if not create_db_table(db_path, f"{change_id}__ADDED_MASSES", added_masses_data, if_exists="replace"):
+    if not create_db_table(excel_filename, db_path, f"{change_id}__ADDED_MASSES", added_masses_data, if_exists="replace"):
         return False
 
     return True
@@ -385,7 +385,7 @@ def check_db_integrity():
     return
 
 
-def load_META(Structure, db_path):
+def load_META(excel_filename, Structure, db_path):
     """
     Load the META table from the  database and update the structures dropdown
     in the Excel workbook.
@@ -402,16 +402,16 @@ def load_META(Structure, db_path):
 
     META = load_db_table(db_path, "META")
     ex.set_dropdown_values(
-        "GeometrieConverter.xlsm",
+        excel_filename,
         sheet_name_structure_loading,
         f"Dropdown_{Structure}_Structures",
         list(META.loc[:, "Identifier"].values)
     )
-    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_META_FULL", META)
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_FULL", META)
     return
 
 
-def load_DATA(Structure, Structure_name, db_path):
+def load_DATA(excel_filename, Structure, Structure_name, db_path):
     """
     Load metadata and structure-specific data from the database
     and write them to the Excel workbook.
@@ -433,18 +433,18 @@ def load_DATA(Structure, Structure_name, db_path):
 
     META_relevant = META.loc[META["Identifier"] == Structure_name]
 
-    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_META_TRUE", META_relevant)
-    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_META", META_relevant)
-    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_DATA_TRUE", DATA)
-    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_DATA", DATA)
-    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_MASSES_TRUE", MASSES)
-    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_MASSES", MASSES)
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_TRUE", META_relevant)
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META", META_relevant)
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_DATA_TRUE", DATA)
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_DATA", DATA)
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_MASSES_TRUE", MASSES)
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_MASSES", MASSES)
 
-    ex.clear_excel_table_contents("GeometrieConverter.xlsm", sheet_name_structure_loading, f"{Structure}_META_NEW")
-    ex.call_vba_dropdown_macro("GeometrieConverter.xlsm", sheet_name_structure_loading, f"Dropdown_{Structure}_Structures", Structure_name)
+    ex.clear_excel_table_contents(excel_filename, sheet_name_structure_loading, f"{Structure}_META_NEW")
+    ex.call_vba_dropdown_macro(excel_filename, sheet_name_structure_loading, f"Dropdown_{Structure}_Structures", Structure_name)
 
 
-def save_data(Structure, db_path, selected_structure):
+def save_data(excel_filename, Structure, db_path, selected_structure):
     """
     Saves data from an Excel sheet and updates a database based on changes in structure metadata and data.
 
@@ -488,7 +488,7 @@ def save_data(Structure, db_path, selected_structure):
         succes, DATA_CURR = valid_data(DATA_CURR)
 
         if not succes:
-            _ = ex.show_message_box("GeometrieConverter.xlsm",
+            _ = ex.show_message_box(excel_filename,
                                     "Invalid data found in Structure data! Aborting.")
             return False, _
 
@@ -509,11 +509,11 @@ def save_data(Structure, db_path, selected_structure):
 
         if meta_new_populated:
             if ((META_CURR_NEW.values[0][0:-1] == '').any()):
-                _ = ex.show_message_box("GeometrieConverter.xlsm",
+                _ = ex.show_message_box(excel_filename,
                                         "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded Structure")
                 return False, _
 
-            sucess = add_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW.values[0])
+            sucess = add_db_element(excel_filename, db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW.values[0])
 
             if sucess:
                 return True, META_CURR_NEW["Identifier"].values[0]
@@ -522,12 +522,12 @@ def save_data(Structure, db_path, selected_structure):
 
         if meta_loaded_changed:
             if not ((META_CURR.values[0][0:-1] != None).all()):
-                _ = ex.show_message_box("GeometrieConverter.xlsm", "Please fully populate the Current Meta table to modify the DB entry.")
+                _ = ex.show_message_box(excel_filename, "Please fully populate the Current Meta table to modify the DB entry.")
                 return False, _
             if selected_structure == "":
-                _ = ex.show_message_box("GeometrieConverter.xlsm", "Now database loaded. Please enter data into \"NEW\" datafield to create new database.")
+                _ = ex.show_message_box(excel_filename, "Now database loaded. Please enter data into \"NEW\" datafield to create new database.")
 
-            sucess = replace_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR.values[0], selected_structure)
+            sucess = replace_db_element(excel_filename, db_path, DATA_CURR, MASSES_CURR, META_CURR.values[0], selected_structure)
 
             if sucess:
                 return True, META_CURR["Identifier"].values[0]
@@ -535,21 +535,21 @@ def save_data(Structure, db_path, selected_structure):
                 return False, None
 
         if data_changed:
-            sucess = hardwrite_db_element_data(db_path, selected_structure, DATA_CURR, MASSES_CURR)
+            sucess = hardwrite_db_element_data(excel_filename, db_path, selected_structure, DATA_CURR, MASSES_CURR)
 
             if sucess:
                 return True, META_CURR["Identifier"].values[0]
             else:
                 return False, None
 
-        _ = ex.show_message_box("GeometrieConverter.xlsm", f"No changes detected.")
+        _ = ex.show_message_box(excel_filename, f"No changes detected.")
         return False, _
 
     META_FULL = load_db_table(db_path, "META")
-    META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META", dtype=str)
-    META_CURR_NEW = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META_NEW", dtype=str)
-    DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA")
-    MASSES_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES")
+    META_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META", dtype=str)
+    META_CURR_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META_NEW", dtype=str)
+    DATA_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_DATA")
+    MASSES_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_MASSES")
 
     # drop "" and nan rows
     META_CURR = META_CURR[~(META_CURR == "").all(axis=1)]
@@ -570,34 +570,34 @@ def save_data(Structure, db_path, selected_structure):
     saved, structure_load_after = saving_logic(META_FULL, META_DB, META_CURR, META_CURR_NEW, DATA_DB, DATA_CURR, MASSES_DB, MASSES_CURR)
 
     if saved:
-        load_META(Structure, db_path)
+        load_META(excel_filename, Structure, db_path)
 
-        load_DATA(Structure, structure_load_after, db_path)
+        load_DATA(excel_filename, Structure, structure_load_after, db_path)
 
 
-def delete_data(Structure, db_path, selected_structure):
-    answer = ex.show_message_box("GeometrieConverter.xlsm", f"Are you sure you want to delete the structure {selected_structure} from the database?", icon="vbYesNo",
+def delete_data(excel_filename, Structure, db_path, selected_structure):
+    answer = ex.show_message_box(excel_filename, f"Are you sure you want to delete the structure {selected_structure} from the database?", icon="vbYesNo",
                                  buttons="vbYesNo")
     logger = ex.setup_logger()
     logger.debug(answer)
     if answer == "Yes":
-        delete_db_element(db_path, selected_structure)
+        delete_db_element(excel_filename, db_path, selected_structure)
 
-        load_META(Structure, db_path)
+        load_META(excel_filename, Structure, db_path)
 
-        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META_NEW")
-        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META_TRUE")
-        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META")
-        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA_TRUE")
-        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA")
-        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES_TRUE")
-        ex.clear_excel_table_contents("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES")
+        ex.clear_excel_table_contents(excel_filename, "BuildYourStructure", f"{Structure}_META_NEW")
+        ex.clear_excel_table_contents(excel_filename, "BuildYourStructure", f"{Structure}_META_TRUE")
+        ex.clear_excel_table_contents(excel_filename, "BuildYourStructure", f"{Structure}_META")
+        ex.clear_excel_table_contents(excel_filename, "BuildYourStructure", f"{Structure}_DATA_TRUE")
+        ex.clear_excel_table_contents(excel_filename, "BuildYourStructure", f"{Structure}_DATA")
+        ex.clear_excel_table_contents(excel_filename, "BuildYourStructure", f"{Structure}_MASSES_TRUE")
+        ex.clear_excel_table_contents(excel_filename, "BuildYourStructure", f"{Structure}_MASSES")
 
     return
 
 
 # %% MP
-def load_MP_META(db_path):
+def load_MP_META(excel_caller, db_path):
     """
     Load the META table from the MP database and update the MP structures dropdown
     in the Excel workbook.
@@ -608,10 +608,11 @@ def load_MP_META(db_path):
     Returns:
         None
     """
-    load_META("MP", db_path)
+    excel_filename = os.path.basename(excel_caller)
+    load_META(excel_filename,"MP", db_path)
 
 
-def load_MP_DATA(Structure_name, db_path):
+def load_MP_DATA(excel_caller, Structure_name, db_path):
     """
     Load metadata and structure-specific data from the MP database
     and write them to the Excel workbook.
@@ -623,23 +624,30 @@ def load_MP_DATA(Structure_name, db_path):
     Returns:
         None
     """
+    excel_filename = os.path.basename(excel_caller)
 
-    load_DATA("MP", Structure_name, db_path)
-
-
-def save_MP_data(db_path, selected_structure):
-    save_data("MP", db_path, selected_structure)
-
-    return
+    load_DATA(excel_filename, "MP", Structure_name, db_path)
 
 
-def delete_MP_data(db_path, selected_structure):
-    delete_data("MP", db_path, selected_structure)
+def save_MP_data(excel_caller, db_path, selected_structure):
+    excel_filename = os.path.basename(excel_caller)
+
+    save_data(excel_filename, "MP", db_path, selected_structure)
 
     return
 
 
-def load_MP_from_MPTool(MP_path):
+def delete_MP_data(excel_caller, db_path, selected_structure):
+    excel_filename = os.path.basename(excel_caller)
+
+    delete_data(excel_filename, "MP", db_path, selected_structure)
+
+    return
+
+
+def load_MP_from_MPTool(excel_caller, MP_path):
+    excel_filename = os.path.basename(excel_caller)
+
     try:
         Section_col = ex.read_excel_range(MP_path, "Geometry", "C1:C1000")
         Section_col = Section_col.iloc[:, 0].dropna()
@@ -647,9 +655,9 @@ def load_MP_from_MPTool(MP_path):
 
         Data = ex.read_excel_range(MP_path, "Geometry", f"C{row_MP + 3}:H1000", dtype=float)
         Data = Data.dropna(how="all")
-        ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_DATA", Data)
+        ex.write_df_to_table(excel_filename, "BuildYourStructure", "MP_DATA", Data)
     except Exception as e:
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Error reading {MP_path} TP and MP. Please make shure, the path leads to a valid MP_tool xlsm file and has the TP data on the 'Geometry' sheet 3 rows under the second 'Section' heeader, empty rows allowed. Error trown by Python: {e}")
         return
 
@@ -663,7 +671,7 @@ def load_MP_from_MPTool(MP_path):
         Refercene_Level = ex.read_excel_range(MP_path, "Control", f"F{row_RL + 1}", dtype=str, use_header=False)
         Mudline = ex.read_excel_range(MP_path, "Control", f"F{row_ML + 1}", dtype=float, use_header=False)
 
-        META_NEW = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"MP_META_NEW", dtype=str)
+        META_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META_NEW", dtype=str)
 
         if len(META_NEW) == 0:
             META_NEW.iloc[0, :] = ""
@@ -672,31 +680,33 @@ def load_MP_from_MPTool(MP_path):
         META_NEW.loc[0, "Water Depth [m]"] = -Mudline
 
         META_NEW.loc[0, "Structure ID"] = os.path.basename(MP_path).replace(".xlsm", "")
-        ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_META_NEW", META_NEW)
+        ex.write_df_to_table(excel_filename, "BuildYourStructure", "MP_META_NEW", META_NEW)
 
         # update porject name geneatation
-        wb = xw.Book("GeometrieConverter.xlsm")
+        wb = xw.Book(excel_filename)
         wb.macro('UpdateIdentifierColumn')("BuildYourStructure", "MP_META")
 
     except Exception as e:
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Error reading {MP_path} Waterlevel data. Please make shure, the path leads to a valid MP_tool xlsm file and has the data on the 'Control' sheet in ther range E:F, empty rows allowed. The Values  are identified by the Keywords 'Reference level' and 'Mudline'. Error trown by Python: {e}")
         return
 
     return
 
 
-def load_MPMasses_from_GeomConv(GeomConv_path):
+def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
+    excel_filename = os.path.basename(excel_caller)
+
     try:
         Data = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
         Data = Data.dropna(how="all")
         Data.columns = ["Elevation [m]", "Mass [kg]", "comment"]
 
-        Structure = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"MP_DATA", dtype=float)
+        Structure = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_DATA", dtype=float)
         Structure = Structure.dropna(how="all")
 
         if len(Structure) == 0:
-            ex.show_message_box("GeometrieConverter.xlsm",
+            ex.show_message_box(excel_filename,
                                 f"Please provide MP Data")
             return
 
@@ -704,7 +714,7 @@ def load_MPMasses_from_GeomConv(GeomConv_path):
 
         Data = Data.loc[(Data["Elevation [m]"] <= heigt_range[0]) & (Data["Elevation [m]"] >= heigt_range[1]), :]
 
-        EXCEL_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"MP_MASSES", dtype=str)
+        EXCEL_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_MASSES", dtype=str)
         EXCEL_MASSES = EXCEL_MASSES[~(EXCEL_MASSES == "").all(axis=1)]
 
         if EXCEL_MASSES.shape[0] != 0:
@@ -712,17 +722,18 @@ def load_MPMasses_from_GeomConv(GeomConv_path):
         else:
             ALL_MASSES = Data
 
-        ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_MASSES", ALL_MASSES)
+        ex.write_df_to_table(excel_filename, "BuildYourStructure", "MP_MASSES", ALL_MASSES)
 
     except Exception as e:
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Error reading MP Masses from {GeomConv_path}. Please make shure, the path leads to a valid GeometrieConverter xlsm file and has the Masses data on the 'Zusätzliche Eingaben' sheet in columns K11:M1000. Error trown by Python: {e}")
         return
     return
 
 
 # %% TP
-def load_TP_META(db_path):
+def load_TP_META(excel_caller, db_path):
+
     """
     Load the META table from the MP database and update the MP structures dropdown
     in the Excel workbook.
@@ -733,10 +744,13 @@ def load_TP_META(db_path):
     Returns:
         None
     """
-    load_META("TP", db_path)
+    excel_filename = os.path.basename(excel_caller)
+
+    load_META(excel_filename, "TP", db_path)
 
 
-def load_TP_DATA(Structure_name, db_path):
+def load_TP_DATA(excel_caller, Structure_name, db_path):
+
     """
     Load metadata and structure-specific data from the TP database
     and write them to the Excel workbook.
@@ -748,33 +762,40 @@ def load_TP_DATA(Structure_name, db_path):
     Returns:
         None
     """
+    excel_filename = os.path.basename(excel_caller)
 
-    load_DATA("TP", Structure_name, db_path)
-
-
-def save_TP_data(db_path, selected_structure):
-    save_data("TP", db_path, selected_structure)
-
-    return
+    load_DATA(excel_filename, "TP", Structure_name, db_path)
 
 
-def delete_TP_data(db_path, selected_structure):
-    delete_data("TP", db_path, selected_structure)
+def save_TP_data(excel_caller, db_path, selected_structure):
+    excel_filename = os.path.basename(excel_caller)
+
+    save_data(excel_filename, "TP", db_path, selected_structure)
 
     return
 
 
-def load_TPMasses_from_GeomConv(GeomConv_path):
+def delete_TP_data(excel_caller, db_path, selected_structure):
+    excel_filename = os.path.basename(excel_caller)
+
+    delete_data(excel_filename,"TP", db_path, selected_structure)
+
+    return
+
+
+def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
+    excel_filename = os.path.basename(excel_caller)
+
     try:
         Data = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
         Data = Data.dropna(how="all")
         Data.columns = ["Elevation [m]", "Mass [kg]", "comment"]
 
-        Structure = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"TP_DATA", dtype=float)
+        Structure = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_DATA", dtype=float)
         Structure = Structure.dropna(how="all")
 
         if len(Structure) == 0:
-            ex.show_message_box("GeometrieConverter.xlsm",
+            ex.show_message_box(excel_filename,
                                 f"Please provide TP Data")
             return
 
@@ -782,7 +803,7 @@ def load_TPMasses_from_GeomConv(GeomConv_path):
 
         Data = Data.loc[(Data["Elevation [m]"] <= heigt_range[0]) & (Data["Elevation [m]"] >= heigt_range[1]), :]
 
-        EXCEL_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"TP_MASSES", dtype=str)
+        EXCEL_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_MASSES", dtype=str)
         EXCEL_MASSES = EXCEL_MASSES[~(EXCEL_MASSES == "").all(axis=1)]
 
         if EXCEL_MASSES.shape[0] != 0:
@@ -790,17 +811,18 @@ def load_TPMasses_from_GeomConv(GeomConv_path):
         else:
             ALL_MASSES = Data
 
-        ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_MASSES", ALL_MASSES)
+        ex.write_df_to_table(excel_filename, "BuildYourStructure", "TP_MASSES", ALL_MASSES)
 
     except Exception as e:
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Error reading TP Masses from {GeomConv_path}. Please make shure, the path leads to a valid GeometrieConverter xlsm file and has the Masses data on the 'Zusätzliche Eingaben' sheet in columns K11:M1000. Error trown by Python: {e}")
         return
     return
 
 
 # %% TOWER
-def load_TOWER_META(db_path):
+def load_TOWER_META(excel_caller, db_path):
+
     """
     Load the META table from the MP database and update the MP structures dropdown
     in the Excel workbook.
@@ -811,10 +833,12 @@ def load_TOWER_META(db_path):
     Returns:
         None
     """
-    load_META("TOWER", db_path)
+    excel_filename = os.path.basename(excel_caller)
+
+    load_META(excel_filename, "TOWER", db_path)
 
 
-def load_TOWER_DATA(Structure_name, db_path):
+def load_TOWER_DATA(excel_caller, Structure_name, db_path):
     """
     Load metadata and structure-specific data from the TOWER database
     and write them to the Excel workbook.
@@ -826,23 +850,30 @@ def load_TOWER_DATA(Structure_name, db_path):
     Returns:
         None
     """
+    excel_filename = os.path.basename(excel_caller)
 
-    load_DATA("TOWER", Structure_name, db_path)
-
-
-def save_TOWER_data(db_path, selected_structure):
-    save_data("TOWER", db_path, selected_structure)
-
-    return
+    load_DATA(excel_filename, "TOWER", Structure_name, db_path)
 
 
-def delete_TOWER_data(db_path, selected_structure):
-    delete_data("TOWER", db_path, selected_structure)
+def save_TOWER_data(excel_caller, db_path, selected_structure):
+    excel_filename = os.path.basename(excel_caller)
+
+    save_data(excel_filename, "TOWER", db_path, selected_structure)
 
     return
 
 
-def load_TP_from_MPTool(MP_path):
+def delete_TOWER_data(excel_caller, db_path, selected_structure):
+    excel_filename = os.path.basename(excel_caller)
+
+    delete_data(excel_filename, "TOWER", db_path, selected_structure)
+
+    return
+
+
+def load_TP_from_MPTool(excel_caller, MP_path):
+    excel_filename = os.path.basename(excel_caller)
+
     try:
         Section_col = ex.read_excel_range(MP_path, "Geometry", "C1:C1000")
         Section_col = Section_col.iloc[:, 0].dropna()
@@ -851,9 +882,9 @@ def load_TP_from_MPTool(MP_path):
 
         Data = ex.read_excel_range(MP_path, "Geometry", f"C{row_TP + 3}:H{row_MP - 2}", dtype=float)
         Data = Data.dropna(how="all")
-        ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_DATA", Data)
+        ex.write_df_to_table(excel_filename, "BuildYourStructure", "TP_DATA", Data)
     except Exception as e:
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Error reading {MP_path} TP and MP. Please make shure, the path leads to a valid MP_tool xlsm file and has the TP data on the 'Geometry' sheet 3 rows under the first 'Section' heeader, empty rows allowed. Error trown by Python: {e}")
 
     try:
@@ -866,7 +897,7 @@ def load_TP_from_MPTool(MP_path):
         Refercene_Level = ex.read_excel_range(MP_path, "Control", f"F{row_RL + 1}", dtype=str, use_header=False)
         Mudline = ex.read_excel_range(MP_path, "Control", f"F{row_ML + 1}", dtype=float, use_header=False)
 
-        META_NEW = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"TP_META_NEW", dtype=str)
+        META_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_META_NEW", dtype=str)
 
         if len(META_NEW) == 0:
             META_NEW.iloc[0, :] = ""
@@ -875,31 +906,33 @@ def load_TP_from_MPTool(MP_path):
         META_NEW.loc[0, "Water Depth [m]"] = -Mudline
 
         META_NEW.loc[0, "Structure ID"] = os.path.basename(MP_path).replace(".xlsm", "")
-        ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_META_NEW", META_NEW)
+        ex.write_df_to_table(excel_filename, "BuildYourStructure", "TP_META_NEW", META_NEW)
 
         # update porject name geneatation
-        wb = xw.Book("GeometrieConverter.xlsm")
+        wb = xw.Book(excel_filename)
         wb.macro('UpdateIdentifierColumn')("BuildYourStructure", "TP_META")
 
     except Exception as e:
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Error reading {MP_path} Waterlevel data. Please make shure, the path leads to a valid MP_tool xlsm file and has the data on the 'Control' sheet in ther range E:F, empty rows allowed. The Values  are identified by the Keywords 'Reference level' and 'Mudline'. Error trown by Python: {e}")
 
     return
 
 
-def load_TOWERMasses_from_GeomConv(GeomConv_path):
+def load_TOWERMasses_from_GeomConv(excel_caller, GeomConv_path):
+    excel_filename = os.path.basename(excel_caller)
+
     try:
         Data = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
         Data = Data.dropna(how="all")
         Data.columns = ["Elevation [m]", "Mass [kg]", "comment"]
 
-        Structure = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"TP_DATA", dtype=float)
+        Structure = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_DATA", dtype=float)
 
         Structure = Structure.dropna(how="all")
 
         if len(Structure) == 0:
-            ex.show_message_box("GeometrieConverter.xlsm",
+            ex.show_message_box(excel_filename,
                                 f"Please provide TOWER Data")
             return
 
@@ -907,7 +940,7 @@ def load_TOWERMasses_from_GeomConv(GeomConv_path):
 
         Data = Data.loc[Data["Elevation [m]"] >= heigt_range[0], :]
 
-        EXCEL_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"TOWER_MASSES", dtype=str)
+        EXCEL_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TOWER_MASSES", dtype=str)
         EXCEL_MASSES = EXCEL_MASSES[~(EXCEL_MASSES == "").all(axis=1)]
 
         if EXCEL_MASSES.shape[0] != 0:
@@ -915,35 +948,39 @@ def load_TOWERMasses_from_GeomConv(GeomConv_path):
         else:
             ALL_MASSES = Data
 
-        ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_MASSES", ALL_MASSES)
+        ex.write_df_to_table(excel_filename, "BuildYourStructure", "TOWER_MASSES", ALL_MASSES)
 
     except Exception as e:
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Error reading TOWER Masses from {GeomConv_path}. Please make shure, the path leads to a valid GeometrieConverter xlsm file and has the Masses data on the 'Zusätzliche Eingaben' sheet in columns K11:M1000. Error trown by Python: {e}")
         return
     return
 
 
 # %% RNA
-def load_RNA_DATA(db_path):
+def load_RNA_DATA(excel_caller, db_path):
+    excel_filename = os.path.basename(excel_caller)
+
     sheet_name_structure_loading = "BuildYourStructure"
 
     data = load_db_table(db_path, "data")
     ex.set_dropdown_values(
-        "GeometrieConverter.xlsm",
+        excel_filename,
         sheet_name_structure_loading,
         f"Dropdown_RNA_Structures",
         list(data.loc[:, "Identifier"].values)
     )
-    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"RNA_DATA", data)
-    ex.write_df_to_table("GeometrieConverter.xlsm", sheet_name_structure_loading, f"RNA_DATA_TRUE", data)
-    ex.set_dropdown_values("GeometrieConverter.xlsm", sheet_name_structure_loading, "Dropdown_RNA_Structures", list(data.loc[:, "Identifier"].values))
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"RNA_DATA", data)
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"RNA_DATA_TRUE", data)
+    ex.set_dropdown_values(excel_filename, sheet_name_structure_loading, "Dropdown_RNA_Structures", list(data.loc[:, "Identifier"].values))
 
 
-def save_RNA_data(db_path, selected_structure):
-    DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"RNA_DATA", dtype=str)
+def save_RNA_data(excel_caller, db_path, selected_structure):
+    excel_filename = os.path.basename(excel_caller)
 
-    create_db_table(db_path, "data", DATA_CURR, if_exists='replace')
+    DATA_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"RNA_DATA", dtype=str)
+
+    create_db_table(excel_filename, db_path, "data", DATA_CURR, if_exists='replace')
 
     return
 

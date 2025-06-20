@@ -814,27 +814,29 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
 
 
 # %% macros
-def export_JBOOST(jboost_path):
+def export_JBOOST(excel_caller ,jboost_path):
+    excel_filename = os.path.basename(excel_caller)
+
     jboost_path = os.path.abspath(jboost_path)
-    GEOMETRY = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "WHOLE_STRUCTURE")
+    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE")
     GEOMETRY = GEOMETRY.drop(columns=["Section", "local Section"])
-    MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "ALL_ADDED_MASSES")
-    MARINE_GROWTH = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "MARINE_GROWTH")
-    PARAMETERS = ex.read_excel_table("GeometrieConverter.xlsm", "ExportStructure", "JBOOST_PARAMETER")
-    STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
-    PROJECT = ex.read_excel_table("GeometrieConverter.xlsm", "ExportStructure", "JBOOST_PROJECT", dtype=str)
-    RNA = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "RNA")
+    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
+    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH")
+    PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PARAMETER")
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
+    RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA")
     RNA.dropna(how="all", axis=0, inplace=True)
 
     if len(RNA) == 0:
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Please define RNA parameters. Aborting")
         return
 
     # check Geometry
-    sucess_GEOMETRY = mc.sanity_check_structure(GEOMETRY)
+    sucess_GEOMETRY = mc.sanity_check_structure(excel_filename, GEOMETRY)
     if not sucess_GEOMETRY:
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Geometry is messed up. Aborting")
         return
 
@@ -858,21 +860,24 @@ def export_JBOOST(jboost_path):
             var = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == parameter, "Value"].values
             if len(var) > 0 and isinstance(var[0], (int, float)):
                 config_data[config_key] = var[0]
+                return True
             else:
                 ex.show_message_box(
-                    "GeometrieConverter.xlsm",
-                    f"Please set {description} in the StructureOverview, as you set {config_key} in {config_name} to 'auto'. Please check exported file or export again with right settings."
+                    excel_filename,
+                    f"Please set {description} in the StructureOverview, as you set {config_key} in {config_name} to 'auto'. Aborting."
                 )
+                return False
 
         if config_data["water_level"] == 'auto':
-            resolve_auto_value("Water level", "water_level", "a water level")
+            if not resolve_auto_value("Water level", "water_level", "a water level"):
+                return
 
         if config_data["seabed_level"] == 'auto':
-            resolve_auto_value("Seabed level", "seabed_level", "a seabed level")
-
+            if not resolve_auto_value("Seabed level", "seabed_level", "a seabed level"):
+                return
         if config_data["h_hub"] == 'auto':
-            resolve_auto_value("Hubheight", "h_hub", "Hubheight")
-
+            if not resolve_auto_value("Hubheight", "h_hub", "Hubheight"):
+                return
         if config_data["h_refwindspeed"] == 'auto':
             config_data["h_refwindspeed"] = config_data["h_hub"]
 
@@ -934,18 +939,20 @@ def export_JBOOST(jboost_path):
         with open(path_struct, 'w') as file:
             file.write(struct_text)
 
-    ex.show_message_box("GeometrieConverter.xlsm",
+    ex.show_message_box(excel_filename,
                         f"JBOOST Structure {PARAMETERS.loc[PARAMETERS['Parameter'] == 'ModelName', 'Value'].values[0]} saved sucessfully at {jboost_path}")
 
     return
 
 
-def export_WLGen(WLGen_path):
-    APPURTANCES_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "WLGen", "APPURTANCES")
-    STRUCTURE = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "WHOLE_STRUCTURE")
+def export_WLGen(excel_caller, WLGen_path):
+    excel_filename = os.path.basename(excel_caller)
+
+    APPURTANCES_MASSES = ex.read_excel_table(excel_filename, "WLGen", "APPURTANCES")
+    STRUCTURE = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE")
     STRUCTURE = STRUCTURE.drop(columns=["Section", "local Section"])
-    MARINE_GROWTH = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "MARINE_GROWTH")
-    STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
+    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH")
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
 
     APPURTANCES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "WL", :]
     ADDITIONAL_MASSES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "AM", :]
@@ -962,14 +969,20 @@ def export_WLGen(WLGen_path):
 
     # Feedback to user
     if not text:
-        ex.show_message_box("GeometrieConverter.xlsm", f"WLGen Structure could not be created: {msg}")
+        ex.show_message_box(excel_filename, f"WLGen Structure could not be created: {msg}")
     else:
-        model_name = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0] + ".lua"
+        model_name = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
+        if model_name is None:
+            model_name = "WLGen_input.lua"
+            ex.show_message_box(excel_filename, f"No model name defined in Structure Overview. File named {model_name}")
+        else:
+            model_name = model_name + ".lua"
+
         WLGen_path = os.path.abspath(os.path.join(WLGen_path, model_name))
 
         with open(WLGen_path, 'w') as file:
             file.write(text)
-        ex.show_message_box("GeometrieConverter.xlsm", f"WLGen Structure created successfully and saved at {WLGen_path}.")
+        ex.show_message_box(excel_filename, f"WLGen Structure created successfully and saved at {WLGen_path}.")
     return
 
 

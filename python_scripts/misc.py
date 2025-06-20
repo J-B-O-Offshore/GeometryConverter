@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 import excel as ex
-
+import os
 
 def valid_data(data):
     if pd.isna(data.values).any():
@@ -13,21 +13,21 @@ def valid_data(data):
         return False, data
 
 
-def sanity_check_structure(df):
+def sanity_check_structure(excel_filename, df):
     # check, if sections are on top of each other
     height_diff = (df["Top [m]"].values[1:] - df["Bottom [m]"].values[:-1]) == 0
     if not all(height_diff):
         missaligned_sections = [int(df.iloc[i, 0]) for i, value in enumerate(height_diff) if not value]
-        ex.show_message_box("GeometrieConverter.xlsm", f"The Sections are overlapping or have space in between at Section(s): {missaligned_sections} ")
+        ex.show_message_box(excel_filename, f"The Sections are overlapping or have space in between at Section(s): {missaligned_sections} ")
         return False
     else:
         return True
 
 
-def check_convert_structure(df: pd.DataFrame, Table):
+def check_convert_structure(excel_filename, df: pd.DataFrame, Table):
     success, df = valid_data(df)
     if not success:
-        ex.show_message_box("GeometrieConverter.xlsm", f"The {Table} Table containes invalid data (nan or non numerical)")
+        ex.show_message_box(excel_filename, f"The {Table} Table containes invalid data (nan or non numerical)")
         return success, df
 
     success = sanity_check_structure
@@ -181,43 +181,44 @@ def add_element(df, z_new):
     return df
 
 
-def assemble_structure(rho, RNA_config):
+def assemble_structure(excel_caller, rho, RNA_config):
     def all_same_ignoring_none(*values):
         non_none = [v for v in values if v is not None]
         return len(non_none) <= 1 or all(v == non_none[0] for v in non_none)
 
+    excel_filename = os.path.basename(excel_caller)
     # load structure Data
-    MP_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_DATA")
-    TP_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_DATA")
-    TOWER_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_DATA")
-    RNA_DATA = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "RNA_DATA")
+    MP_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "MP_DATA")
+    TP_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_DATA")
+    TOWER_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_DATA")
+    RNA_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "RNA_DATA")
 
-    MP_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_META")
-    TP_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_META")
-    TOWER_META = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_META")
-    STRUCTURE_META = ex.read_excel_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META")
+    MP_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "MP_META")
+    TP_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_META")
+    TOWER_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_META")
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
     STRUCTURE_META.loc[:, "Value"] = ""
 
     # Quality Checks/Warings of single datasets, if any fail fataly, abort
-    sucess_MP, MP_DATA = check_convert_structure(MP_DATA, "MP")
-    sucess_TP, TP_DATA = check_convert_structure(TP_DATA, "TP")
-    sucess_TOWER, TOWER_DATA = check_convert_structure(TOWER_DATA, "TOWER")
+    sucess_MP, MP_DATA = check_convert_structure(excel_filename, MP_DATA, "MP")
+    sucess_TP, TP_DATA = check_convert_structure(excel_filename, TP_DATA, "TP")
+    sucess_TOWER, TOWER_DATA = check_convert_structure(excel_filename, TOWER_DATA, "TOWER")
 
     if not all([sucess_MP, sucess_TP, sucess_TOWER]):
         return
 
     # RNA
     if RNA_config == "":
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Caution, no RNA selected")
     else:
         if not RNA_config in RNA_DATA["Identifier"].values:
-            ex.show_message_box("GeometrieConverter.xlsm",
+            ex.show_message_box(excel_filename,
                                 f"Choosen RNA not in RNA dropdown menu. Aborting")
             return None
         else:
             RNA = RNA_DATA.loc[RNA_DATA["Identifier"] == RNA_config, :]
-            ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "RNA", RNA)
+            ex.write_df_to_table(excel_filename, "StructureOverview", "RNA", RNA)
 
     # Height Reference handling
     WL_ref_MP = MP_META.loc[0, "Height Reference"]
@@ -225,14 +226,14 @@ def assemble_structure(rho, RNA_config):
     WL_ref_TOWER = TOWER_META.loc[0, "Height Reference"]
 
     if not all_same_ignoring_none(WL_ref_MP, WL_ref_MT, WL_ref_TOWER):
-        answer = ex.show_message_box("GeometrieConverter.xlsm",
+        answer = ex.show_message_box(excel_filename,
                                      f"Warning, not all height references are the same (MP: {WL_ref_MP}, TP: {WL_ref_MT}, TOWER: {WL_ref_TOWER}). Assable anyway?",
                                      buttons="vbYesNo", icon="warning")
         if answer == "No":
             return
     else:
         STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"] = [v for v in [WL_ref_MP, WL_ref_MT, WL_ref_TOWER] if v is not None][0]
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"Height references are the same or not defined. (MP: {WL_ref_MP}, TP: {WL_ref_MT}, TOWER: {WL_ref_TOWER}).")
 
     # waterdepth handling
@@ -248,7 +249,7 @@ def assemble_structure(rho, RNA_config):
 
     # check MP TP connection
     if range_MP[0] < range_TP[-1]:
-        ex.show_message_box("GeometrieConverter.xlsm",
+        ex.show_message_box(excel_filename,
                             f"The Top of the MP at {range_MP[0]} is lower than the Bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. This cant work, aborting.")
         return
     WHOLE_STRUCTURE = MP_DATA
@@ -263,13 +264,13 @@ def assemble_structure(rho, RNA_config):
     TP_bot = range_TP[-1]
 
     if MP_top > TP_bot:
-        result = ex.show_message_box("GeometrieConverter.xlsm",
+        result = ex.show_message_box(excel_filename,
                                      f"The MP and the TP are overlapping by {-range_TP[-1] + range_MP[0]}m. Combine stiffness etc as grouted connection (yes) or add as skirt (no)?",
                                      buttons="vbYesNo", icon="vbYesNo", )
 
         if result == "Yes":
 
-            ex.show_message_box("GeometrieConverter.xlsm",
+            ex.show_message_box(excel_filename,
                                 f"under construction...")
         else:
 
@@ -295,11 +296,11 @@ def assemble_structure(rho, RNA_config):
             SKIRT_POINTMASS.loc[:, "Mass [t]"] = skirt_weight
             SKIRT_POINTMASS.loc[:, "comment"] = "Skirt"
 
-            ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "SKIRT", SKIRT)
-            ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "SKIRT_POINTMASS", SKIRT_POINTMASS)
+            ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT", SKIRT)
+            ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT_POINTMASS", SKIRT_POINTMASS)
 
     else:
-        ex.show_message_box("GeometrieConverter.xlsm", f"The MP and the TP are fitting together perfectly")
+        ex.show_message_box(excel_filename, f"The MP and the TP are fitting together perfectly")
 
         WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
 
@@ -313,13 +314,13 @@ def assemble_structure(rho, RNA_config):
     WHOLE_STRUCTURE.rename(columns={"Section": "local Section"}, inplace=True)
     WHOLE_STRUCTURE = WHOLE_STRUCTURE.reset_index(drop=True)
     WHOLE_STRUCTURE.insert(0, "Section", WHOLE_STRUCTURE.index.values + 1)
-    ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "WHOLE_STRUCTURE", WHOLE_STRUCTURE)
+    ex.write_df_to_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", WHOLE_STRUCTURE)
 
     # ADDED MASSES
 
-    MP_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "MP_MASSES")
-    TP_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TP_MASSES")
-    TOWER_MASSES = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", "TOWER_MASSES")
+    MP_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "MP_MASSES")
+    TP_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_MASSES")
+    TOWER_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_MASSES")
 
     TOWER_MASSES["Elevation [m]"] = TOWER_MASSES["Elevation [m]"] + tower_offset
 
@@ -330,39 +331,44 @@ def assemble_structure(rho, RNA_config):
     ALL_MASSES = pd.concat([MP_MASSES, TP_MASSES, TOWER_MASSES], axis=0)
     ALL_MASSES.sort_values(inplace=True, ascending=False, axis=0, by=["Elevation [m]"])
 
-    ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
-    ex.write_df_to_table("GeometrieConverter.xlsm", "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
+    ex.write_df_to_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
+    ex.write_df_to_table(excel_filename, "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
 
     return
 
 
-def move_structure(displ, Structure):
+def move_structure(excel_filename, displ, Structure):
+
     try:
         displ = float(displ)
     except ValueError:
-        ex.show_message_box("GeometrieConverter.xlsm", f"Please enter a valid float value for the displacement.")
+        ex.show_message_box(excel_filename, f"Please enter a valid float value for the displacement.")
         return
-    META_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META", dtype=str)
-    DATA_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA", dtype=float)
-    MASSES_CURR = ex.read_excel_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES")
+    META_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META", dtype=str)
+    DATA_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_DATA", dtype=float)
+    MASSES_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_MASSES")
 
     META_CURR.loc[:, "Height Reference"] = None
     DATA_CURR.loc[:, "Top [m]"] = DATA_CURR.loc[:, "Top [m]"] + displ
     DATA_CURR.loc[:, "Bottom [m]"] = DATA_CURR.loc[:, "Bottom [m]"] + displ
     MASSES_CURR.loc[:, "Elevation [m]"] = MASSES_CURR.loc[:, "Elevation [m]"] + displ
 
-    ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_META", META_CURR)
-    ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_DATA", DATA_CURR)
-    ex.write_df_to_table("GeometrieConverter.xlsm", "BuildYourStructure", f"{Structure}_MASSES", MASSES_CURR)
+    ex.write_df_to_table(excel_filename, "BuildYourStructure", f"{Structure}_META", META_CURR)
+    ex.write_df_to_table(excel_filename, "BuildYourStructure", f"{Structure}_DATA", DATA_CURR)
+    ex.write_df_to_table(excel_filename, "BuildYourStructure", f"{Structure}_MASSES", MASSES_CURR)
 
 
-def move_structure_MP(displ):
-    move_structure(displ, "MP")
+def move_structure_MP(excel_caller, displ):
+    excel_filename = os.path.basename(excel_caller)
+
+    move_structure(excel_filename, displ, "MP")
 
     return
 
 
-def move_structure_TP(displ):
-    move_structure(displ, "TP")
+def move_structure_TP(excel_caller, displ):
+    excel_filename = os.path.basename(excel_caller)
+
+    move_structure(excel_filename, displ, "TP")
 
     return
