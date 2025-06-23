@@ -8,6 +8,7 @@ import misc as mc
 import numpy as np
 import math
 import re
+from pandas.api.types import CategoricalDtype
 
 
 # %% helpers
@@ -319,7 +320,7 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, defl_T
 
     MASSES : pd.DataFrame, optional
         Optional DataFrame of additional point masses with columns:
-        ["Elevation [m]", "Mass [kg]", "comment"].
+        ["Top [m]","Bottom [m]", "Mass [kg]", "Name"].
 
     defl_TP : float or np.ndarray, optional
         Transition piece deflection, if different from tower or monopile.
@@ -396,23 +397,27 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, defl_T
     if MASSES is not None:
         # distribute Masses on Nodes
         for idx in MASSES.index:
-            z_Mass = MASSES.loc[idx, "Elevation [m]"]
+            z_bot = MASSES.loc[idx, "Bottom [m]"]
+            if z_bot is not None and z_bot is not np.nan and z_bot != "":
+                z_Mass = (MASSES.loc[idx, "Bottom [m]"] + MASSES.loc[idx, "Top [m]"]) / 2
+            else:
+                z_Mass = MASSES.loc[idx, "Top [m]"]
 
             # if Mass is near node
             in_tolerance = np.where(np.abs(NODES["z"].values - z_Mass) <= create_node_tolerance)[0]
 
             if len(in_tolerance) > 0:
                 NODES.loc[in_tolerance[0], "pMass"] += MASSES.loc[idx, "Mass [kg]"]
-                NODES.loc[in_tolerance[0], "pMassName"] += MASSES.loc[idx, "comment"] + " "
+                NODES.loc[in_tolerance[0], "pMassName"] += MASSES.loc[idx, "Name"] + " "
             # if not, create new nodes
             else:
                 if z_Mass >= GEOMETRY.loc[:, "Bottom [m]"].values[-1]:
                     NODES = add_node(NODES, z_Mass)
                     NODES.loc[NODES["z"] == z_Mass, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
-                    NODES.loc[NODES["z"] == z_Mass, "pMassName"] = MASSES.loc[idx, "comment"]
+                    NODES.loc[NODES["z"] == z_Mass, "pMassName"] = MASSES.loc[idx, "Name"]
                     GEOMETRY = mc.add_element(GEOMETRY, z_Mass)
                 else:
-                    print(f"Warning! Mass '{MASSES.loc[idx, 'comment']}' not added, it is below the seabed level!")
+                    print(f"Warning! Mass '{MASSES.loc[idx, 'Name']}' not added, it is below the seabed level!")
 
     # add RNA
     MP_top = NODES.iloc[0, :].loc["z"]
@@ -671,10 +676,10 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
     APPURTANCES : pd.DataFrame
         Table containing appurtenance data. Required columns:
         'Top [m]', 'Bottom [m]', 'Mass [kg]', 'Diameter [m]', 'Orientation [°]',
-        'Surface roughness [m]', 'Distance Axis to Axis', 'Gap between surfaces', 'comment'.
+        'Surface roughness [m]', 'Distance Axis to Axis', 'Gap between surfaces', 'Name'.
     ADDITIONAL_MASSES : pd.DataFrame
         Table of additional point masses. Required columns:
-        'Top [m]', 'Bottom [m]', 'Mass [kg]', 'comment'.
+        'Top [m]', 'Bottom [m]', 'Mass [kg]', 'Name'.
     MP : pd.DataFrame
         Monopile section data. Required columns:
         'D, bottom [m]', 'D, top [m]', 't [mm]', 'Bottom [m]', 'Top [m]'.
@@ -691,6 +696,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
         and the second item is an error message (empty string if successful).
         If an error occurs, the first item is False.
     """
+
     def check_values(df, columns):
         return [col for col in columns if df[col].isnull().any()]
 
@@ -698,9 +704,9 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
         # For APPURTANCES: exclude mutually exclusive fields from missing value check
         (APPURTANCES, [
             "Top [m]", "Bottom [m]", "Mass [kg]",
-            "Diameter [m]", "Orientation [°]", "Surface roughness [m]", "comment"
+            "Diameter [m]", "Orientation [°]", "Surface roughness [m]", "Name"
         ], "APPURTANCES"),
-        (ADDITIONAL_MASSES, ["Top [m]", "Bottom [m]", "Mass [kg]", "comment"], "ADDITIONAL_MASSES"),
+        (ADDITIONAL_MASSES, ["Top [m]", "Bottom [m]", "Mass [kg]", "Name"], "ADDITIONAL_MASSES"),
         (MP, ["D, bottom [m]", "D, top [m]", "t [mm]", "Bottom [m]", "Top [m]"], "MP"),
         (TP, ["D, bottom [m]", "D, top [m]", "t [mm]", "Bottom [m]", "Top [m]"], "TP"),
         (MARINE_GROWTH, [
@@ -763,7 +769,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
 
     Data_Masses_Monopile_TransitionPiece = [
         ("Data_Masses_Monopile_TransitionPiece{" +
-         f" id = \"{row['comment']}\", " +
+         f" id = \"{row['Name']}\", " +
          f" z =  {((row['Top [m]'] + row['Bottom [m]']) / 2):01.3f}, " +
          f" mass =  {row['Mass [kg]']:01.1f}, " +
          "}") for _, row in ADDITIONAL_MASSES.iterrows()
@@ -772,7 +778,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
     Data_Appurtenances = []
     for _, row in APPURTANCES.iterrows():
         parts = [
-            f" id = \"{row['comment']}\"",
+            f" id = \"{row['Name']}\"",
             f" z_bot = {row['Bottom [m]']:01.3f}",
             f" z_top = {row['Top [m]']:01.3f}",
             f" diameter = {row['Diameter [m]']:01.3f}",
@@ -790,31 +796,31 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
         ("Data_MarineGrowth{" +
          f" z_bot = \"{row['Bottom [m]']}\", " +
          f" z_top =  {row['Top [m]']:01.3f}, " +
-         f" thickness =  {(row['Marine Growth [mm]']/1000):01.3f}, " +
+         f" thickness =  {(row['Marine Growth [mm]'] / 1000):01.3f}, " +
          f" density =  {row['Density  [kg/m^3]']:01.0f}, " +
          f" surface_roughness =  {row['Surface Roughness [m]']:01.3f}, " +
          "}") for _, row in MARINE_GROWTH.iterrows()
     ]
 
     text = (
-        "--Input for WLGen generated by Excel\n\n"
-        "--data for monopile sections: vertical positions z_bot and z_top are relative to design water level. Dimensions in meters.\n"
-        + "\n".join(Data_MonopileSections) + "\n\n"
-        "--data for transition-piece sections: vertical positions z_bot and z_top are relative to design water level. Dimensions in meters.\n"
-        + "\n".join(Data_TransitionPieceSections) + "\n\n"
-        "--data for additional masses: vertical positions z are relative to design water level.\n"
-        + "\n".join(Data_Masses_Monopile_TransitionPiece) + "\n\n"
-        "--data for appurtenances: vertical positions z_bot and z_top are relative to design water level. Dimensions in meters, with the exception of orientation in degree from North and mass in kg.\n"
-        + "\n".join(Data_Appurtenances) + "\n\n"
-        "--data for marine growth: thickness up to defined vertical positions, relative to design water level, both in meters. The thickness is zero above the last given vertical position. Density in kg/m3.\n"
-        + "\n".join(Data_MarineGrowth)
+            "--Input for WLGen generated by Excel\n\n"
+            "--data for monopile sections: vertical positions z_bot and z_top are relative to design water level. Dimensions in meters.\n"
+            + "\n".join(Data_MonopileSections) + "\n\n"
+                                                 "--data for transition-piece sections: vertical positions z_bot and z_top are relative to design water level. Dimensions in meters.\n"
+            + "\n".join(Data_TransitionPieceSections) + "\n\n"
+                                                        "--data for additional masses: vertical positions z are relative to design water level.\n"
+            + "\n".join(Data_Masses_Monopile_TransitionPiece) + "\n\n"
+                                                                "--data for appurtenances: vertical positions z_bot and z_top are relative to design water level. Dimensions in meters, with the exception of orientation in degree from North and mass in kg.\n"
+            + "\n".join(Data_Appurtenances) + "\n\n"
+                                              "--data for marine growth: thickness up to defined vertical positions, relative to design water level, both in meters. The thickness is zero above the last given vertical position. Density in kg/m3.\n"
+            + "\n".join(Data_MarineGrowth)
     )
 
     return text, ""
 
 
 # %% macros
-def export_JBOOST(excel_caller ,jboost_path):
+def export_JBOOST(excel_caller, jboost_path):
     excel_filename = os.path.basename(excel_caller)
 
     jboost_path = os.path.abspath(jboost_path)
@@ -954,8 +960,10 @@ def export_WLGen(excel_caller, WLGen_path):
     MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH")
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
 
-    APPURTANCES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "WL", :]
-    ADDITIONAL_MASSES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "AM", :]
+    APPURTANCES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 1] == "WL", :]
+    ADDITIONAL_MASSES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 1] == "AM", :]
+
+    # check APP
 
     # cut of below waterline
     z_wl = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0]
@@ -984,5 +992,56 @@ def export_WLGen(excel_caller, WLGen_path):
             file.write(text)
         ex.show_message_box(excel_filename, f"WLGen Structure created successfully and saved at {WLGen_path}.")
     return
+
+
+def fill_WLGenMasses(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
+    MASSES = MASSES.loc[(MASSES["Affiliation"] == "TP") | (MASSES["Affiliation"] == "MP")]
+
+    def categorize_row(row):
+        # Check mandatory fields
+        if pd.isna(row['Top [m]']) or pd.isna(row['Mass [kg]']):
+            return 'INVALID'
+
+        # Check if it qualifies as an APPURTENANCE
+        has_bottom = not pd.isna(row['Bottom [m]'])
+        has_diameter = not pd.isna(row['Diameter [m]'])
+        has_orientation = not pd.isna(row['Orientation [°]'])
+        has_roughness = not pd.isna(row['Surface roughness [m]'])
+
+        has_axis_to_axis = not pd.isna(row['Distance Axis to Axis'])
+        has_gap = not pd.isna(row['Gap between surfaces'])
+        # xor_axis_gap = has_axis_to_axis != has_gap  # exclusive OR
+
+        if all([has_bottom, has_diameter, has_orientation, has_roughness]) and (has_axis_to_axis or has_gap):
+            return 'WL'
+        else:
+            return 'AM'
+
+    cols = ["Use For (WL: Waveload generator, AM: Additional Masses)"] + list(MASSES.columns)
+    MASSES_WL = pd.DataFrame(columns=cols)
+
+    for idx, row in MASSES.iterrows():
+        kind = categorize_row(row)
+
+        row["Use For (WL: Waveload generator, AM: Additional Masses)"] = kind
+
+        row_df = row.to_frame().T  # Convert Series to 1-row DataFrame
+        row_aligned = row_df[MASSES_WL.columns.intersection(row_df.columns)]
+
+        MASSES_WL = pd.concat([MASSES_WL, row_aligned], ignore_index=True)
+
+    # sort df
+    # Define custom order
+    cat_order = CategoricalDtype(categories=["WL", "AM", "INVALID"], ordered=True)
+
+    # Convert the column to categorical
+    MASSES_WL['Use For (WL: Waveload generator, AM: Additional Masses)'] = MASSES_WL['Use For (WL: Waveload generator, AM: Additional Masses)'].astype(cat_order)
+
+    # Sort the DataFrame
+    MASSES_WL = MASSES_WL.sort_values('Use For (WL: Waveload generator, AM: Additional Masses)')
+
+    ex.write_df_to_table(excel_filename, "WLGen", "APPURTANCES", MASSES_WL)
 
 

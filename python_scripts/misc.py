@@ -1,8 +1,10 @@
+import os
+
 import numpy as np
 import pandas as pd
 
 import excel as ex
-import os
+
 
 def valid_data(data):
     if pd.isna(data.values).any():
@@ -322,14 +324,16 @@ def assemble_structure(excel_caller, rho, RNA_config):
     TP_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_MASSES")
     TOWER_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_MASSES")
 
-    TOWER_MASSES["Elevation [m]"] = TOWER_MASSES["Elevation [m]"] + tower_offset
+    TOWER_MASSES["Top [m]"] = TOWER_MASSES["Top [m]"] + tower_offset
+    mask = pd.to_numeric(TOWER_MASSES["Bottom [m]"], errors='coerce').notna()
+    TOWER_MASSES.loc[mask, "Bottom [m]"] += tower_offset
 
     MP_MASSES.insert(0, "Affiliation", "MP")
     TP_MASSES.insert(0, "Affiliation", "TP")
     TOWER_MASSES.insert(0, "Affiliation", "TOWER")
 
     ALL_MASSES = pd.concat([MP_MASSES, TP_MASSES, TOWER_MASSES], axis=0)
-    ALL_MASSES.sort_values(inplace=True, ascending=False, axis=0, by=["Elevation [m]"])
+    ALL_MASSES.sort_values(inplace=True, ascending=False, axis=0, by=["Top [m]"])
 
     ex.write_df_to_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
     ex.write_df_to_table(excel_filename, "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
@@ -338,7 +342,6 @@ def assemble_structure(excel_caller, rho, RNA_config):
 
 
 def move_structure(excel_filename, displ, Structure):
-
     try:
         displ = float(displ)
     except ValueError:
