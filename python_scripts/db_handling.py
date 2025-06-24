@@ -698,9 +698,22 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
-        Data = Data.dropna(how="all")
-        Data.columns = ["Elevation [m]", "Mass [kg]", "comment"]
+        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
+        Data_temp = Data_temp.dropna(how="all")
+        Data = pd.DataFrame({
+            "Name": Data_temp.iloc[:, 2],
+            "Top [m]": Data_temp.iloc[:, 0],
+            "Bottom [m]": Data_temp.iloc[:, 0],
+            "Mass [kg]": Data_temp.iloc[:, 1],
+            "Diameter [m]": None,
+            "Orientation [°]": None,
+            "Distance Axis to Axis": None,
+            "Gap between surfaces": None,
+            "Surface roughness [m]": None,
+        })[[
+            "Name", "Top [m]", "Bottom [m]", "Mass [kg]", "Diameter [m]",
+            "Orientation [°]", "Distance Axis to Axis", "Gap between surfaces", "Surface roughness [m]"
+        ]]
 
         Structure = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_DATA", dtype=float)
         Structure = Structure.dropna(how="all")
@@ -712,7 +725,7 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         heigt_range = (Structure.loc[0, "Top [m]"], Structure.loc[len(Structure) - 1, "Bottom [m]"])
 
-        Data = Data.loc[(Data["Elevation [m]"] <= heigt_range[0]) & (Data["Elevation [m]"] >= heigt_range[1]), :]
+        Data = Data.loc[(Data["Top [m]"] <= heigt_range[0]) & (Data["Top [m]"] >= heigt_range[1]), :]
 
         EXCEL_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_MASSES", dtype=str)
         EXCEL_MASSES = EXCEL_MASSES[~(EXCEL_MASSES == "").all(axis=1)]
@@ -787,9 +800,22 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
-        Data = Data.dropna(how="all")
-        Data.columns = ["Elevation [m]", "Mass [kg]", "comment"]
+        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
+        Data_temp = Data_temp.dropna(how="all")
+        Data = pd.DataFrame({
+            "Name": Data_temp.iloc[:, 2],
+            "Top [m]": Data_temp.iloc[:, 0],
+            "Bottom [m]": Data_temp.iloc[:, 0],
+            "Mass [kg]": Data_temp.iloc[:, 1],
+            "Diameter [m]": None,
+            "Orientation [°]": None,
+            "Distance Axis to Axis": None,
+            "Gap between surfaces": None,
+            "Surface roughness [m]": None,
+        })[[
+            "Name", "Top [m]", "Bottom [m]", "Mass [kg]", "Diameter [m]",
+            "Orientation [°]", "Distance Axis to Axis", "Gap between surfaces", "Surface roughness [m]"
+        ]]
 
         Structure = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_DATA", dtype=float)
         Structure = Structure.dropna(how="all")
@@ -801,7 +827,7 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         heigt_range = (Structure.loc[0, "Top [m]"], Structure.loc[len(Structure) - 1, "Bottom [m]"])
 
-        Data = Data.loc[(Data["Elevation [m]"] <= heigt_range[0]) & (Data["Elevation [m]"] >= heigt_range[1]), :]
+        Data = Data.loc[(Data["Top [m]"] <= heigt_range[0]) & (Data["Top [m]"] >= heigt_range[1]), :]
 
         EXCEL_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_MASSES", dtype=str)
         EXCEL_MASSES = EXCEL_MASSES[~(EXCEL_MASSES == "").all(axis=1)]
@@ -923,10 +949,22 @@ def load_TOWERMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
-        Data = Data.dropna(how="all")
-        Data.columns = ["Elevation [m]", "Mass [kg]", "comment"]
-
+        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
+        Data_temp = Data_temp.dropna(how="all")
+        Data = pd.DataFrame({
+            "Name": Data_temp.iloc[:, 2],
+            "Top [m]": Data_temp.iloc[:, 0],
+            "Bottom [m]": Data_temp.iloc[:, 0],
+            "Mass [kg]": Data_temp.iloc[:, 1],
+            "Diameter [m]": None,
+            "Orientation [°]": None,
+            "Distance Axis to Axis": None,
+            "Gap between surfaces": None,
+            "Surface roughness [m]": None,
+        })[[
+            "Name", "Top [m]", "Bottom [m]", "Mass [kg]", "Diameter [m]",
+            "Orientation [°]", "Distance Axis to Axis", "Gap between surfaces", "Surface roughness [m]"
+        ]]
         Structure = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_DATA", dtype=float)
 
         Structure = Structure.dropna(how="all")
@@ -938,7 +976,7 @@ def load_TOWERMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         heigt_range = (Structure.loc[0, "Top [m]"], None)
 
-        Data = Data.loc[Data["Elevation [m]"] >= heigt_range[0], :]
+        Data = Data.loc[Data["Top [m]"] >= heigt_range[0], :]
 
         EXCEL_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TOWER_MASSES", dtype=str)
         EXCEL_MASSES = EXCEL_MASSES[~(EXCEL_MASSES == "").all(axis=1)]
@@ -986,3 +1024,5 @@ def save_RNA_data(excel_caller, db_path, selected_structure):
 
 # %%
 
+
+#load_MPMasses_from_GeomConv("NEW_Generic.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/Validation_Generic/OLD_Generic.xlsm")

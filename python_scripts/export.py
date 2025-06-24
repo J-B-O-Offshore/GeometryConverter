@@ -729,6 +729,9 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
         if col not in APPURTANCES.columns:
             return False, f"Missing required column '{col}' in APPURTANCES."
 
+    APPURTANCES = APPURTANCES.sort_values(by='Top [m]', ascending=False)
+    ADDITIONAL_MASSES = ADDITIONAL_MASSES.sort_values(by='Top [m]', ascending=False)
+
     # Now validate mutual exclusivity per row
     err_list = []
     for idx, row in APPURTANCES.iterrows():
@@ -752,7 +755,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
          f" wall_thickness = {(row['t [mm]'] / 1000):01.3f}, " +
          f" z_bot = {row['Bottom [m]']:01.3f}, " +
          f" z_top = {row['Top [m]']:01.3f}, " +
-         " surface_roughness = 0, " +
+         " surface_roughness = 0:.3f" +
          "}") for _, row in MP.iterrows()
     ]
 
@@ -763,7 +766,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
          f" wall_thickness = {(row['t [mm]'] / 1000):01.3f}, " +
          f" z_bot = {row['Bottom [m]']:01.3f}, " +
          f" z_top = {row['Top [m]']:01.3f}, " +
-         " surface_roughness = 0, " +
+         " surface_roughness = 0:.3f" +
          "}") for _, row in TP.iterrows()
     ]
 
@@ -771,7 +774,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
         ("Data_Masses_Monopile_TransitionPiece{" +
          f" id = \"{row['Name']}\", " +
          f" z =  {((row['Top [m]'] + row['Bottom [m]']) / 2):01.3f}, " +
-         f" mass =  {row['Mass [kg]']:01.1f}, " +
+         f" mass =  {row['Mass [kg]']:01.1f}" +
          "}") for _, row in ADDITIONAL_MASSES.iterrows()
     ]
 
@@ -790,7 +793,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
             parts.insert(6, f" gap_between_surfaces = {row['Gap between surfaces']}")
         if pd.notna(row['Distance Axis to Axis']):
             parts.insert(6, f" distance_axis_to_axis = {row['Distance Axis to Axis']}")
-        Data_Appurtenances.append(" Data_Appurtenances{" + ", ".join(parts) + " }")
+        Data_Appurtenances.append(" Data_Appurtenances{" + ", ".join(parts) + "}")
 
     Data_MarineGrowth = [
         ("Data_MarineGrowth{" +
@@ -798,8 +801,8 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
          f" z_top =  {row['Top [m]']:01.3f}, " +
          f" thickness =  {(row['Marine Growth [mm]'] / 1000):01.3f}, " +
          f" density =  {row['Density  [kg/m^3]']:01.0f}, " +
-         f" surface_roughness =  {row['Surface Roughness [m]']:01.3f}, " +
-         "}") for _, row in MARINE_GROWTH.iterrows()
+         f" surface_roughness =  {row['Surface Roughness [m]']:01.3f}" +
+         "}") for _, row in MARINE_GROWTH.iterrows() if row['Marine Growth [mm]'] > 0
     ]
 
     text = (
@@ -960,8 +963,8 @@ def export_WLGen(excel_caller, WLGen_path):
     MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH")
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
 
-    APPURTANCES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 1] == "WL", :]
-    ADDITIONAL_MASSES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 1] == "AM", :]
+    APPURTANCES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "WL", :]
+    ADDITIONAL_MASSES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "AM", :]
 
     # check APP
 
