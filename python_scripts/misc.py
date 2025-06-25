@@ -145,6 +145,7 @@ def add_element(df, z_new):
     - The "Affiliation" of the new row is copied from the original row if the column exists.
     - No checks are made for column types or values; ensure input DataFrame is clean and valid.
     """
+    df = df.reset_index(drop=True)
     if len(df.loc[(df["Top [m]"] == z_new) | (df["Bottom [m]"] == z_new)].index) > 0:
         return df
 
@@ -174,6 +175,7 @@ def add_element(df, z_new):
     new_row.loc[0, "D, top [m]"] = d_inter
     new_row.loc[0, "D, bottom [m]"] = df.loc[id_inter, "D, bottom [m]"]
 
+    df = df.copy()
     # update original segment
     df.loc[id_inter, "Bottom [m]"] = z_new
 

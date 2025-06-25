@@ -667,7 +667,7 @@ os_PlotResultsGraph([[Result_JBOOST_Graph]])
     return Proj_text
 
 
-def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
+def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, skirt=None):
     """
     Generate a WLGen input file text based on structural and geometric input data.
 
@@ -688,6 +688,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
     MARINE_GROWTH : pd.DataFrame
         Marine growth parameters. Required columns:
         'Bottom [m]', 'Top [m]', 'Marine Growth [mm]', 'Density  [kg/m^3]', 'Surface Roughness [m]'.
+    skirt: pd.DataFrame, optional
 
     Returns
     -------
@@ -747,6 +748,37 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
     if err_list:
         return False, "Geometry specification issues in APPURTANCES:\n" + "\n".join(err_list)
 
+    # Add skirt
+    skirt_nodes = list(skirt.loc[:, "Top [m]"].values) + [skirt.iloc[-1, :].loc["Bottom [m]"]]
+
+    for skirt_node in skirt_nodes:
+        MP = mc.add_element(MP, skirt_node)
+        TP = mc.add_element(TP, skirt_node)
+
+    # interpolate skirt nodes
+    MP_nodes = list(MP.loc[:, "Top [m]"].values) + [MP.iloc[-1, :].loc["Bottom [m]"]]
+    TP_nodes = list(TP.loc[:, "Top [m]"].values) + [TP.iloc[-1, :].loc["Bottom [m]"]]
+
+    all_nodes = TP_nodes[0:-1] + MP_nodes
+    overlaps = [node for node in all_nodes if node < float(skirt_nodes[0]) and node > float(skirt_nodes[1])]
+
+    for overlap in overlaps:
+        skirt = mc.add_element(skirt, float(overlap))
+
+
+    if skirt is not None:
+        for idx, row in skirt.iterrows():
+            top = row["Top [m]"]
+            bottom = row["Bottom [m]"]
+
+            if top in list(MP.loc[:, "Top [m]"].values):
+                MP.loc[MP["Top [m]"] == top, "D, top [m]"] = row["D, top [m]"]
+                MP.loc[MP["Bottom [m]"] == bottom, "D, bottom [m]"] = row["D, bottom [m]"]
+
+            if top in list(TP.loc[:, "Top [m]"].values):
+                TP.loc[TP["Top [m]"] == top, "D, top [m]"] = row["D, top [m]"]
+                TP.loc[TP["Bottom [m]"] == bottom, "D, bottom [m]"] = row["D, bottom [m]"]
+
     # === STRING GENERATION ===
     Data_MonopileSections = [
         ("Data_MonopileSections{" +
@@ -755,7 +787,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
          f" wall_thickness = {(row['t [mm]'] / 1000):01.3f}, " +
          f" z_bot = {row['Bottom [m]']:01.3f}, " +
          f" z_top = {row['Top [m]']:01.3f}, " +
-         " surface_roughness = 0:.3f" +
+         f" surface_roughness = {0:.3f}" +
          "}") for _, row in MP.iterrows()
     ]
 
@@ -766,7 +798,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH):
          f" wall_thickness = {(row['t [mm]'] / 1000):01.3f}, " +
          f" z_bot = {row['Bottom [m]']:01.3f}, " +
          f" z_top = {row['Top [m]']:01.3f}, " +
-         " surface_roughness = 0:.3f" +
+         f" surface_roughness = {0:.3f}" +
          "}") for _, row in TP.iterrows()
     ]
 
@@ -962,6 +994,8 @@ def export_WLGen(excel_caller, WLGen_path):
     STRUCTURE = STRUCTURE.drop(columns=["Section", "local Section"])
     MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH")
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", "SKIRT")
+    SKIRT = SKIRT.dropna(how="all")
 
     APPURTANCES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "WL", :]
     ADDITIONAL_MASSES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "AM", :]
@@ -972,11 +1006,14 @@ def export_WLGen(excel_caller, WLGen_path):
     z_wl = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0]
     STRUCTURE = mc.add_element(STRUCTURE, z_new=z_wl)
     STRUCTURE = STRUCTURE[STRUCTURE["Bottom [m]"] >= z_wl]
+
     # only take MP and TP
     MP = STRUCTURE.loc[STRUCTURE.loc[:, "Affiliation"] == "MP", :]
     TP = STRUCTURE.loc[STRUCTURE.loc[:, "Affiliation"] == "TP", :]
 
-    text, msg = create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH)
+    if len(SKIRT) == 0:
+        SKIRT = None
+    text, msg = create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, skirt=SKIRT)
 
     # Feedback to user
     if not text:
@@ -1047,4 +1084,4 @@ def fill_WLGenMasses(excel_caller):
 
     ex.write_df_to_table(excel_filename, "WLGen", "APPURTANCES", MASSES_WL)
 
-
+#export_WLGen("NewGeomConv_24A523.xlsm", ".")
