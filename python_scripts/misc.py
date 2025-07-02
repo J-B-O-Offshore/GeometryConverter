@@ -356,7 +356,8 @@ def move_structure(excel_filename, displ, Structure):
     META_CURR.loc[:, "Height Reference"] = None
     DATA_CURR.loc[:, "Top [m]"] = DATA_CURR.loc[:, "Top [m]"] + displ
     DATA_CURR.loc[:, "Bottom [m]"] = DATA_CURR.loc[:, "Bottom [m]"] + displ
-    MASSES_CURR.loc[:, "Elevation [m]"] = MASSES_CURR.loc[:, "Elevation [m]"] + displ
+    MASSES_CURR.loc[:, "Top [m]"] = MASSES_CURR.loc[:, "Top [m]"] + displ
+    MASSES_CURR.loc[:, "Bottom [m]"] = MASSES_CURR.loc[:, "Bottom [m]"] + displ
 
     ex.write_df_to_table(excel_filename, "BuildYourStructure", f"{Structure}_META", META_CURR)
     ex.write_df_to_table(excel_filename, "BuildYourStructure", f"{Structure}_DATA", DATA_CURR)

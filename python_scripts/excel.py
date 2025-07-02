@@ -5,6 +5,8 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 import re
+import tempfile
+
 def setup_logger():
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
@@ -509,3 +511,32 @@ def add_unique_row(df1, df2, exclude_columns=None):
 def call_vba_dropdown_macro(workbook_name: str, sheet_name: str, dropdown_name: str, new_value: str):
     wb = xw.Book(workbook_name)  # Adjust path or use xw.Book.caller()
     wb.macro('set_dropdown_value')(sheet_name, dropdown_name, new_value)
+
+def insert_plot(fig, workbook_name, sheet_name, named_range):
+    """
+    Insert a Matplotlib Figure into an already open Excel workbook at the named range.
+
+    Parameters:
+    - fig: matplotlib.figure.Figure object
+    - workbook_name: str, name of the open Excel workbook (e.g., 'file.xlsx')
+    - sheet_name: str, name of the sheet in the workbook
+    - named_range: str, named range in the sheet to place the image at
+    """
+
+    app = xw.apps.active
+    wb = app.books[workbook_name]
+    sheet = wb.sheets[sheet_name]
+    rng = sheet.range(named_range)
+
+    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmpfile:
+        fig.savefig(tmpfile.name, bbox_inches='tight')
+        tmpfile.flush()
+
+        sheet.pictures.add(tmpfile.name,
+                           name=f"Fig_{named_range}",
+                           update=True,
+                           top=rng.top,
+                           left=rng.left)
+    os.remove(tmpfile.name)
+
+
