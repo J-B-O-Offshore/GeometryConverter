@@ -10,6 +10,7 @@ import math
 import re
 from pandas.api.types import CategoricalDtype
 
+from math import isnan, isfinite
 
 # %% helpers
 
@@ -26,7 +27,7 @@ def add_node(df, z_new):
     """
     # Create a new node row
     new_node = pd.DataFrame([{
-        'z': z_new,
+        'Elevation [m]': z_new,
         'node': 0,  # placeholder
         'pInertia': 0,
         'pMass': 0.0,
@@ -35,7 +36,7 @@ def add_node(df, z_new):
 
     # Append and sort by height (descending)
     df_updated = pd.concat([df, new_node], ignore_index=True)
-    df_updated = df_updated.sort_values(by='z', ascending=False).reset_index(drop=True)
+    df_updated = df_updated.sort_values(by='Elevation [m]', ascending=False).reset_index(drop=True)
 
     # Reassign node numbers: highest z gets highest node number
     max_node = df_updated['node'].max() + 1  # ensure uniqueness if original node numbers are reused
@@ -82,59 +83,74 @@ def check_values(df: pd.DataFrame, columns=None, mode='missing') -> list[str]:
     return error_messages
 
 
-def interpolate_with_neighbors(data):
-    """
-    Linearly interpolates internal None/NaN values with neighbors and extrapolates
-    at the beginning and end using the first/last two known values.
+def interpolate_with_neighbors(x, y):
 
-    Parameters:
-        data (list of float, None, or NaN): The input list.
+        """
+        Fills holes (None or NaN) in y using linear interpolation:
+        - Interior holes use left and right known neighbors.
+        - Leading holes use the first two known values on the right.
+        - Trailing holes use the last two known values on the left.
 
-    Returns:
-        list of float or None: List with interpolated and extrapolated values.
-    """
+        Parameters:
+        - x: list of x-values (same length as y), must be sorted
+        - y: list of y-values with possible holes (None or np.nan)
 
-    def is_missing(x):
-        return x is None or (isinstance(x, float) and math.isnan(x))
+        Returns:
+        - A new list with the holes in y filled locally
+        """
+        x = list(x)
+        y = list(y)
+        y_filled = y.copy()
+        n = len(y)
 
-    result = data[:]
+        i = 0
+        while i < n:
+            if y_filled[i] is None or (isinstance(y_filled[i], float) and np.isnan(y_filled[i])):
+                # Start of hole
+                start = i
+                while i < n and (y_filled[i] is None or (isinstance(y_filled[i], float) and np.isnan(y_filled[i]))):
+                    i += 1
+                end = i  # first known value after the hole
 
-    # --- First: Interpolate values with two known neighbors ---
-    i = 0
-    while i < len(result):
-        if is_missing(result[i]):
-            start = i
-            while i < len(result) and is_missing(result[i]):
+                # Case 1: Interior hole
+                if start > 0 and end < n:
+                    x0, y0 = x[start - 1], y_filled[start - 1]
+                    x1, y1 = x[end], y_filled[end]
+                    for j in range(start, end):
+                        t = (x[j] - x0) / (x1 - x0)
+                        y_filled[j] = (1 - t) * y0 + t * y1
+
+                # Case 2: Leading edge hole
+                elif end < n:
+                    # Use first two known values after the hole
+                    k1 = end
+                    while k1 + 1 < n and (y_filled[k1 + 1] is None or np.isnan(y_filled[k1 + 1])):
+                        k1 += 1
+                    if k1 + 1 < n:
+                        x0, y0 = x[k1], y_filled[k1]
+                        x1, y1 = x[k1 + 1], y_filled[k1 + 1]
+                        for j in range(start, end):
+                            t = (x[j] - x0) / (x1 - x0)
+                            y_filled[j] = (1 - t) * y0 + t * y1
+
+                # Case 3: Trailing edge hole
+                elif start > 1:
+                    # Use last two known values before the hole
+                    k1 = start - 1
+                    while k1 - 1 >= 0 and (y_filled[k1 - 1] is None or np.isnan(y_filled[k1 - 1])):
+                        k1 -= 1
+                    if k1 - 1 >= 0:
+                        x0, y0 = x[k1 - 1], y_filled[k1 - 1]
+                        x1, y1 = x[k1], y_filled[k1]
+                        for j in range(start, end):
+                            t = (x[j] - x0) / (x1 - x0)
+                            y_filled[j] = (1 - t) * y0 + t * y1
+
+                # Otherwise: cannot fill
+            else:
                 i += 1
-            end = i
-            if 0 < start and end < len(result) and not is_missing(result[start - 1]) and not is_missing(result[end]):
-                left = result[start - 1]
-                right = result[end]
-                n = end - start + 1
-                for j in range(start, end):
-                    frac = (j - start + 1) / n
-                    result[j] = left + frac * (right - left)
-        else:
-            i += 1
 
-    # --- Then: Extrapolate missing values at the start ---
-    first_known_idx = next((i for i, x in enumerate(result) if not is_missing(x)), None)
-    if first_known_idx is not None and first_known_idx >= 2:
-        val1 = result[first_known_idx]
-        val2 = result[first_known_idx + 1]
-        for i in range(first_known_idx - 1, -1, -1):
-            result[i] = val1 - (first_known_idx - i) * (val2 - val1)
-
-    # --- Extrapolate missing values at the end ---
-    last_known_idx = next((i for i in reversed(range(len(result))) if not is_missing(result[i])), None)
-    if last_known_idx is not None and last_known_idx <= len(result) - 3:
-        val1 = result[last_known_idx]
-        val2 = result[last_known_idx - 1]
-        for i in range(last_known_idx + 1, len(result)):
-            result[i] = val1 + (i - last_known_idx) * (val1 - val2)
-
-    return result
-
+        return y_filled
 
 def read_lua_values(file_path, keys):
     """
@@ -228,274 +244,261 @@ def write_lua_variables(lua_string, variables):
 
 # %% functions
 
-def calculate_deflection(
-        NODES: pd.DataFrame,
-        defl_MP: Tuple[float, str],
-        defl_TP: Tuple[float, str],
-        defl_Tower: Tuple[float, str],
+from typing import Tuple
 
+
+def calculate_deflection(
+    NODES: pd.DataFrame,
+    defl_MP: Tuple[float, str],
+    defl_TP: Tuple[float, str],
+    defl_Tower: Tuple[float, str],
 ) -> pd.Series:
     """
-    Calculate deflection values based on given tilt angles. defl_Tower is relative to defl TP, defl_MP and defl_TP is absloute
+    Calculate continuous deflection values with varying tilt angles.
+    - defl_Tower is RELATIVE to defl_TP
+    - defl_MP and defl_TP are ABSOLUTE
+    The deflection at the lowest elevation is always zero, including BORDER nodes.
 
     Parameters:
-    - NODES: DataFrame with columns ["z", "Affiliation"]
-    - defl_MP, defl_Tower, defl_TP: Tuples (value, unit), where unit is "deg" or "mm/m"
+    - NODES: DataFrame with ["Elevation [m]", "Affiliation"]
+    - defl_MP, defl_TP, defl_Tower: Tuples (value, unit)
 
     Returns:
     - pd.Series of deflection values
     """
 
     def _convert_to_rad(value: float, unit: str) -> float:
-        """Convert deflection from mm/m or degrees to radians."""
         if unit == "deg":
             return np.deg2rad(value)
         elif unit == "mm/m":
             return np.arctan(value / 1000)
         else:
-            raise ValueError(f"Unsupported unit '{unit}'. Use 'deg' or 'mm/m'.")
+            raise ValueError(f"Unsupported unit '{unit}'")
 
-    def _compute_line(z: pd.Series, angle_rad: float, base_z: float) -> pd.Series:
-        """Compute the deflection line based on angle and base z level."""
-        return np.sin(angle_rad) * (z - base_z)
+    def _segment_deflection(z: pd.Series, angle_rad: float, base_z: float, offset: float) -> pd.Series:
+        return np.tan(angle_rad) * (z - base_z) + offset
 
+    # Extract and sort elevations
+    z = NODES["Elevation [m]"]
     affiliations = NODES["Affiliation"]
-    z = NODES["z"]
-    base_z = z.iloc[-1]
 
-    # Convert all given angles to radians
+    # Sort BORDER elevations to determine boundaries
+    borders = NODES.loc[affiliations == "BORDER", "Elevation [m]"].sort_values().values
+    if len(borders) < 2:
+        raise ValueError("Two 'BORDER' nodes required to separate TP and TOWER.")
+
+    base_TOWER = borders[1]
+    base_TP = borders[0]
+    base_MP = z.min()  # Always take the lowest z as the MP base
+
+    # Convert angles
     angle_MP = _convert_to_rad(*defl_MP)
-    angle_Tower = _convert_to_rad(*defl_Tower)
-    angle_TP = _convert_to_rad(*defl_TP) if defl_TP else None
+    angle_TP = _convert_to_rad(*defl_TP)
+    angle_Tower = angle_TP + _convert_to_rad(*defl_Tower)  # relative to TP
 
-    angle_Tower = angle_TP + angle_Tower
+    # Compute deflection offsets for continuity
+    defl_MP_end = np.tan(angle_MP) * (base_TP - base_MP)
+    defl_TP_end = np.tan(angle_TP) * (base_TOWER - base_TP) + defl_MP_end
 
-    # Compute initial deflection lines
-    line_MP = _compute_line(z, angle_MP, base_z)
-    line_Tower = _compute_line(z, angle_Tower, base_z)
-    line_TP = _compute_line(z, angle_TP, base_z) if angle_TP else None
+    # Prepare full output Series
+    defl = pd.Series(0.0, index=NODES.index, dtype="float64")
 
-    # Initialize DEFL column
-    NODES["DEFL"] = 0.0
+    # MP and BORDER nodes below TP
+    mask_MP = (z <= base_TP)
+    defl[mask_MP] = _segment_deflection(z[mask_MP], angle_MP, base_MP, 0)
 
-    # Assign MP deflection
-    mask_MP = affiliations == "MP"
-    NODES.loc[mask_MP, "DEFL"] = pd.Series(line_MP[mask_MP], dtype="float64")
+    # TP and BORDER nodes between TP and TOWER
+    mask_TP = (z > base_TP) & (z <= base_TOWER)
+    defl[mask_TP] = _segment_deflection(z[mask_TP], angle_TP, base_TP, defl_MP_end)
 
-    mask_TP = affiliations == "TP"
-    TP_offset = line_MP[mask_MP].iloc[0] - line_TP[mask_MP].iloc[0]
-    NODES.loc[mask_TP, "DEFL"] = pd.Series(line_MP[mask_MP], dtype="float64") + TP_offset
+    # TOWER and BORDER nodes above TOWER
+    mask_TOWER = z > base_TOWER
+    defl[mask_TOWER] = _segment_deflection(z[mask_TOWER], angle_Tower, base_TOWER, defl_TP_end)
 
-    mask_TOWER = affiliations == "TOWER"
-    TOWER_offset = NODES.loc[mask_TP, "DEFL"].iloc[0] - line_Tower[mask_TP].iloc[0]
-    NODES.loc[mask_TOWER, "DEFL"] = pd.Series(line_MP[mask_MP], dtype="float64") + TOWER_offset
-
-    return NODES["DEFL"]
+    return defl
 
 
-def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, defl_TP=None, ModelName="Struct", EModul="2.10E+11", fyk="355", poisson="0.3", dens="7850", addMass=0,
+def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE_GROWTH=None, defl_TP=None,
+                         ModelName="Struct", EModul="2.10E+11", fyk="355", poisson="0.3", dens="7850", addMass=0,
                          member_id=1, create_node_tolerance=0.1, seabed_level=None, waterlevel=0):
     """
     Generates a JBOOST structural input text block based on geometric and mass data for offshore wind turbine structures.
-
-    This function constructs node and element definitions for a structural model used in the JBOOST simulation tool.
-    It processes geometry and mass input data, applies deflections, optionally inserts RNA and additional point masses,
-    and formats the data into a textual representation for JBOOST input.
-
-    Parameters:
-    ----------
-    GEOMETRY : pd.DataFrame
-        DataFrame containing structural geometry with columns:
-        ["Top [m]", "Bottom [m]", "D, top [m]", "D, bottom [m]", "t [mm]", "Affiliation"].
-
-    RNA : pd.DataFrame
-        DataFrame with RNA (Rotor-Nacelle Assembly) properties.
-        Must include "Offset TT_COG [m]", "Mass [kg]", "Inertia [kg m^2]", and "Identifier".
-
-    defl_MP : float or np.ndarray
-        Monopile deflection at the top node (used for calculating out-of-verticality).
-
-    delf_TOWER : float or np.ndarray
-        Tower-specific deflection used in deflection calculation.
-
-    MASSES : pd.DataFrame, optional
-        Optional DataFrame of additional point masses with columns:
-        ["Top [m]","Bottom [m]", "Mass [kg]", "Name"].
-
-    defl_TP : float or np.ndarray, optional
-        Transition piece deflection, if different from tower or monopile.
-
-    ModelName : str, default "Struct"
-        Name of the model used in JBOOST output.
-
-    EModul : str, default "2.10E+11"
-        Young’s modulus (E) of material used in the elements.
-
-    fyk : str, default "355"
-        Yield strength of the material in MPa.
-
-    poisson : str, default "0.3"
-        Poisson’s ratio of the material.
-
-    dens : str or float, default "7850"
-        Density of the structure in kg/m³.
-
-    addMass : float, default 0
-        Additional mass per meter applied uniformly to elements.
-
-    member_id : int, default 1
-        ID used for grouping or identifying structural members.
-
-    create_node_tolerance : float, default 0.1
-        Tolerance used when placing point masses: if no existing node is within this
-        tolerance of a mass elevation, a new node is created.
-
-    seabed_level : float, optional
-        Elevation of the seabed. All geometry below this level is removed.
-
-    Returns:
-    -------
-    str
-        A formatted string representing the full JBOOST model, including node and element
-        definitions with deflections, mass distributions, and structural properties.
     """
 
     NODES_txt = []
     ELEMENTS_txt = []
     elements = []
     waterlevel = float(waterlevel)
+
+    # Filter geometry below seabed
     if seabed_level is not None:
         GEOMETRY = mc.add_element(GEOMETRY, seabed_level)
     GEOMETRY = GEOMETRY.loc[GEOMETRY["Bottom [m]"] >= seabed_level]
-    # Nodes
-    N_Nodes = len(GEOMETRY) + 1
-    NODES = pd.DataFrame({
-        "z": pd.concat([
-            GEOMETRY["Top [m]"],
-            pd.Series([GEOMETRY["Bottom [m]"].iloc[-1]])
-        ], ignore_index=True)
-    })
-    nodes = [501 + i for i in range(N_Nodes)]
-    nodes.reverse()
+
+    # Extract and initialize nodes
+    NODES = mc.extract_nodes_from_elements(GEOMETRY)
+    nodes = list(reversed([501 + i for i in range(len(NODES))]))
     NODES["node"] = nodes
     NODES["pInertia"] = 0
     NODES["pMass"] = 0.0
-    NODES["Affiliation"] = "NOT DEFINDED"
     NODES["pMassName"] = ""
-    NODES.loc[NODES.index[:-1], "Affiliation"] = GEOMETRY.iloc[:]["Affiliation"]
-    NODES.loc[NODES.index[-1], "Affiliation"] = GEOMETRY.iloc[-1]["Affiliation"]
 
-    # calculate deflection
-    calculate_deflection(NODES, defl_MP, defl_TP, delf_TOWER)
+    # Deflection
+    NODES["DEFL"] = calculate_deflection(NODES, defl_MP, defl_TP, delf_TOWER)
 
-    # insert Node at WL
-    if not waterlevel in NODES["z"].values:
+    # Insert node at water level
+    if waterlevel not in NODES["Elevation [m]"].values:
         NODES = add_node(NODES, waterlevel)
         GEOMETRY = mc.add_element(GEOMETRY, waterlevel)
+    NODES.loc[NODES["Elevation [m]"] == waterlevel, "pMassName"] = "--- watelevel"
 
-    # distribute Masses, create new Node if in between
+    # Add point masses
     if MASSES is not None:
-        # distribute Masses on Nodes
         for idx in MASSES.index:
             z_bot = MASSES.loc[idx, "Bottom [m]"]
-            if z_bot is not None and z_bot is not np.nan and z_bot != "":
-                z_Mass = (MASSES.loc[idx, "Bottom [m]"] + MASSES.loc[idx, "Top [m]"]) / 2
+            z_Mass = (z_bot + MASSES.loc[idx, "Top [m]"]) / 2 if pd.notna(z_bot) else MASSES.loc[idx, "Top [m]"]
+
+            differences = np.abs(NODES["Elevation [m]"].values - z_Mass)
+            within_tol = np.where(differences <= create_node_tolerance)[0]
+
+            if len(within_tol) > 0:
+                closest_index = within_tol[np.argmin(differences[within_tol])]
+                NODES.loc[closest_index, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
+                NODES.loc[closest_index, "pMassName"] += MASSES.loc[idx, "Name"] + " "
+            elif z_Mass >= GEOMETRY["Bottom [m]"].values[-1]:
+                NODES = add_node(NODES, z_Mass)
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, ["pMass", "pMassName"]] = \
+                    MASSES.loc[idx, ["Mass [kg]", "Name"]].values
+                GEOMETRY = mc.add_element(GEOMETRY, z_Mass)
             else:
-                z_Mass = MASSES.loc[idx, "Top [m]"]
+                print(f"Warning! Mass '{MASSES.loc[idx, 'Name']}' not added, it is below the seabed level!")
 
-            # if Mass is near node
-            in_tolerance = np.where(np.abs(NODES["z"].values - z_Mass) <= create_node_tolerance)[0]
+    # Add marine growth
+    if MARINE_GROWTH is not None:
+        z_marine = MARINE_GROWTH["Bottom [m]"].to_list() + [MARINE_GROWTH.iloc[1]["Top [m]"]]
+        z_marine = [round(z, 1) for z in z_marine]
+        for z in z_marine:
+            if not any(np.isclose(z, NODES["Elevation [m]"].values)):
+                NODES = add_node(NODES, z)
+                NODES.loc[NODES["Elevation [m]"] == z, "Affiliation"] = "MARINE_GROWTH"
+                GEOMETRY = mc.add_element(GEOMETRY, z)
+                NODES.loc[NODES["Elevation [m]"] == z, "pMassName"] = ""
 
-            if len(in_tolerance) > 0:
-                NODES.loc[in_tolerance[0], "pMass"] += MASSES.loc[idx, "Mass [kg]"]
-                NODES.loc[in_tolerance[0], "pMassName"] += MASSES.loc[idx, "Name"] + " "
-            # if not, create new nodes
-            else:
-                if z_Mass >= GEOMETRY.loc[:, "Bottom [m]"].values[-1]:
-                    NODES = add_node(NODES, z_Mass)
-                    NODES.loc[NODES["z"] == z_Mass, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
-                    NODES.loc[NODES["z"] == z_Mass, "pMassName"] = MASSES.loc[idx, "Name"]
-                    GEOMETRY = mc.add_element(GEOMETRY, z_Mass)
-                else:
-                    print(f"Warning! Mass '{MASSES.loc[idx, 'Name']}' not added, it is below the seabed level!")
 
-    # add RNA
-    MP_top = NODES.iloc[0, :].loc["z"]
-    D_MP_top = GEOMETRY.iloc[0, :].loc["D, top [m]"]
-    t_MP_top = GEOMETRY.iloc[0, :].loc["t [mm]"]
+    # Add RNA
+    MP_top = NODES.iloc[0]["Elevation [m]"]
+    D_MP_top = GEOMETRY.iloc[0]["D, top [m]"]
+    t_MP_top = GEOMETRY.iloc[0]["t [mm]"]
 
     z_RNA = MP_top + RNA.loc[0, "Vertical Offset TT to HH [m]"]
     NODES = add_node(NODES, z_RNA)
-    GEOMETRY = pd.concat([pd.DataFrame({'Affiliation': 'TOWER', 'Top [m]': z_RNA, 'Bottom [m]': MP_top, 'D, top [m]': D_MP_top, 'D, bottom [m]': D_MP_top,
-                                        't [mm]': t_MP_top}, index=[-1]), GEOMETRY], ignore_index=True, axis=0)
+    GEOMETRY = pd.concat([
+        pd.DataFrame({
+            'Affiliation': 'TOWER',
+            'Top [m]': z_RNA,
+            'Bottom [m]': MP_top,
+            'D, top [m]': D_MP_top,
+            'D, bottom [m]': D_MP_top,
+            't [mm]': t_MP_top
+        }, index=[-1]),
+        GEOMETRY
+    ], ignore_index=True)
 
-    NODES.loc[NODES["z"] == z_RNA, "pMass"] += RNA.loc[0, "Mass of RNA [kg]"]
-    NODES.loc[NODES["z"] == z_RNA, "pMassName"] = f"RNA {RNA.loc[0, 'Identifier']}"
-    NODES.loc[NODES["z"] == z_RNA, "pInertia"] = (RNA.loc[0, 'Inertia of RNA fore-aft @COG [kg m^2]'] + RNA.loc[0, 'Inertia of RNA side-side @COG [kg m^2]']) / 2
+    NODES.loc[NODES["Elevation [m]"] == z_RNA, "pMass"] += RNA.loc[0, "Mass of RNA [kg]"]
+    NODES.loc[NODES["Elevation [m]"] == z_RNA, "pMassName"] = f"RNA {RNA.loc[0, 'Identifier']}"
+    NODES.loc[NODES["Elevation [m]"] == z_RNA, "pInertia"] = (
+        RNA.loc[0, 'Inertia of RNA fore-aft @COG [kg m^2]'] +
+        RNA.loc[0, 'Inertia of RNA side-side @COG [kg m^2]']
+    ) / 2
 
-    # fill deflection values for newly inserted Nodes
-    NODES.loc[:, "DEFL"] = interpolate_with_neighbors(NODES.loc[:, "DEFL"].values)
-
-    # Revert Node order
+    # Interpolate deflections for added nodes and reverse node order
+    NODES["DEFL"] = interpolate_with_neighbors(NODES["Elevation [m]"].values, NODES["DEFL"].values)
     NODES = NODES.iloc[::-1].reset_index(drop=True)
 
-    # construct Node lines
-    for idx, node in NODES.iterrows():
-        temp = ("os_FeNode{model=ModelName" "\t" +
-                ",node=" + str(int(node["node"])) + "\t" +
-                ",x=0" "\t" +
-                ",y=0" "\t" +
-                ",z=" + f"{round(node['z'], 2):05.2f}" + "\t" +
-                ",pMass=" + f"{node['pMass']:06.0f}" + "\t" +
-                ",pInertia=" + str(node["pInertia"]) + "\t" +
-                ",pOutOfVertically=" + f"{round(node['DEFL'], 3):06.3f}" + "}")
 
-        # write comment about pointmasses
-        if node["pMassName"] != "":
+    # Create node definitions
+    for _, node in NODES.iterrows():
+        elevation = round(node['Elevation [m]'], 2)
+        pMass = round(node['pMass'], 0)
+        pInertia = node['pInertia']  # keep as-is, assuming no formatting needed
+        pDefl = round(node['DEFL'], 3)
+
+        line = (
+            f"os_FeNode{{model=ModelName"
+            f"\t,node={int(node['node'])}"
+            f"\t,x=0\t,y=0"
+            f"\t,z={elevation:.2f}"
+            f"\t,pMass={pMass:06.0f}"
+            f"\t,pInertia={pInertia}"
+            f"\t,pOutOfVertically={pDefl:06.3f}}}"
+        )
+
+        if node["pMassName"]:
             if node["Affiliation"] == "ADDED_FOR_MASS":
-                temp += f"--added node for pointmass '{node['pMassName']}'"
+                line += f"--added node for '{node['pMassName']}'"
             else:
-                temp += f"--placed pointmasse(s) '{node['pMassName']}'"
-        NODES_txt.append(temp)
+                line += f"--placed pointmasse(s) '{node['pMassName']}'"
+        if node["Affiliation"] == "MARINE_GROWTH":
+            line += "--added node for marine growth"
 
-    # Elements
+
+        NODES_txt.append(line)
+
+    # Create element definitions
     for i in range(len(NODES) - 1):
-        startnode = NODES.loc[i, "node"]
-        endnode = NODES.loc[i + 1, "node"]
-        diameter = (GEOMETRY.loc[i, "D, top [m]"] + GEOMETRY.loc[i, "D, bottom [m]"]) / 2
-        t_wall = GEOMETRY.loc[i, "t [mm]"] / 1000
+        startnode = int(NODES.loc[i, "node"])
+        endnode = int(NODES.loc[i + 1, "node"])
+        diameter = round((GEOMETRY.loc[i, "D, top [m]"] + GEOMETRY.loc[i, "D, bottom [m]"]) / 2, 2)
+        t_wall = round(GEOMETRY.loc[i, "t [mm]"] / 1000, 3)
 
-        elements.append({"elem_id": i + 1, "startnode": startnode, "endnode": endnode, "diameter": diameter, "t_wall": t_wall, "dens": dens})
+        elements.append({
+            "elem_id": i + 1,
+            "startnode": startnode,
+            "endnode": endnode,
+            "diameter": diameter,
+            "t_wall": t_wall,
+            "dens": dens
+        })
 
     ELEM = pd.DataFrame(elements)
-    ELEM.loc[ELEM.index[-1], "dens"] = 1.0
+    ELEM.at[ELEM.index[-1], "dens"] = 1.0
 
-    for idx, elem in ELEM.iterrows():
-        temp = ("os_FeElem{model=ModelName\t"
-                ",elem_id=" + f"{elem['elem_id']:03.0f}" + "\t" +
-                ",startnode=" + f"{elem['startnode']:03.0f}" + "\t" +
-                ",endnode=" + f"{elem['endnode']:03.0f}" + "\t" +
-                ",diameter=" + f"{round(elem['diameter'], 2):02.2f}" + "\t" +
-                ",t_wall=" + f"{round(elem['t_wall'], 3):.3f}" + "\t" +
-                ",EModul=" + str(EModul) + "\t" +
-                ",fky=" + str(fyk) + "\t" +
-                ",poisson=" + str(poisson) + "\t" +
-                ",dens=" + str(elem['dens']) + "\t" +
-                ",addMass=" + str(addMass) + "\t" +
-                ",member_id=" + str(member_id) + "\t" +
-                "}")
-        ELEMENTS_txt.append(temp)
+    for _, elem in ELEM.iterrows():
+        elem_id = int(elem['elem_id'])
+        startnode = int(elem['startnode'])
+        endnode = int(elem['endnode'])
+        diameter = round(elem['diameter'], 2)
+        t_wall = round(elem['t_wall'], 3)
+        dens_rounded = round(elem['dens'], 3)
 
-    text = ("--Input for JBOOST generated by Excel\n" +
+        line = (
+            f"os_FeElem{{model=ModelName"
+            f"\t,elem_id={elem_id:03.0f}"
+            f"\t,startnode={startnode:03.0f}"
+            f"\t,endnode={endnode:03.0f}"
+            f"\t,diameter={diameter:.2f}"
+            f"\t,t_wall={t_wall:.3f}"
+            f"\t,EModul={EModul}"
+            f"\t,fky={fyk}"
+            f"\t,poisson={poisson}"
+            f"\t,dens={dens_rounded}"
+            f"\t,addMass={addMass}"
+            f"\t,member_id={member_id}}}"
+        )
+        ELEMENTS_txt.append(line)
+
+    # Compose final JBOOST input
+    text = (
+            "--Input for JBOOST generated by Excel\n"
             "--    Definition Modelname\n"
-            'local	ModelName="' + ModelName + '"\n' +
-            "--    Definition der FE-Knoten\n" +
-            "\n".join(NODES_txt) + "\n\n" +
-            "--Definition der FE-Elemente- Zusatzmassen in kg / m" + "\n" +
-            "\n".join(ELEMENTS_txt) + "\n"
-            )
-    return text
+            f'local	ModelName="{ModelName}"\n'
+            "--    Definition der FE-Knoten\n"
+            + "\n".join(NODES_txt) + "\n\n"
+                                     "--Definition der FE-Elemente- Zusatzmassen in kg / m\n"
+            + "\n".join(ELEMENTS_txt) + "\n"
+    )
 
+    return text
 
 def create_JBOOST_proj(Parameters, marine_growth=None, modelname="struct.lua", runFEModul=True, runFrequencyModul=False, runHindcastValidation=False, wavefile="wave.lua",
                        windfile="wind."):
@@ -765,7 +768,6 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, ski
     for overlap in overlaps:
         skirt = mc.add_element(skirt, float(overlap))
 
-
     if skirt is not None:
         for idx, row in skirt.iterrows():
             top = row["Top [m]"]
@@ -859,15 +861,14 @@ def export_JBOOST(excel_caller, jboost_path):
     excel_filename = os.path.basename(excel_caller)
 
     jboost_path = os.path.abspath(jboost_path)
-    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE")
+    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
     GEOMETRY = GEOMETRY.drop(columns=["Section", "local Section"])
-    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
-    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH")
-    PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PARAMETER")
+    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
+    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
+    PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PARAMETER", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
     PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
-    RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA")
-    RNA.dropna(how="all", axis=0, inplace=True)
+    RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA", dropnan=True)
 
     if len(RNA) == 0:
         ex.show_message_box(excel_filename,
@@ -912,7 +913,6 @@ def export_JBOOST(excel_caller, jboost_path):
         if config_data["water_level"] == 'auto':
             if not resolve_auto_value("Water level", "water_level", "a water level"):
                 return
-
         if config_data["seabed_level"] == 'auto':
             if not resolve_auto_value("Seabed level", "seabed_level", "a seabed level"):
                 return
@@ -953,6 +953,7 @@ def export_JBOOST(excel_caller, jboost_path):
                                            (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Value"].values[0],
                                             PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Unit"].values[0]),
                                            MASSES=MASSES,
+                                           MARINE_GROWTH=MARINE_GROWTH,
                                            defl_TP=(PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Value"].values[0],
                                                     PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Unit"].values[0]),
                                            ModelName=Model_name,
@@ -1085,3 +1086,6 @@ def fill_WLGenMasses(excel_caller):
     ex.write_df_to_table(excel_filename, "WLGen", "APPURTANCES", MASSES_WL)
 
 #export_WLGen("NewGeomConv_24A523.xlsm", ".")
+
+
+export_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/Validation_Dreekant/NEW/JBOOST/")

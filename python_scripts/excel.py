@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import re
 import tempfile
+from collections import defaultdict
 
 def setup_logger():
     logger = logging.getLogger()
@@ -320,7 +321,7 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
     return response_map.get(result, f"Unknown ({result})")
 
 
-def read_excel_table(workbook_name, sheet_name, table_name, dtype=None):
+def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=False):
     """
     Read an Excel Table into a Pandas DataFrame, using the Table's header as column names.
 
@@ -364,7 +365,10 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None):
         for col, col_dtype in dtype.items():
             df[col] = df[col].astype(col_dtype)
 
-    return df
+    if dropnan:
+        return df.dropna(how='all')
+    else:
+        return df
 
 from pathlib import Path
 

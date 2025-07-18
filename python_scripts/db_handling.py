@@ -5,6 +5,7 @@ import pandas as pd
 import sqlite3
 import excel as ex
 
+import plot as ex_plt
 
 class ConciveError(Exception):
     """
@@ -404,7 +405,7 @@ def load_META(excel_filename, Structure, db_path):
     ex.set_dropdown_values(
         excel_filename,
         sheet_name_structure_loading,
-        f"Dropdown_{Structure}_Structures",
+        f"Dropdown_{Structure}_Structures2",
         list(META.loc[:, "Identifier"].values)
     )
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_FULL", META)
@@ -441,7 +442,7 @@ def load_DATA(excel_filename, Structure, Structure_name, db_path):
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_MASSES", MASSES)
 
     ex.clear_excel_table_contents(excel_filename, sheet_name_structure_loading, f"{Structure}_META_NEW")
-    ex.call_vba_dropdown_macro(excel_filename, sheet_name_structure_loading, f"Dropdown_{Structure}_Structures", Structure_name)
+    ex.call_vba_dropdown_macro(excel_filename, sheet_name_structure_loading, f"Dropdown_{Structure}_Structures2", Structure_name)
 
 
 def save_data(excel_filename, Structure, db_path, selected_structure):
@@ -627,7 +628,7 @@ def load_MP_DATA(excel_caller, Structure_name, db_path):
     excel_filename = os.path.basename(excel_caller)
 
     load_DATA(excel_filename, "MP", Structure_name, db_path)
-
+    ex_plt.plot_MP(excel_caller)
 
 def save_MP_data(excel_caller, db_path, selected_structure):
     excel_filename = os.path.basename(excel_caller)
@@ -778,6 +779,7 @@ def load_TP_DATA(excel_caller, Structure_name, db_path):
     excel_filename = os.path.basename(excel_caller)
 
     load_DATA(excel_filename, "TP", Structure_name, db_path)
+    ex_plt.plot_TP(excel_caller)
 
 
 def save_TP_data(excel_caller, db_path, selected_structure):
@@ -879,6 +881,7 @@ def load_TOWER_DATA(excel_caller, Structure_name, db_path):
     excel_filename = os.path.basename(excel_caller)
 
     load_DATA(excel_filename, "TOWER", Structure_name, db_path)
+    ex_plt.plot_TOWER(excel_caller)
 
 
 def save_TOWER_data(excel_caller, db_path, selected_structure):
