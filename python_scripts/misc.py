@@ -108,77 +108,117 @@ def calc_weight(rho, t, z_top, z_bot, d_top, d_bot):
     return rho * volume
 
 
-def add_element(df, z_new):
+def add_element(df, z_new, defaults=None, add_outside_bound=False):
     """
-    Inserts an interpolated node into a structural DataFrame at a specified height.
+    Inserts an interpolated structural segment into a DataFrame at a specified height.
 
-    If the height already exists as a "Top [m]" or "Bottom [m]" value, the original DataFrame is returned.
-    Otherwise, if the height lies within exactly one segment (i.e., between "Top [m]" and "Bottom [m]" of a single row),
-    a new row is inserted by interpolating the diameter at that height. The original segment is split accordingly.
+    The function adds a new row at height `z_new` by splitting an existing segment in the
+    DataFrame. The existing segment is divided into two parts: the lower part is updated
+    to end at `z_new`, and a new upper part is created starting at `z_new`, using linear
+    interpolation to compute the diameter at that height.
+
+    If `z_new` matches an existing "Top [m]" or "Bottom [m]" value, or lies outside the
+    structure bounds and `add_outside_bound` is False, the original DataFrame is returned unchanged.
 
     Parameters
     ----------
     df : pandas.DataFrame
-        DataFrame containing structural node information with columns such as:
-        - "Top [m]"
-        - "Bottom [m]"
-        - "D, top [m]"
-        - "D, bottom [m]"
-        - "t [mm]"
-        - optionally: "Affiliation"
-    height : float
-        The height (in meters) at which to interpolate a new node.
+        Structural DataFrame with the following required columns:
+            - "Top [m]": Top height of each segment (in meters)
+            - "Bottom [m]": Bottom height of each segment (in meters)
+            - "D, top [m]": Diameter at the top of the segment (in meters)
+            - "D, bottom [m]": Diameter at the bottom of the segment (in meters)
+            - "t [mm]": Wall thickness (in millimeters)
+        Optionally, the column:
+            - "Affiliation": Metadata copied into the new segment if present.
+        Other columns are allowed and will be preserved. For these, the inserted row will
+        contain a default value based on the column's data type:
+            - float or int → np.nan
+            - bool → False
+            - object (e.g. string) → None
+            - datetime64 → pd.NaT
+            - other/unknown types → None (fallback)
+
+    z_new : float
+        Height (in meters) at which to insert the new node.
+
+    defaults : dict, optional
+        Dictionary mapping column names to custom default values for the inserted row.
+
+    add_outside_bound : bool, default False
+        If False, prevents insertion of nodes outside the vertical extent of the structure.
 
     Returns
     -------
-    pandas.DataFrame or None
-        Updated DataFrame with the interpolated node inserted, or None if:
-        - the height is outside the bounds of the structure, or
-        - multiple segments contain the height (i.e., structure is not consecutive at that height).
-
-    Notes
-    -----
-    - If interpolation is successful, the original segment is split, with the lower part ending at the new height,
-      and a new row inserted on top with interpolated diameter.
-    - The "Affiliation" of the new row is copied from the original row if the column exists.
-    - No checks are made for column types or values; ensure input DataFrame is clean and valid.
+    pandas.DataFrame
+        Updated DataFrame with the new interpolated row inserted.
+        Returns original DataFrame if:
+        - z_new already exists
+        - z_new is outside the structure bounds and add_outside_bound=False
+        - z_new lies within overlapping segments (non-unique match)
     """
     df = df.reset_index(drop=True)
-    if len(df.loc[(df["Top [m]"] == z_new) | (df["Bottom [m]"] == z_new)].index) > 0:
+    defaults = defaults or {}
+
+    # Skip if height already exists
+    if len(df.loc[(df["Top [m]"] == z_new) | (df["Bottom [m]"] == z_new)]) > 0:
         return df
 
     id_inter = df.loc[(df["Top [m]"] > z_new) & (df["Bottom [m]"] < z_new)].index
+
     if len(id_inter) == 0:
-        print("interpolation not possible, outside bounds")
-        return df
+        if not add_outside_bound:
+            print("interpolation not possible, outside bounds")
+            return df
+        else:
+            print("No segment contains z_new, but add_outside_bound=True. No interpolation performed.")
+            return df
+
     if len(id_inter) > 1:
         print("interpolation not possible, structure not consecutive")
         return df
-    id_inter = id_inter[0]
 
-    new_row = pd.DataFrame(columns=df.columns)
+    id_inter = id_inter[0]
+    df = df.copy()
+    row_base = df.loc[id_inter]
+    new_row = {}
+
+    # Required fields
+    new_row["Top [m]"] = z_new
+    new_row["Bottom [m]"] = row_base["Bottom [m]"]
+    new_row["t [mm]"] = row_base["t [mm]"]
 
     if "Affiliation" in df.columns:
-        new_row.loc[0, "Affiliation"] = df.loc[id_inter, "Affiliation"]
+        new_row["Affiliation"] = row_base["Affiliation"]
 
-    new_row.loc[0, "t [mm]"] = df.loc[id_inter, "t [mm]"]
+    # Diameter interpolation
+    inter_x_rel = (z_new - row_base["Bottom [m]"]) / (row_base["Top [m]"] - row_base["Bottom [m]"])
+    d_inter = (row_base["D, top [m]"] - row_base["D, bottom [m]"]) * inter_x_rel + row_base["D, bottom [m]"]
 
-    # height
-    new_row.loc[0, "Top [m]"] = z_new
-    new_row.loc[0, "Bottom [m]"] = df.loc[id_inter, "Bottom [m]"]
+    new_row["D, top [m]"] = d_inter
+    new_row["D, bottom [m]"] = row_base["D, bottom [m]"]
 
-    # diameter interpolation
-    inter_x_rel = (z_new - df.loc[id_inter, "Bottom [m]"]) / (df.loc[id_inter, "Top [m]"] - df.loc[id_inter, "Bottom [m]"])
-    d_inter = (df.loc[id_inter, "D, top [m]"] - df.loc[id_inter, "D, bottom [m]"]) * inter_x_rel + df.loc[id_inter, "D, bottom [m]"]
-    new_row.loc[0, "D, top [m]"] = d_inter
-    new_row.loc[0, "D, bottom [m]"] = df.loc[id_inter, "D, bottom [m]"]
+    # Fill all other columns using defaults or type-based rules
+    for col in df.columns:
+        if col not in new_row:
+            if col in defaults:
+                new_row[col] = defaults[col]
+            else:
+                dtype = df[col].dtype
+                if pd.api.types.is_bool_dtype(dtype):
+                    new_row[col] = False
+                elif pd.api.types.is_numeric_dtype(dtype):
+                    new_row[col] = np.nan
+                elif pd.api.types.is_datetime64_any_dtype(dtype):
+                    new_row[col] = pd.NaT
+                elif pd.api.types.is_object_dtype(dtype):
+                    new_row[col] = None
+                else:
+                    new_row[col] = None  # Fallback
 
-    df = df.copy()
-    # update original segment
+    # Update existing row and insert new one
     df.loc[id_inter, "Bottom [m]"] = z_new
-
-    # insert new row
-    df = pd.concat([df.iloc[:id_inter + 1], new_row, df.iloc[id_inter + 1:]]).reset_index(drop=True)
+    df = pd.concat([df.iloc[:id_inter + 1], pd.DataFrame([new_row]), df.iloc[id_inter + 1:]]).reset_index(drop=True)
 
     return df
 
@@ -515,11 +555,11 @@ def extract_nodes_from_elements(df_elements: pd.DataFrame) -> pd.DataFrame:
         """
 
     # Ensure sorting by Top depth (descending), in case not already sorted
-    df_sorted = df_elements.sort_values(by='Top [m]', ascending=False).reset_index(drop=True)
+    #df_sorted = df_elements.sort_values(by='Top [m]', ascending=False).reset_index(drop=True)
 
     nodes = []
 
-    for i, row in df_sorted.iterrows():
+    for i, row in df_elements.iterrows():
         # Top node of the first element
         if i == 0:
             nodes.append({
@@ -531,8 +571,8 @@ def extract_nodes_from_elements(df_elements: pd.DataFrame) -> pd.DataFrame:
         # Bottom node of current element
         bottom_elev = row['Bottom [m]']
 
-        if i + 1 < len(df_sorted):
-            next_affiliation = df_sorted.loc[i + 1, 'Affiliation']
+        if i + 1 < len(df_elements):
+            next_affiliation = df_elements.loc[i + 1, 'Affiliation']
         else:
             next_affiliation = row['Affiliation']  # Last element — use same
 

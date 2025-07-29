@@ -12,34 +12,83 @@ from pandas.api.types import CategoricalDtype
 
 from math import isnan, isfinite
 
+
 # %% helpers
 
-def add_node(df, z_new):
+def add_node(df, z_new, defaults=None, add_outside_bound=False):
     """
-    Add a new node at the specified height `z_new` to the DataFrame `df`.
+    Adds a new node at the specified height `z_new` to the node DataFrame `df`.
 
-    Parameters:
-    - df (pd.DataFrame): Original node DataFrame.
-    - z_new (float): Height at which to add the new node.
+    If `z_new` already exists in the 'Elevation [m]' column, or lies outside the vertical bounds
+    and `add_outside_bound` is False, the original DataFrame is returned unchanged.
 
-    Returns:
-    - pd.DataFrame: Updated DataFrame with new node added and reindexed.
+    The new node includes default values for all required fields. For any additional columns
+    in `df`, values are taken from the `defaults` dictionary if provided by type (e.g., 'float', 'int').
+    If a dtype is not in `defaults`, a general type-based fallback is assigned.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Original node DataFrame. Must include at least:
+            - 'Elevation [m]'
+            - 'node'
+            - 'pInertia'
+            - 'pMass'
+
+    z_new : float
+        Elevation at which to insert the new node.
+
+    defaults : dict, optional
+        Optional dictionary mapping data type names (e.g., 'float', 'bool') to default values.
+
+    add_outside_bound : bool, default False
+        If False, prevents insertion of nodes outside the current elevation range.
+
+    Returns
+    -------
+    pd.DataFrame
+        Updated DataFrame with the new node added, sorted by elevation and reindexed.
     """
-    # Create a new node row
-    new_node = pd.DataFrame([{
+    if z_new in df['Elevation [m]'].values:
+        return df
+
+    if not add_outside_bound:
+        z_min, z_max = df['Elevation [m]'].min(), df['Elevation [m]'].max()
+        if not (z_min < z_new < z_max):
+            return df
+
+    defaults = defaults or {}
+
+    new_row = {
         'Elevation [m]': z_new,
         'node': 0,  # placeholder
-        'pInertia': 0,
-        'pMass': 0.0,
-        'Affiliation': 'ADDED_FOR_MASS'
-    }])
+    }
 
-    # Append and sort by height (descending)
-    df_updated = pd.concat([df, new_node], ignore_index=True)
+    for col in df.columns:
+        if col in new_row:
+            continue
+
+        dtype = df[col].dtype
+
+        if pd.api.types.is_bool_dtype(dtype):
+            new_row[col] = defaults.get("bool", False)
+        elif pd.api.types.is_integer_dtype(dtype):
+            new_row[col] = defaults.get("int", np.nan)
+        elif pd.api.types.is_float_dtype(dtype):
+            new_row[col] = defaults.get("float", np.nan)
+        elif pd.api.types.is_numeric_dtype(dtype):  # fallback
+            new_row[col] = defaults.get("numeric", np.nan)
+        elif pd.api.types.is_datetime64_any_dtype(dtype):
+            new_row[col] = defaults.get("datetime", pd.NaT)
+        elif pd.api.types.is_object_dtype(dtype):
+            new_row[col] = defaults.get("object", None)
+        else:
+            new_row[col] = defaults.get("other", None)
+
+    df_updated = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
     df_updated = df_updated.sort_values(by='Elevation [m]', ascending=False).reset_index(drop=True)
 
-    # Reassign node numbers: highest z gets highest node number
-    max_node = df_updated['node'].max() + 1  # ensure uniqueness if original node numbers are reused
+    max_node = df_updated['node'].max() + 1
     df_updated['node'] = list(range(max_node, max_node - len(df_updated), -1))
 
     return df_updated
@@ -84,73 +133,73 @@ def check_values(df: pd.DataFrame, columns=None, mode='missing') -> list[str]:
 
 
 def interpolate_with_neighbors(x, y):
+    """
+    Fills holes (None or NaN) in y using linear interpolation:
+    - Interior holes use left and right known neighbors.
+    - Leading holes use the first two known values on the right.
+    - Trailing holes use the last two known values on the left.
 
-        """
-        Fills holes (None or NaN) in y using linear interpolation:
-        - Interior holes use left and right known neighbors.
-        - Leading holes use the first two known values on the right.
-        - Trailing holes use the last two known values on the left.
+    Parameters:
+    - x: list of x-values (same length as y), must be sorted
+    - y: list of y-values with possible holes (None or np.nan)
 
-        Parameters:
-        - x: list of x-values (same length as y), must be sorted
-        - y: list of y-values with possible holes (None or np.nan)
+    Returns:
+    - A new list with the holes in y filled locally
+    """
+    x = list(x)
+    y = list(y)
+    y_filled = y.copy()
+    n = len(y)
 
-        Returns:
-        - A new list with the holes in y filled locally
-        """
-        x = list(x)
-        y = list(y)
-        y_filled = y.copy()
-        n = len(y)
+    i = 0
+    while i < n:
+        if y_filled[i] is None or (isinstance(y_filled[i], float) and np.isnan(y_filled[i])):
+            # Start of hole
+            start = i
+            while i < n and (y_filled[i] is None or (isinstance(y_filled[i], float) and np.isnan(y_filled[i]))):
+                i += 1
+            end = i  # first known value after the hole
 
-        i = 0
-        while i < n:
-            if y_filled[i] is None or (isinstance(y_filled[i], float) and np.isnan(y_filled[i])):
-                # Start of hole
-                start = i
-                while i < n and (y_filled[i] is None or (isinstance(y_filled[i], float) and np.isnan(y_filled[i]))):
-                    i += 1
-                end = i  # first known value after the hole
+            # Case 1: Interior hole
+            if start > 0 and end < n:
+                x0, y0 = x[start - 1], y_filled[start - 1]
+                x1, y1 = x[end], y_filled[end]
+                for j in range(start, end):
+                    t = (x[j] - x0) / (x1 - x0)
+                    y_filled[j] = (1 - t) * y0 + t * y1
 
-                # Case 1: Interior hole
-                if start > 0 and end < n:
-                    x0, y0 = x[start - 1], y_filled[start - 1]
-                    x1, y1 = x[end], y_filled[end]
+            # Case 2: Leading edge hole
+            elif end < n:
+                # Use first two known values after the hole
+                k1 = end
+                while k1 + 1 < n and (y_filled[k1 + 1] is None or np.isnan(y_filled[k1 + 1])):
+                    k1 += 1
+                if k1 + 1 < n:
+                    x0, y0 = x[k1], y_filled[k1]
+                    x1, y1 = x[k1 + 1], y_filled[k1 + 1]
                     for j in range(start, end):
                         t = (x[j] - x0) / (x1 - x0)
                         y_filled[j] = (1 - t) * y0 + t * y1
 
-                # Case 2: Leading edge hole
-                elif end < n:
-                    # Use first two known values after the hole
-                    k1 = end
-                    while k1 + 1 < n and (y_filled[k1 + 1] is None or np.isnan(y_filled[k1 + 1])):
-                        k1 += 1
-                    if k1 + 1 < n:
-                        x0, y0 = x[k1], y_filled[k1]
-                        x1, y1 = x[k1 + 1], y_filled[k1 + 1]
-                        for j in range(start, end):
-                            t = (x[j] - x0) / (x1 - x0)
-                            y_filled[j] = (1 - t) * y0 + t * y1
+            # Case 3: Trailing edge hole
+            elif start > 1:
+                # Use last two known values before the hole
+                k1 = start - 1
+                while k1 - 1 >= 0 and (y_filled[k1 - 1] is None or np.isnan(y_filled[k1 - 1])):
+                    k1 -= 1
+                if k1 - 1 >= 0:
+                    x0, y0 = x[k1 - 1], y_filled[k1 - 1]
+                    x1, y1 = x[k1], y_filled[k1]
+                    for j in range(start, end):
+                        t = (x[j] - x0) / (x1 - x0)
+                        y_filled[j] = (1 - t) * y0 + t * y1
 
-                # Case 3: Trailing edge hole
-                elif start > 1:
-                    # Use last two known values before the hole
-                    k1 = start - 1
-                    while k1 - 1 >= 0 and (y_filled[k1 - 1] is None or np.isnan(y_filled[k1 - 1])):
-                        k1 -= 1
-                    if k1 - 1 >= 0:
-                        x0, y0 = x[k1 - 1], y_filled[k1 - 1]
-                        x1, y1 = x[k1], y_filled[k1]
-                        for j in range(start, end):
-                            t = (x[j] - x0) / (x1 - x0)
-                            y_filled[j] = (1 - t) * y0 + t * y1
+            # Otherwise: cannot fill
+        else:
+            i += 1
 
-                # Otherwise: cannot fill
-            else:
-                i += 1
+    return y_filled
 
-        return y_filled
 
 def read_lua_values(file_path, keys):
     """
@@ -248,10 +297,10 @@ from typing import Tuple
 
 
 def calculate_deflection(
-    NODES: pd.DataFrame,
-    defl_MP: Tuple[float, str],
-    defl_TP: Tuple[float, str],
-    defl_Tower: Tuple[float, str],
+        NODES: pd.DataFrame,
+        defl_MP: Tuple[float, str],
+        defl_TP: Tuple[float, str],
+        defl_Tower: Tuple[float, str],
 ) -> pd.Series:
     """
     Calculate continuous deflection values with varying tilt angles.
@@ -340,18 +389,33 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE
     nodes = list(reversed([501 + i for i in range(len(NODES))]))
     NODES["node"] = nodes
     NODES["pInertia"] = 0
-    NODES["pMass"] = 0.0
-    NODES["pMassName"] = ""
-
+    NODES["comment"] = None
+    NODES["added"] = False
     # Deflection
     NODES["DEFL"] = calculate_deflection(NODES, defl_MP, defl_TP, delf_TOWER)
 
     # Insert node at water level
     if waterlevel not in NODES["Elevation [m]"].values:
-        NODES = add_node(NODES, waterlevel)
+        NODES = add_node(NODES, waterlevel, defaults={"float": 0})
         GEOMETRY = mc.add_element(GEOMETRY, waterlevel)
-    NODES.loc[NODES["Elevation [m]"] == waterlevel, "pMassName"] = "--- watelevel"
+        NODES.loc[NODES["Elevation [m]"] == waterlevel, "comment"] = "watelevel "
+        NODES.loc[NODES["Elevation [m]"] == waterlevel, "added"] = True
 
+    # Add marine growth
+    if MARINE_GROWTH is not None:
+
+        z_marine = MARINE_GROWTH["Bottom [m]"].to_list() + [MARINE_GROWTH.iloc[1]["Top [m]"]]
+        z_marine = [round(z, 1) for z in z_marine]
+
+        for z in z_marine:
+            if not any(np.isclose(z, NODES["Elevation [m]"].values)):
+                NODES = add_node(NODES, z, defaults={"float": 0})
+                GEOMETRY = mc.add_element(GEOMETRY, z)
+                NODES.loc[NODES["Elevation [m]"] == z, "comment"] = "marine growth border "
+                NODES.loc[NODES["Elevation [m]"] == z, "added"] = True
+
+    NODES["pMass"] = 0.0
+    NODES["pMassNames"] = None
     # Add point masses
     if MASSES is not None:
         for idx in MASSES.index:
@@ -361,29 +425,31 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE
             differences = np.abs(NODES["Elevation [m]"].values - z_Mass)
             within_tol = np.where(differences <= create_node_tolerance)[0]
 
+            # if node is (nearly) on Node
             if len(within_tol) > 0:
                 closest_index = within_tol[np.argmin(differences[within_tol])]
                 NODES.loc[closest_index, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
-                NODES.loc[closest_index, "pMassName"] += MASSES.loc[idx, "Name"] + " "
+
+                if NODES.loc[closest_index, "pMassNames"] is None:
+                    NODES.loc[closest_index, "pMassNames"] = MASSES.loc[idx, "Name"] + " "
+                else:
+                    NODES.loc[closest_index, "pMassNames"] += MASSES.loc[idx, "Name"] + " "
+
+            # if node mass is over bottom
             elif z_Mass >= GEOMETRY["Bottom [m]"].values[-1]:
-                NODES = add_node(NODES, z_Mass)
-                NODES.loc[NODES["Elevation [m]"] == z_Mass, ["pMass", "pMassName"]] = \
-                    MASSES.loc[idx, ["Mass [kg]", "Name"]].values
+
+                # add Node and Element
+                NODES = add_node(NODES, z_Mass, defaults={"float": 0})
                 GEOMETRY = mc.add_element(GEOMETRY, z_Mass)
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, "added"] = True
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, "comment"] = None
+
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
+
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, "pMassNames"] = MASSES.loc[idx, "Name"] + " "
+
             else:
                 print(f"Warning! Mass '{MASSES.loc[idx, 'Name']}' not added, it is below the seabed level!")
-
-    # Add marine growth
-    if MARINE_GROWTH is not None:
-        z_marine = MARINE_GROWTH["Bottom [m]"].to_list() + [MARINE_GROWTH.iloc[1]["Top [m]"]]
-        z_marine = [round(z, 1) for z in z_marine]
-        for z in z_marine:
-            if not any(np.isclose(z, NODES["Elevation [m]"].values)):
-                NODES = add_node(NODES, z)
-                NODES.loc[NODES["Elevation [m]"] == z, "Affiliation"] = "MARINE_GROWTH"
-                GEOMETRY = mc.add_element(GEOMETRY, z)
-                NODES.loc[NODES["Elevation [m]"] == z, "pMassName"] = ""
-
 
     # Add RNA
     MP_top = NODES.iloc[0]["Elevation [m]"]
@@ -391,7 +457,7 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE
     t_MP_top = GEOMETRY.iloc[0]["t [mm]"]
 
     z_RNA = MP_top + RNA.loc[0, "Vertical Offset TT to HH [m]"]
-    NODES = add_node(NODES, z_RNA)
+    NODES = add_node(NODES, z_RNA, defaults={"float": 0}, add_outside_bound=True)
     GEOMETRY = pd.concat([
         pd.DataFrame({
             'Affiliation': 'TOWER',
@@ -405,16 +471,18 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE
     ], ignore_index=True)
 
     NODES.loc[NODES["Elevation [m]"] == z_RNA, "pMass"] += RNA.loc[0, "Mass of RNA [kg]"]
-    NODES.loc[NODES["Elevation [m]"] == z_RNA, "pMassName"] = f"RNA {RNA.loc[0, 'Identifier']}"
+    NODES.loc[NODES["Elevation [m]"] == z_RNA, "comment"] = f"RNA {RNA.loc[0, 'Identifier']}"
+    NODES.loc[NODES["Elevation [m]"] == z_RNA, "added"] = True
+    NODES.loc[NODES["Elevation [m]"] == z_RNA, "pMassNames"] = None
+
     NODES.loc[NODES["Elevation [m]"] == z_RNA, "pInertia"] = (
-        RNA.loc[0, 'Inertia of RNA fore-aft @COG [kg m^2]'] +
-        RNA.loc[0, 'Inertia of RNA side-side @COG [kg m^2]']
-    ) / 2
+                                                                     RNA.loc[0, 'Inertia of RNA fore-aft @COG [kg m^2]'] +
+                                                                     RNA.loc[0, 'Inertia of RNA side-side @COG [kg m^2]']
+                                                             ) / 2
 
     # Interpolate deflections for added nodes and reverse node order
     NODES["DEFL"] = interpolate_with_neighbors(NODES["Elevation [m]"].values, NODES["DEFL"].values)
     NODES = NODES.iloc[::-1].reset_index(drop=True)
-
 
     # Create node definitions
     for _, node in NODES.iterrows():
@@ -432,15 +500,18 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE
             f"\t,pInertia={pInertia}"
             f"\t,pOutOfVertically={pDefl:06.3f}}}"
         )
+        comment = ""
+        if node["added"]:
+            comment += "-- added node,  "
+            if node["comment"]:
+                comment += node["comment"] + " "
+            if node["pMassNames"]:
+                comment += "Mass(es): " + node["pMassNames"]
 
-        if node["pMassName"]:
-            if node["Affiliation"] == "ADDED_FOR_MASS":
-                line += f"--added node for '{node['pMassName']}'"
-            else:
-                line += f"--placed pointmasse(s) '{node['pMassName']}'"
-        if node["Affiliation"] == "MARINE_GROWTH":
-            line += "--added node for marine growth"
-
+        else:
+            if node["pMassNames"]:
+                comment += "-- added masses on existing node: " + node["pMassNames"]
+        line += comment
 
         NODES_txt.append(line)
 
@@ -499,6 +570,7 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE
     )
 
     return text
+
 
 def create_JBOOST_proj(Parameters, marine_growth=None, modelname="struct.lua", runFEModul=True, runFrequencyModul=False, runHindcastValidation=False, wavefile="wave.lua",
                        windfile="wind."):
@@ -752,23 +824,19 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, ski
         return False, "Geometry specification issues in APPURTANCES:\n" + "\n".join(err_list)
 
     # Add skirt
-    skirt_nodes = list(skirt.loc[:, "Top [m]"].values) + [skirt.iloc[-1, :].loc["Bottom [m]"]]
-
-    for skirt_node in skirt_nodes:
-        MP = mc.add_element(MP, skirt_node)
-        TP = mc.add_element(TP, skirt_node)
-
-    # interpolate skirt nodes
-    MP_nodes = list(MP.loc[:, "Top [m]"].values) + [MP.iloc[-1, :].loc["Bottom [m]"]]
-    TP_nodes = list(TP.loc[:, "Top [m]"].values) + [TP.iloc[-1, :].loc["Bottom [m]"]]
-
-    all_nodes = TP_nodes[0:-1] + MP_nodes
-    overlaps = [node for node in all_nodes if node < float(skirt_nodes[0]) and node > float(skirt_nodes[1])]
-
-    for overlap in overlaps:
-        skirt = mc.add_element(skirt, float(overlap))
-
     if skirt is not None:
+        skirt_nodes = list(skirt.loc[:, "Top [m]"].values) + [skirt.iloc[-1, :].loc["Bottom [m]"]]
+        for skirt_node in skirt_nodes:
+            MP = mc.add_element(MP, skirt_node)
+            TP = mc.add_element(TP, skirt_node)
+        # interpolate skirt nodes
+        MP_nodes = list(MP.loc[:, "Top [m]"].values) + [MP.iloc[-1, :].loc["Bottom [m]"]]
+        TP_nodes = list(TP.loc[:, "Top [m]"].values) + [TP.iloc[-1, :].loc["Bottom [m]"]]
+        all_nodes = TP_nodes[0:-1] + MP_nodes
+        overlaps = [node for node in all_nodes if node < float(skirt_nodes[0]) and node > float(skirt_nodes[1])]
+
+        for overlap in overlaps:
+            skirt = mc.add_element(skirt, float(overlap))
         for idx, row in skirt.iterrows():
             top = row["Top [m]"]
             bottom = row["Bottom [m]"]
@@ -990,13 +1058,12 @@ def export_JBOOST(excel_caller, jboost_path):
 def export_WLGen(excel_caller, WLGen_path):
     excel_filename = os.path.basename(excel_caller)
 
-    APPURTANCES_MASSES = ex.read_excel_table(excel_filename, "WLGen", "APPURTANCES")
+    APPURTANCES_MASSES = ex.read_excel_table(excel_filename, "ExportStructure", "APPURTANCES")
     STRUCTURE = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE")
     STRUCTURE = STRUCTURE.drop(columns=["Section", "local Section"])
     MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH")
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
-    SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", "SKIRT")
-    SKIRT = SKIRT.dropna(how="all")
+    SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", "SKIRT", dropnan=True)
 
     APPURTANCES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "WL", :]
     ADDITIONAL_MASSES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "AM", :]
@@ -1083,9 +1150,121 @@ def fill_WLGenMasses(excel_caller):
     # Sort the DataFrame
     MASSES_WL = MASSES_WL.sort_values('Use For (WL: Waveload generator, AM: Additional Masses)')
 
-    ex.write_df_to_table(excel_filename, "WLGen", "APPURTANCES", MASSES_WL)
-
-#export_WLGen("NewGeomConv_24A523.xlsm", ".")
+    ex.write_df_to_table(excel_filename, "ExportStructure", "APPURTANCES", MASSES_WL)
 
 
-export_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/Validation_Dreekant/NEW/JBOOST/")
+def fill_Bladed_table(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
+    Bladed_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Material", dropnan=True)
+
+    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
+    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
+    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+
+    Bladed_Elements = pd.DataFrame(columns=["Affiliation [-]", "Member [-]", "Node [-]", "Diameter [m]", "Wall thickness [mm]", "cd [-]", "cm [-]", "Marine growth [mm]", "Density [kg*m^-3]", "Material [-]", "Elevation [m]"])
+    Bladed_Nodes = pd.DataFrame(columns=["Node [-]", "Elevation [m]", "Local x [m]", "Local y [m]", "Point mass [kg]"])
+
+    create_node_tolerance = Bladed_Settings.loc[Bladed_Settings["Parameter"] == "Dimensional Tolerance for Node generating [m]", "Value"].values[0]
+    seabed_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0]
+    material = Bladed_Material.loc[0, "Material"]
+    density = Bladed_Material.loc[0, "Density"]
+
+    # Filter geometry below seabed
+    if seabed_level is not None:
+        GEOMETRY = mc.add_element(GEOMETRY, seabed_level)
+    GEOMETRY = GEOMETRY.loc[GEOMETRY["Bottom [m]"] >= seabed_level]
+
+    NODES = mc.extract_nodes_from_elements(GEOMETRY)
+
+    # Add masses
+    NODES["pMass"] = 0.0
+    NODES["pMassNames"] = None
+    NODES["added"] = False
+    NODES["comment"] = None
+
+    if MASSES is not None:
+        for idx in MASSES.index:
+            z_bot = MASSES.loc[idx, "Bottom [m]"]
+            z_Mass = (z_bot + MASSES.loc[idx, "Top [m]"]) / 2 if pd.notna(z_bot) else MASSES.loc[idx, "Top [m]"]
+
+            differences = np.abs(NODES["Elevation [m]"].values - z_Mass)
+            within_tol = np.where(differences <= create_node_tolerance)[0]
+
+            # if node is (nearly) on Node
+            if len(within_tol) > 0:
+                closest_index = within_tol[np.argmin(differences[within_tol])]
+                NODES.loc[closest_index, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
+
+                if NODES.loc[closest_index, "comment"] is None:
+                    NODES.loc[closest_index, "comment"] = MASSES.loc[idx, "Name"] + " "
+                else:
+                    NODES.loc[closest_index, "comment"] += MASSES.loc[idx, "Name"] + " "
+
+            # if node mass is over bottom
+            elif z_Mass >= GEOMETRY["Bottom [m]"].values[-1]:
+
+                # add Node
+                NODES = add_node(NODES, z_Mass, defaults={"float": 0})
+                GEOMETRY = mc.add_element(GEOMETRY, z_Mass)
+
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, "added"] = True
+
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
+
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, "comment"] = MASSES.loc[idx, "Name"] + " "
+
+            else:
+                print(f"Warning! Mass '{MASSES.loc[idx, 'Name']}' not added, it is below the seabed level!")
+
+    # Nodes
+    Bladed_Nodes.loc[:, "Node [-]"] = np.linspace(1, len(NODES), len(NODES))
+    Bladed_Nodes.loc[:, "Elevation [m]"] = NODES.loc[:, "Elevation [m]"]
+    Bladed_Nodes.loc[:, "Local x [m]"] = 0.0
+    Bladed_Nodes.loc[:, "Local y [m]"] = 0.0
+    Bladed_Nodes.loc[:, "Point mass [kg]"] = NODES.loc[:, "pMass"]
+    Bladed_Nodes.loc[:, "Added"] = NODES.loc[:, "added"]
+    Bladed_Nodes.loc[:, "Comment"] = NODES.loc[:, "comment"]
+
+    # Geometry
+    GEOMETRY.loc[:, "Section"] = np.linspace(1, len(GEOMETRY), len(GEOMETRY))
+    Bladed_Elements.loc[:, "Affiliation [-]"] = np.array([[aff_elem, aff_elem] for aff_elem in GEOMETRY["Affiliation"].values]).flatten()
+    Bladed_Elements.loc[:, "Member [-]"] = np.array([[f"{int(sec_elem)} (End 1)", f"{int(sec_elem)} (End 2)"] for sec_elem in GEOMETRY["Section"].values]).flatten()
+
+    Bladed_Elements.loc[:, "Elevation [m]"] = np.array([[row["Top [m]"], row["Bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
+
+    for i, row in Bladed_Elements.iterrows():
+
+        # node
+        elevation = row["Elevation [m]"]
+        # Find matching node based on elevation
+        node = Bladed_Nodes.loc[Bladed_Nodes["Elevation [m]"] == elevation, "Node [-]"]
+        if not node.empty:
+            Bladed_Elements.at[i, "Node [-]"] = int(node.values[0])
+
+        marineGrowth = MARINE_GROWTH.loc[(MARINE_GROWTH["Bottom [m]"] < elevation) & (MARINE_GROWTH["Top [m]"] >= elevation), "Marine Growth [mm]"]
+
+        if not marineGrowth.empty:
+            Bladed_Elements.at[i, "Marine growth [mm]"] = marineGrowth.values[0]
+        else:
+            Bladed_Elements.at[i, "Marine growth [mm]"] = 0
+
+    Bladed_Elements.drop(columns=["Elevation [m]"], inplace=True)
+
+    Bladed_Elements.loc[:, "Diameter [m]"] = np.array([[row["D, top [m]"], row["D, bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
+    Bladed_Elements.loc[:, "Wall thickness [mm]"] = np.array([[row["t [mm]"], row["t [mm]"]] for i, row in GEOMETRY.iterrows()]).flatten()
+
+    Bladed_Elements.loc[:, "cd [-]"] = 0.9
+    Bladed_Elements.loc[:, "cm [-]"] = 2.0
+    Bladed_Elements.loc[:, "Density [kg*m^-3]"] = density
+    Bladed_Elements.loc[:, "Material [-]"] = material
+
+    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
+    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
+
+
+
+    return
+# export_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm", ".")
+#fill_Bladed_table("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm")

@@ -24,7 +24,7 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
     # -------------------------------
     axis = ax[0]
 
-    plot_cans(Structure, axis, show_section_numbers=True, set_lims=False, color="k")
+    plot_cans(Structure, axis, show_section_numbers=show_section_numbers, set_lims=False, color="k")
 
     if waterlevel is not None:
         axis.axhline(waterlevel, color="blue", linestyle="--")
@@ -44,15 +44,21 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
     # Plot 2: Added masses with smart labels
     # -------------------------------
     axis = ax[1]
-    weight = mc.calc_weight(7850, Structure.loc[:, "t [mm]"], Structure.loc[:, "Top [m]"], Structure.loc[:, "Bottom [m]"], Structure.loc[:, "D, top [m]"],
-                            Structure.loc[:, "D, bottom [m]"])
+    weight = mc.calc_weight(
+        7850,
+        Structure.loc[:, "t [mm]"],
+        Structure.loc[:, "Top [m]"],
+        Structure.loc[:, "Bottom [m]"],
+        Structure.loc[:, "D, top [m]"],
+        Structure.loc[:, "D, bottom [m]"]
+    )
 
     grey = [0.8, 0.8, 0.8]
-    plot_cans(Structure, axis, show_section_numbers=False, color=grey,  set_lims=False)
+    plot_cans(Structure, axis, show_section_numbers=False, color=grey, set_lims=False)
 
     label_entries = []
     placed_z = defaultdict(int)
-    tol = 0.100 * (top_all - bottom_all)
+    tol = 0.050 * (top_all - bottom_all)
     x_step = 0.04 * (right - left)
 
     for _, mass in Added_Masses.iterrows():
@@ -88,29 +94,45 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
             'x_start': x_pos
         })
 
-    # --- Improved label placement ---
-    label_entries.sort(key=lambda x: -x['y'])  # top to bottom
-    occupied_y = []
-    min_dy = 0.03 * (top_all - bottom_all)
-    x_text = 0.6 * abs(right)
+    # --- Handle too many labels ---
+    MAX_LABELS = 25
+    too_many_labels = len(label_entries) > MAX_LABELS
 
-    for entry in label_entries:
-        target_y = entry['y']
-        while any(abs(target_y - oy) < min_dy for oy in occupied_y):
-            target_y -= min_dy
-        occupied_y.append(target_y)
+    if not too_many_labels:
+        # --- Improved label placement ---
+        label_entries.sort(key=lambda x: -x['y'])  # top to bottom
+        occupied_y = []
+        min_dy = 0.03 * (top_all - bottom_all)
+        x_text = 0.6 * abs(right)
 
-        # Draw connector
-        axis.plot([entry['x_start'], x_text - 0.05], [entry['y'], target_y],
-                  linestyle='-', color=entry['color'], linewidth=1)
+        for entry in label_entries:
+            target_y = entry['y']
+            while any(abs(target_y - oy) < min_dy for oy in occupied_y):
+                target_y -= min_dy
+            occupied_y.append(target_y)
 
-        # Draw label
-        axis.text(x_text, target_y, entry['label'], ha='left', va='center',
-                  fontsize=9, color=entry['color'])
+            # Draw connector
+            axis.plot([entry['x_start'], x_text - 0.05], [entry['y'], target_y],
+                      linestyle='-', color=entry['color'], linewidth=1)
 
+            # Draw label
+            axis.text(x_text, target_y, entry['label'], ha='left', va='center',
+                      fontsize=9, color=entry['color'])
+    else:
+        axis.text(
+            0.8 * abs(right),
+            0.5 * (top_all + bottom_all),
+            "Too many masses to label",
+            ha='center',
+            va='center',
+            fontsize=13,
+            color='red'
+        )
+
+    # Final axis settings
     axis.axvline(0, color="grey", linestyle="--", linewidth=1)
     axis.set_xlim(-0.1 * abs(right), 2 * abs(right))
-    axis.set_title("Masses")
+    axis.set_title("Masses \n (horizontal displacement only for distinction, all lie on center line)")
     axis.set_xticklabels([])
     axis.set_xticks([])
 
@@ -191,19 +213,7 @@ def plot_cans(Structure, axis, show_section_numbers=False, set_lims=True, **plot
                       fontsize=8, ha='center', va='center', fontweight='bold')
 
 
-def plot_Assambly(excel_caller):
-    excel_filename = os.path.basename(excel_caller)
-    MP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_DATA", dtype=float, dropnan=True)
-    TP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_DATA", dtype=float, dropnan=True)
-    TOWER = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TOWER_DATA", dtype=float, dropnan=True)
-
-    META_MP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META", dropnan=True)
-    if len(META_MP) != 0:
-        seabed = -META_MP.loc[0, "Water Depth [m]"]
-    else:
-        seabed = None
-
-    WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
+def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0):
 
     fig, axis = plt.subplots(1, 1, figsize=[8, 27])
 
@@ -220,12 +230,47 @@ def plot_Assambly(excel_caller):
     if SKIRT is not None:
         plot_cans(SKIRT, axis, show_section_numbers=False, color="red", set_lims=False, alpha=0.8)
 
-    axis.axhline(0, color="blue", linestyle="--")
+    axis.axhline(waterlevel, color="blue", linestyle="--")
     axis.axvline(0, color="grey", linestyle="--", linewidth=1)
     if seabed is not None:
         axis.axhline(seabed, color="brown", linestyle="-", linewidth=2)
 
-    ex.insert_plot(fig, excel_filename, "BuildYourStructure", f"Assambly_plot")
+    return fig
+
+def plot_Assambly_Build(excel_caller):
+
+    excel_filename = os.path.basename(excel_caller)
+    MP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_DATA", dtype=float, dropnan=True)
+    TP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_DATA", dtype=float, dropnan=True)
+    TOWER = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TOWER_DATA", dtype=float, dropnan=True)
+    META_MP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META", dropnan=True)
+
+    if len(META_MP) != 0:
+        seabed = -META_MP.loc[0, "Water Depth [m]"]
+    else:
+        seabed = None
+
+    WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
+
+    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0)
+
+    ex.insert_plot(Fig, excel_filename, "BuildYourStructure", f"Assambly_plot")
+
+
+def plot_Assambly_Overview(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    WHOLE_STRUCTURE = ex.read_excel_table(excel_filename, "StructureOverview", f"WHOLE_STRUCTURE", dtype=float, dropnan=True)
+    ALL_ADDED_MASSES = ex.read_excel_table(excel_filename, "StructureOverview", f"ALL_ADDED_MASSES", dropnan=True)
+    SKIRT_POINTMASS = ex.read_excel_table(excel_filename, "StructureOverview", f"SKIRT_POINTMASS", dropnan=True)
+    SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", f"SKIRT", dropnan=True)
+    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", f"MARINE_GROWTH", dropnan=True)
+    HYDRO_COEFFICIENTS = ex.read_excel_table(excel_filename, "StructureOverview", f"HYDRO_COEFFICIENTS", dropnan=True)
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", f"STRUCTURE_META", dropnan=True)
+
+    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0)
+
+    ex.insert_plot(Fig, excel_filename, "BuildYourStructure", f"Assambly_plot")
+
 
 def plot_MP(excel_caller):
     excel_filename = os.path.basename(excel_caller)
@@ -295,4 +340,4 @@ def plot_TOWER(excel_caller):
     return
 
 
-#plot_Assambly("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm")
+#plot_Assambly_Build("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm")
