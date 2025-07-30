@@ -9,6 +9,53 @@ import misc as mc
 
 
 def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", waterlevel=0, show_section_numbers=True):
+    """
+    Visualizes an offshore or tubular structure in three subplots: structural geometry, added mass distribution,
+    and geometric parameters like slope, wall thickness, and D/t ratio.
+
+    Parameters
+    ----------
+    Structure : pandas.DataFrame
+        DataFrame containing structural segment information with the following required columns:
+        - "Top [m]": top elevation of each segment.
+        - "Bottom [m]": bottom elevation of each segment.
+        - "D, top [m]": outer diameter at the top of each segment.
+        - "D, bottom [m]": outer diameter at the bottom of each segment.
+        - "t [mm]": wall thickness of each segment in millimeters.
+
+    Added_Masses : pandas.DataFrame
+        DataFrame containing added mass information with the following required columns:
+        - "Top [m]": top elevation of the mass (equal to bottom for point masses).
+        - "Bottom [m]": bottom elevation of the mass.
+        - "Mass [kg]": mass value in kilograms.
+        - "Name": identifier for labeling.
+
+    waterdepth : float, optional
+        Water depth (z-value) to be highlighted on the plot. Drawn as a horizontal line in brown.
+
+    height_ref : str, optional
+        Suffix appended to the y-axis label (e.g., ' MSL' for mean sea level reference).
+
+    waterlevel : float, optional, default=0
+        Water level (z-value) for visualization. Drawn as a dashed blue line.
+
+    show_section_numbers : bool, default=True
+        Whether to annotate structure segments with section numbers in the first subplot.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The generated Matplotlib figure with three subplots:
+        1. Structural overview with diameter and water level.
+        2. Added masses visualized with smart label placement to reduce overlap.
+        3. Slope (dD/dz), wall thickness (t), and D/t ratio vs. height.
+
+    Notes
+    -----
+    - Horizontal positions in the second plot (Added Masses) are adjusted solely for visualization purposes.
+      All added masses are assumed to lie on the structure's centerline.
+    - If more than 25 added masses are present, individual labels are omitted to reduce clutter.
+    """
     fig, ax = plt.subplots(1, 3, figsize=[22, 6])
     top_all = max(Structure["Top [m]"].max(), Added_Masses["Top [m]"].max())
     bottom_all = min(Structure["Bottom [m]"].min(), Added_Masses["Bottom [m]"].min())
@@ -188,7 +235,38 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
 
 
 def plot_cans(Structure, axis, show_section_numbers=False, set_lims=True, **plot_kwargs):
+    """
+    Plots a structural representation of cylindrical segments ("cans") on a given Matplotlib axis.
 
+    Parameters
+    ----------
+    Structure : pandas.DataFrame
+        DataFrame describing the structure, with one row per cylindrical segment.
+        Required columns:
+        - "Top [m]": top elevation of each segment.
+        - "Bottom [m]": bottom elevation of each segment.
+        - "D, top [m]": diameter at the top of the segment.
+        - "D, bottom [m]": diameter at the bottom of the segment.
+        - "Section": (optional) section number used for labeling (required if `show_section_numbers=True`).
+
+    axis : matplotlib.axes.Axes
+        Matplotlib axis on which the cans will be drawn.
+
+    show_section_numbers : bool, optional
+        If True, displays section numbers at the center of each can.
+        Requires the 'Section' column in `Structure`.
+
+    set_lims : bool, optional
+        If True, automatically sets the axis limits based on the geometry of the structure.
+
+    **plot_kwargs : dict, optional
+        Additional keyword arguments passed to `axis.plot()` for customizing line style, color, etc.
+
+    Returns
+    -------
+    None
+        The function modifies the provided `axis` in place.
+    """
     if set_lims:
         top_all = Structure["Top [m]"].max()
         bottom_all = Structure["Bottom [m]"].min()
@@ -213,8 +291,43 @@ def plot_cans(Structure, axis, show_section_numbers=False, set_lims=True, **plot
                       fontsize=8, ha='center', va='center', fontweight='bold')
 
 
-def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0):
+def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height_ref=""):
+    """
+    Plots the assembled offshore structure, showing its subcomponents (MP, TP, TOWER) and optionally a skirt.
 
+    Parameters
+    ----------
+    WHOLE_STRUCTURE : pandas.DataFrame
+        Combined structure data with one row per segment. Must include:
+        - "Top [m]": top elevation of the segment.
+        - "Bottom [m]": bottom elevation of the segment.
+        - "D, top [m]": diameter at the top of the segment.
+        - "D, bottom [m]": diameter at the bottom of the segment.
+        - "Affiliation": string column specifying the component ("MP", "TP", or "TOWER").
+
+    SKIRT : pandas.DataFrame, optional
+        Additional structure to plot (e.g., skirt piles). Same structure as `WHOLE_STRUCTURE`.
+
+    seabed : float, optional
+        Elevation of the seabed in meters. If provided, a horizontal brown line will be plotted.
+
+    waterlevel : float, default=0
+        Elevation of the water level in meters. Shown as a dashed blue line.
+
+    height_ref : str, optional
+        Optional height reference string (e.g., " MSL") appended to the y-axis label.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The generated Matplotlib figure showing the assembled structure with appropriate annotations.
+
+    Notes
+    -----
+    - MP (monopile), TP (transition piece), and TOWER segments are colored black, blue, and grey respectively.
+    - The skirt (if provided) is colored red with partial transparency.
+    - Diameters are doubled in the x-axis tick labels to represent total width.
+    """
     fig, axis = plt.subplots(1, 1, figsize=[8, 27])
 
     MP_assambled = WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE["Affiliation"] == "MP", :]
@@ -230,6 +343,12 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0):
     if SKIRT is not None:
         plot_cans(SKIRT, axis, show_section_numbers=False, color="red", set_lims=False, alpha=0.8)
 
+    ticks = axis.get_xticks()
+    axis.set_xticks(ticks[ticks >= 0])
+    axis.set_xticklabels([f"{2 * t:.0f}" for t in ticks if t >= 0])
+    axis.set_xlabel("Diameter in [m]")
+    axis.set_ylabel(f"z in m{height_ref}")
+
     axis.axhline(waterlevel, color="blue", linestyle="--")
     axis.axvline(0, color="grey", linestyle="--", linewidth=1)
     if seabed is not None:
@@ -237,8 +356,46 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0):
 
     return fig
 
-def plot_Assambly_Build(excel_caller):
 
+def plot_Assambly_Build(excel_caller):
+    """
+    Reads structural component data from an Excel workbook, assembles the offshore structure,
+    generates an assembly plot, and inserts it back into the Excel file.
+
+    Parameters
+    ----------
+    excel_caller : str
+        Full path to the Excel file from which to read structure data. The filename is extracted
+        and used to read various component tables from the "BuildYourStructure" sheet.
+
+    Reads From Excel
+    ----------------
+    Sheet: "BuildYourStructure"
+        - "MP_DATA": Main pile geometry (required).
+        - "TP_DATA": Transition piece geometry (required).
+        - "TOWER_DATA": Tower geometry (required).
+        - "MP_META": Metadata including:
+            - "Water Depth [m]": Used to determine seabed elevation.
+            - "Height Reference": Optional reference appended to the vertical axis label.
+
+    Excel Output
+    ------------
+    Sheet: "BuildYourStructure"
+        - Plot inserted into cell anchor labeled "Assambly_plot".
+
+    Returns
+    -------
+    None
+        This function performs operations with side effects:
+        - Generates a structural assembly plot using `plot_Assambly`.
+        - Inserts the figure into the provided Excel workbook.
+
+    Notes
+    -----
+    - The function calls `mc.assemble_structure` to combine MP, TP, and TOWER into a unified DataFrame.
+    - If the "Water Depth [m]" value in metadata is not numeric, seabed is ignored.
+    - The assembled structure is visualized using the `plot_Assambly` function with color-coded segments.
+    """
     excel_filename = os.path.basename(excel_caller)
     MP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_DATA", dtype=float, dropnan=True)
     TP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_DATA", dtype=float, dropnan=True)
@@ -246,20 +403,26 @@ def plot_Assambly_Build(excel_caller):
     META_MP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META", dropnan=True)
 
     if len(META_MP) != 0:
-        seabed = -META_MP.loc[0, "Water Depth [m]"]
+        value = META_MP.loc[0, "Water Depth [m]"]
+        seabed = -value if np.isreal(value) else None
+
+        value = META_MP.loc[0, "Height Reference"]
+        height_ref = value if value else None
+
     else:
         seabed = None
+        height_ref = None
 
     WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
 
-    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0)
+    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0, height_ref=height_ref)
 
     ex.insert_plot(Fig, excel_filename, "BuildYourStructure", f"Assambly_plot")
 
 
 def plot_Assambly_Overview(excel_caller):
     excel_filename = os.path.basename(excel_caller)
-    WHOLE_STRUCTURE = ex.read_excel_table(excel_filename, "StructureOverview", f"WHOLE_STRUCTURE", dtype=float, dropnan=True)
+    WHOLE_STRUCTURE = ex.read_excel_table(excel_filename, "StructureOverview", f"WHOLE_STRUCTURE", dropnan=True)
     ALL_ADDED_MASSES = ex.read_excel_table(excel_filename, "StructureOverview", f"ALL_ADDED_MASSES", dropnan=True)
     SKIRT_POINTMASS = ex.read_excel_table(excel_filename, "StructureOverview", f"SKIRT_POINTMASS", dropnan=True)
     SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", f"SKIRT", dropnan=True)
@@ -267,9 +430,28 @@ def plot_Assambly_Overview(excel_caller):
     HYDRO_COEFFICIENTS = ex.read_excel_table(excel_filename, "StructureOverview", f"HYDRO_COEFFICIENTS", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", f"STRUCTURE_META", dropnan=True)
 
-    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0)
+    water_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Water level", "Value"]
+    if water_level.empty:
+        water_level = None
+    else:
+        water_level = -water_level.values[0]
 
-    ex.insert_plot(Fig, excel_filename, "BuildYourStructure", f"Assambly_plot")
+    seabed_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"]
+    if seabed_level.empty:
+        seabed_level = None
+    else:
+        seabed_level = -seabed_level.values[0]
+
+    height_ref = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"]
+    if height_ref.empty:
+        height_ref = None
+    else:
+        height_ref = height_ref.values[0]
+
+
+    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, waterlevel=water_level, seabed=-seabed_level, height_ref=height_ref)
+
+    ex.insert_plot(Fig, excel_filename, "StructureOverview", f"Assambly_plot_Overview2")
 
 
 def plot_MP(excel_caller):
@@ -339,5 +521,5 @@ def plot_TOWER(excel_caller):
 
     return
 
-
-#plot_Assambly_Build("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm")
+# plot_Assambly_Build("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm")
+#plot_Assambly_Overview("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm")
