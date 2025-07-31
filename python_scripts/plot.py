@@ -9,69 +9,41 @@ import misc as mc
 
 
 def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", waterlevel=0, show_section_numbers=True):
-    """
-    Visualizes an offshore or tubular structure in three subplots: structural geometry, added mass distribution,
-    and geometric parameters like slope, wall thickness, and D/t ratio.
 
-    Parameters
-    ----------
-    Structure : pandas.DataFrame
-        DataFrame containing structural segment information with the following required columns:
-        - "Top [m]": top elevation of each segment.
-        - "Bottom [m]": bottom elevation of each segment.
-        - "D, top [m]": outer diameter at the top of each segment.
-        - "D, bottom [m]": outer diameter at the bottom of each segment.
-        - "t [mm]": wall thickness of each segment in millimeters.
 
-    Added_Masses : pandas.DataFrame
-        DataFrame containing added mass information with the following required columns:
-        - "Top [m]": top elevation of the mass (equal to bottom for point masses).
-        - "Bottom [m]": bottom elevation of the mass.
-        - "Mass [kg]": mass value in kilograms.
-        - "Name": identifier for labeling.
-
-    waterdepth : float, optional
-        Water depth (z-value) to be highlighted on the plot. Drawn as a horizontal line in brown.
-
-    height_ref : str, optional
-        Suffix appended to the y-axis label (e.g., ' MSL' for mean sea level reference).
-
-    waterlevel : float, optional, default=0
-        Water level (z-value) for visualization. Drawn as a dashed blue line.
-
-    show_section_numbers : bool, default=True
-        Whether to annotate structure segments with section numbers in the first subplot.
-
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-        The generated Matplotlib figure with three subplots:
-        1. Structural overview with diameter and water level.
-        2. Added masses visualized with smart label placement to reduce overlap.
-        3. Slope (dD/dz), wall thickness (t), and D/t ratio vs. height.
-
-    Notes
-    -----
-    - Horizontal positions in the second plot (Added Masses) are adjusted solely for visualization purposes.
-      All added masses are assumed to lie on the structure's centerline.
-    - If more than 25 added masses are present, individual labels are omitted to reduce clutter.
-    """
     fig, ax = plt.subplots(1, 3, figsize=[22, 6])
-    top_all = max(Structure["Top [m]"].max(), Added_Masses["Top [m]"].max())
-    bottom_all = min(Structure["Bottom [m]"].min(), Added_Masses["Bottom [m]"].min())
 
-    left = -max(Structure["D, top [m]"].max(), Structure["D, bottom [m]"].max()) / 2
-    right = -left
+    # Check if Structure is empty
+    structure_empty = Structure.empty
+
+    if not structure_empty:
+        top_structure = Structure["Top [m]"].max()
+        bottom_structure = Structure["Bottom [m]"].min()
+        left = -max(Structure["D, top [m]"].max(), Structure["D, bottom [m]"].max()) / 2
+        right = -left
+    else:
+        top_structure = -np.inf
+        bottom_structure = np.inf
+        left, right = -1.0, 1.0  # Default limits
+
+    # Use Added_Masses if present to help set limits
+    if not Added_Masses.empty:
+        top_masses = Added_Masses["Top [m]"].max()
+        bottom_masses = Added_Masses["Bottom [m]"].min()
+        top_all = max(top_structure, top_masses)
+        bottom_all = min(bottom_structure, bottom_masses)
+    else:
+        top_all = top_structure if top_structure != -np.inf else 10
+        bottom_all = bottom_structure if bottom_structure != np.inf else 0
 
     for ax_curr in ax:
         ax_curr.set_ylim(bottom_all - 0.05 * (top_all - bottom_all), top_all + 0.05 * (top_all - bottom_all))
         ax_curr.grid(True, linestyle='--')
-    # -------------------------------
-    # Plot 1: Structure overview
-    # -------------------------------
-    axis = ax[0]
 
-    plot_cans(Structure, axis, show_section_numbers=show_section_numbers, set_lims=False, color="k")
+    # Plot 1: Structure overview
+    axis = ax[0]
+    if not structure_empty:
+        plot_cans(Structure, axis, show_section_numbers=show_section_numbers, set_lims=False, color="k")
 
     if waterlevel is not None:
         axis.axhline(waterlevel, color="blue", linestyle="--")
@@ -87,21 +59,19 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
     axis.set_ylabel(f"z in m{height_ref}")
     axis.set_title("Overview and Diameter")
 
-    # -------------------------------
-    # Plot 2: Added masses with smart labels
-    # -------------------------------
+    # Plot 2: Added masses
     axis = ax[1]
-    weight = mc.calc_weight(
-        7850,
-        Structure.loc[:, "t [mm]"],
-        Structure.loc[:, "Top [m]"],
-        Structure.loc[:, "Bottom [m]"],
-        Structure.loc[:, "D, top [m]"],
-        Structure.loc[:, "D, bottom [m]"]
-    )
-
-    grey = [0.8, 0.8, 0.8]
-    plot_cans(Structure, axis, show_section_numbers=False, color=grey, set_lims=False)
+    if not structure_empty:
+        weight = mc.calc_weight(
+            7850,
+            Structure["t [mm]"],
+            Structure["Top [m]"],
+            Structure["Bottom [m]"],
+            Structure["D, top [m]"],
+            Structure["D, bottom [m]"]
+        )
+        grey = [0.8, 0.8, 0.8]
+        plot_cans(Structure, axis, show_section_numbers=False, color=grey, set_lims=False)
 
     label_entries = []
     placed_z = defaultdict(int)
@@ -114,12 +84,8 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
         bottom = mass['Bottom [m]']
         mass_val = mass['Mass [kg]']
 
-        if top == bottom:
-            z = top
-            is_point = True
-        else:
-            z = (top + bottom) / 2
-            is_point = False
+        is_point = top == bottom
+        z = top if is_point else (top + bottom) / 2
 
         z_key = round(z / tol) * tol
         index = placed_z[z_key]
@@ -141,13 +107,10 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
             'x_start': x_pos
         })
 
-    # --- Handle too many labels ---
+    # Labeling logic
     MAX_LABELS = 25
-    too_many_labels = len(label_entries) > MAX_LABELS
-
-    if not too_many_labels:
-        # --- Improved label placement ---
-        label_entries.sort(key=lambda x: -x['y'])  # top to bottom
+    if len(label_entries) <= MAX_LABELS:
+        label_entries.sort(key=lambda x: -x['y'])
         occupied_y = []
         min_dy = 0.03 * (top_all - bottom_all)
         x_text = 0.6 * abs(right)
@@ -158,81 +121,50 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
                 target_y -= min_dy
             occupied_y.append(target_y)
 
-            # Draw connector
-            axis.plot([entry['x_start'], x_text - 0.05], [entry['y'], target_y],
-                      linestyle='-', color=entry['color'], linewidth=1)
-
-            # Draw label
-            axis.text(x_text, target_y, entry['label'], ha='left', va='center',
-                      fontsize=9, color=entry['color'])
+            axis.plot([entry['x_start'], x_text - 0.05], [entry['y'], target_y], '-', color=entry['color'])
+            axis.text(x_text, target_y, entry['label'], ha='left', va='center', fontsize=9, color=entry['color'])
     else:
-        axis.text(
-            0.8 * abs(right),
-            0.5 * (top_all + bottom_all),
-            "Too many masses to label",
-            ha='center',
-            va='center',
-            fontsize=13,
-            color='red'
-        )
+        axis.text(0.8 * abs(right), 0.5 * (top_all + bottom_all), "Too many masses to label", ha='center', va='center', fontsize=13, color='red')
 
-    # Final axis settings
     axis.axvline(0, color="grey", linestyle="--", linewidth=1)
     axis.set_xlim(-0.1 * abs(right), 2 * abs(right))
-    axis.set_title("Masses \n (horizontal displacement only for distinction, all lie on center line)")
-    axis.set_xticklabels([])
+    axis.set_title("Masses\n(horizontal displacement only for distinction, all lie on center line)")
     axis.set_xticks([])
+    axis.set_xticklabels([])
 
-    # -------------------------------
     # Plot 3: Slope, Wall Thickness, D/t Ratio
-
-    z_nodes = list(Structure.loc[:, "Top [m]"]) + [Structure.loc[:, "Bottom [m]"].values[-1]]
-
-    t = list(Structure.loc[:, "t [mm]"] / 1000)
-    slope = -(Structure.loc[:, "D, top [m]"] - Structure.loc[:, "D, bottom [m]"]) / (Structure.loc[:, "Top [m]"] - Structure.loc[:, "Bottom [m]"])
-    D_nodes = list(Structure.loc[:, "D, top [m]"]) + [Structure.loc[:, "D, bottom [m]"].values[-1]]
-
-    # D/t
-    z_d_by_t = []
-    d_by_t = []
-    for id, row in Structure.iterrows():
-        t_curr = row["t [mm]"]
-
-        z_d_by_t.append(row["Top [m]"])
-        z_d_by_t.append(row["Bottom [m]"])
-
-        d_by_t.append(row["D, top [m]"] / t_curr)
-        d_by_t.append(row["D, bottom [m]"] / t_curr)
-
-    # Step values for t and slope (constant over each segment, len = len(z_nodes)-1)
-    slope_steps = list(slope)
-
-    # Plotting
     axis = ax[2]
-    axis2 = axis.twiny()  # upper x-axis for D/t
+    axis2 = axis.twiny()
+    if not structure_empty:
+        z_nodes = list(Structure["Top [m]"]) + [Structure["Bottom [m]"].values[-1]]
+        t = list(Structure["t [mm]"] / 1000)
+        slope = -(Structure["D, top [m]"] - Structure["D, bottom [m]"]) / (Structure["Top [m]"] - Structure["Bottom [m]"])
+        D_nodes = list(Structure["D, top [m]"]) + [Structure["D, bottom [m]"].values[-1]]
 
-    # Plot D/t (upper x-axis)
-    axis2.plot(d_by_t, z_d_by_t, label="D/t", color="C0")
-    axis2.set_xlabel("D/t [-]")
-    axis2.xaxis.set_label_position('top')
-    axis2.xaxis.tick_top()
+        # D/t
+        z_d_by_t = []
+        d_by_t = []
+        for _, row in Structure.iterrows():
+            t_curr = row["t [mm]"]
+            z_d_by_t += [row["Top [m]"], row["Bottom [m]"]]
+            d_by_t += [row["D, top [m]"] / t_curr, row["D, bottom [m]"] / t_curr]
 
-    slope_steps = [float("nan") if slope == 0 else slope for slope in slope_steps]
+        slope_steps = [np.nan if s == 0 else s for s in slope]
 
-    # Plot on both axes
-    line1 = axis.stairs(slope_steps, z_nodes, orientation="horizontal", label="slope (where not 0)", color="C1", baseline=None)
-    line2 = axis.stairs(t, z_nodes, label="t [mm]", orientation="horizontal", color="C2", baseline=None)
+        axis2.plot(d_by_t, z_d_by_t, label="D/t", color="C0")
+        axis2.set_xlabel("D/t [-]")
+        axis2.xaxis.set_label_position('top')
+        axis2.xaxis.tick_top()
 
-    # Combine legend entries
-    lines = [line1, line2]
-    labels = [line.get_label() for line in lines]
+        line1 = axis.stairs(slope_steps, z_nodes, orientation="horizontal", label="slope (where not 0)", color="C1", baseline=None)
+        line2 = axis.stairs(t, z_nodes, label="t [mm]", orientation="horizontal", color="C2", baseline=None)
 
-    # Add combined legend to main axis
-    axis.legend(lines, labels, loc="lower left")
+        lines = [line1, line2]
+        labels = [line.get_label() for line in lines]
+        axis.legend(lines, labels, loc="lower left")
 
     axis.set_title("Slope, Wall Thickness, D/t Ratio")
     return fig
-
 
 def plot_cans(Structure, axis, show_section_numbers=False, set_lims=True, **plot_kwargs):
     """
@@ -413,10 +345,15 @@ def plot_Assambly_Build(excel_caller):
         seabed = None
         height_ref = None
 
-    WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
+    if len(MP) > 0 and len(TP) > 0:
+        WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
+
+    else:
+        WHOLE_STRUCTURE = pd.DataFrame(columns=["Affiliation"])
+        SKIRT = None
+        ex.show_message_box(excel_filename, "Please fill MP and/or TP section to plot whole structure" )
 
     Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0, height_ref=height_ref)
-
     ex.insert_plot(Fig, excel_filename, "BuildYourStructure", f"Assambly_plot")
 
 

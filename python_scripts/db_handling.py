@@ -425,7 +425,9 @@ def load_DATA(excel_filename, Structure, Structure_name, db_path):
     Returns:
         None
     """
-    logger = ex.setup_logger()
+
+
+
     sheet_name_structure_loading = "BuildYourStructure"
 
     META = load_db_table(db_path, "META")

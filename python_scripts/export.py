@@ -1127,13 +1127,13 @@ def fill_WLGenMasses(excel_caller):
         else:
             return 'AM'
 
-    cols = ["Use For (WL: Waveload generator, AM: Additional Masses)"] + list(MASSES.columns)
+    cols = ["Use For"] + list(MASSES.columns)
     MASSES_WL = pd.DataFrame(columns=cols)
 
     for idx, row in MASSES.iterrows():
         kind = categorize_row(row)
 
-        row["Use For (WL: Waveload generator, AM: Additional Masses)"] = kind
+        row["Use For"] = kind
 
         row_df = row.to_frame().T  # Convert Series to 1-row DataFrame
         row_aligned = row_df[MASSES_WL.columns.intersection(row_df.columns)]
@@ -1145,10 +1145,10 @@ def fill_WLGenMasses(excel_caller):
     cat_order = CategoricalDtype(categories=["WL", "AM", "INVALID"], ordered=True)
 
     # Convert the column to categorical
-    MASSES_WL['Use For (WL: Waveload generator, AM: Additional Masses)'] = MASSES_WL['Use For (WL: Waveload generator, AM: Additional Masses)'].astype(cat_order)
+    MASSES_WL['Use For'] = MASSES_WL['Use For'].astype(cat_order)
 
     # Sort the DataFrame
-    MASSES_WL = MASSES_WL.sort_values('Use For (WL: Waveload generator, AM: Additional Masses)')
+    MASSES_WL = MASSES_WL.sort_values('Use For')
 
     ex.write_df_to_table(excel_filename, "ExportStructure", "APPURTANCES", MASSES_WL)
 
