@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import excel as ex
+import plot as GCplt
 
 
 def valid_data(data):
@@ -477,6 +478,7 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
         WHOLE_STRUCTURE, ALL_MASSES, SKIRT, SKIRT_POINTMASS = assemble_structure(MP_DATA, TP_DATA, TOWER_DATA, MP_MASSES=MP_MASSES, TP_MASSES=TP_MASSES, TOWER_MASSES=TOWER_MASSES,
                                                                                  excel_caller=excel_filename, rho=rho)
     except ValueError:
+        GCplt.plot_Assambly_Overview(excel_caller)
         return
 
     ex.write_df_to_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", WHOLE_STRUCTURE)
@@ -487,6 +489,9 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT", SKIRT)
     if SKIRT_POINTMASS is not None:
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT_POINTMASS", SKIRT_POINTMASS)
+
+    # plot assambly
+    GCplt.plot_Assambly_Overview(excel_caller)
 
     return
 

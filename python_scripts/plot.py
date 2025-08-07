@@ -166,6 +166,7 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
     axis.set_title("Slope, Wall Thickness, D/t Ratio")
     return fig
 
+
 def plot_cans(Structure, axis, show_section_numbers=False, set_lims=True, **plot_kwargs):
     """
     Plots a structural representation of cylindrical segments ("cans") on a given Matplotlib axis.
@@ -281,8 +282,11 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height
     axis.set_xlabel("Diameter in [m]")
     axis.set_ylabel(f"z in m{height_ref}")
 
-    axis.axhline(waterlevel, color="blue", linestyle="--")
+    if waterlevel is not None:
+        axis.axhline(waterlevel, color="blue", linestyle="--")
+
     axis.axvline(0, color="grey", linestyle="--", linewidth=1)
+
     if seabed is not None:
         axis.axhline(seabed, color="brown", linestyle="-", linewidth=2)
 
@@ -335,6 +339,7 @@ def plot_Assambly_Build(excel_caller):
     META_MP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META", dropnan=True)
 
     if len(META_MP) != 0:
+
         value = META_MP.loc[0, "Water Depth [m]"]
         seabed = -value if np.isreal(value) else None
 
@@ -370,21 +375,24 @@ def plot_Assambly_Overview(excel_caller):
     water_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Water level", "Value"]
     if water_level.empty:
         water_level = None
-    else:
+    elif water_level.values[0] is not None:
         water_level = -water_level.values[0]
+    else:
+        water_level = None
 
     seabed_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"]
     if seabed_level.empty:
         seabed_level = None
-    else:
+    elif seabed_level.values[0] is not None:
         seabed_level = -seabed_level.values[0]
+    else:
+        seabed_level = None
 
     height_ref = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"]
     if height_ref.empty:
         height_ref = None
     else:
         height_ref = height_ref.values[0]
-
 
     Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, waterlevel=water_level, seabed=-seabed_level, height_ref=height_ref)
 
