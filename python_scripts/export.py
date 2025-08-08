@@ -1266,5 +1266,4 @@ def fill_Bladed_table(excel_caller):
 
 
     return
-# export_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm", ".")
-#fill_Bladed_table("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm")
+

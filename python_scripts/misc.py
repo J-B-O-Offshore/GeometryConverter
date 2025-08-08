@@ -594,3 +594,4 @@ def extract_nodes_from_elements(df_elements: pd.DataFrame) -> pd.DataFrame:
         })
 
     return pd.DataFrame(nodes)
+

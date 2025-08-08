@@ -63,65 +63,6 @@ def drop_db_table(excel_filename, db_path, Identifier):
 
     return True
 
-
-def load_db_table(db_path, Identifier, dtype=None):
-    """
-    Load a specific table from an SQLite database into a pandas DataFrame.
-
-    Args:
-        db_path (str): Path to the SQLite database file.
-        Identifier (str): Name of the table to load.
-        dtype (dict): Optional dictionary specifying column data types.
-
-    Returns:
-        pd.DataFrame: The table content as a pandas DataFrame.
-
-    Raises:
-        ConciveError: If database connection fails or table does not exist.
-    """
-    if not isinstance(Identifier, str):
-        raise ConciveError(f"Identifier must be a string, got {type(Identifier)}.")
-
-    try:
-        conn = sqlite3.connect(db_path)
-    except sqlite3.Error as e:
-        raise ConciveError(f"Failed to connect to the database: {e}")
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        table_names = [table[0] for table in cursor.fetchall()]
-    except sqlite3.Error as e:
-        conn.close()
-        raise ConciveError(f"Failed to retrieve table names: {e}")
-
-    if Identifier not in table_names:
-        conn.close()
-        raise ConciveError(f"Table '{Identifier}' does not exist in the database. Available tables: {table_names}")
-
-    try:
-        query = f'SELECT * FROM "{Identifier}"'
-        df = pd.read_sql_query(query, conn)
-    except Exception as e:
-        conn.close()
-        raise ConciveError(f"Failed to load table '{Identifier}': {e}")
-    finally:
-        conn.close()
-
-    # Optional: Remove 'index' column if it exists
-    if 'index' in df.columns:
-        df = df.drop(columns=['index'])
-
-    # Optional: Apply dtype conversion
-    if dtype is not None:
-        try:
-            df = df.astype(dtype)
-        except Exception as e:
-            raise ConciveError(f"Failed to apply data types {dtype}: {e}")
-
-    return df
-
-
 def create_db_table(excel_filename, db_path, Identifier, df, if_exists='fail'):
     """
     Creates or appends to a table in an SQLite database from a pandas DataFrame.
@@ -169,6 +110,88 @@ def create_db_table(excel_filename, db_path, Identifier, df, if_exists='fail'):
 
     return True
 
+def load_db_table(excel_filename, db_path, Identifier, dtype=None):
+    """
+    Load a specific table from an SQLite database into a pandas DataFrame.
+
+    Args:
+        excel_filename (str): Path to the Excel file (used for message box context).
+        db_path (str): Path to the SQLite database file.
+        Identifier (str): Name of the table to load.
+        dtype (dict): Optional dictionary specifying column data types.
+
+    Returns:
+        pd.DataFrame or None: The table content as a pandas DataFrame if successful, otherwise None.
+
+    Notes:
+        Shows Excel warning boxes via `ex.show_message_box()` on failure.
+    """
+    if not isinstance(Identifier, str):
+        ex.show_message_box(
+            excel_filename,
+            f"Invalid Identifier.\nExpected string but got {type(Identifier)}."
+        )
+        return None
+
+    try:
+        conn = sqlite3.connect(db_path)
+    except sqlite3.Error as e:
+        ex.show_message_box(
+            excel_filename,
+            f"Failed to connect to the database '{db_path}'.\nPython Error: {e}"
+        )
+        return None
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        table_names = [table[0] for table in cursor.fetchall()]
+    except sqlite3.Error as e:
+        conn.close()
+        ex.show_message_box(
+            excel_filename,
+            f"Failed to retrieve table names from '{db_path}'.\nPython Error: {e}"
+        )
+        return None
+
+    if Identifier not in table_names:
+        conn.close()
+        ex.show_message_box(
+            excel_filename,
+            f"Table '{Identifier}' does not exist in the database.\nAvailable tables: {table_names}"
+        )
+        return None
+
+    try:
+        query = f'SELECT * FROM "{Identifier}"'
+        df = pd.read_sql_query(query, conn)
+    except Exception as e:
+        conn.close()
+        ex.show_message_box(
+            excel_filename,
+            f"Failed to load table '{Identifier}' from database.\nPython Error: {e}"
+        )
+        return None
+    finally:
+        conn.close()
+
+    # Optional: Remove 'index' column if it exists
+    if 'index' in df.columns:
+        df = df.drop(columns=['index'])
+
+    # Optional: Apply dtype conversion
+    if dtype is not None:
+        try:
+            df = df.astype(dtype)
+        except Exception as e:
+            ex.show_message_box(
+                excel_filename,
+                f"Failed to apply data types {dtype} to table '{Identifier}'.\nPython Error: {e}"
+            )
+            return None
+
+    return df
+
 
 def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, Meta_values):
     """
@@ -196,7 +219,10 @@ def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, M
         - The identifier already exists in the database
     """
     # Load existing META table and schema
-    META = load_db_table(db_path, "META")
+    META = load_db_table(excel_filename, db_path, "META")
+    if META is None:
+        return
+
     meta_columns = META.columns.tolist()
     Meta_values = list(Meta_values)
 
@@ -258,7 +284,9 @@ def delete_db_element(excel_filename, db_path, Identifier):
         - '{Identifier}__ADDED_MASSES'
     - If any step fails, an error message is shown and the operation is aborted.
     """
-    META = load_db_table(db_path, "META")
+    META = load_db_table(excel_filename, db_path, "META")
+    if META is None:
+        return False
 
     if Identifier not in META["Identifier"].values:
         ex.show_message_box(
@@ -308,7 +336,11 @@ def replace_db_element(excel_filename, db_path, Structure_data, added_masses_dat
     - If the identifier is changed (`old_id` → `new_id`), the old entry and its tables will be dropped.
     - The function checks for duplicate identifiers before proceeding.
     """
-    META = load_db_table(db_path, "META", dtype=str)
+
+    META = load_db_table(excel_filename, db_path, "META", dtype=str)
+    if META is None:
+        return
+
     Meta_infos = list(Meta_infos)
     new_id = Meta_infos[0]
 
@@ -401,7 +433,9 @@ def load_META(excel_filename, Structure, db_path):
     logger = ex.setup_logger()
     sheet_name_structure_loading = "BuildYourStructure"
 
-    META = load_db_table(db_path, "META")
+    META = load_db_table(excel_filename, db_path, "META")
+    if META is None:
+        return
     ex.set_dropdown_values(
         excel_filename,
         sheet_name_structure_loading,
@@ -426,13 +460,24 @@ def load_DATA(excel_filename, Structure, Structure_name, db_path):
         None
     """
 
-
+    if db_path is None or db_path == "":
+        ex.show_message_box(excel_filename, "No database path provided.")
+        return
 
     sheet_name_structure_loading = "BuildYourStructure"
 
-    META = load_db_table(db_path, "META")
-    DATA = load_db_table(db_path, Structure_name)
-    MASSES = load_db_table(db_path, Structure_name + "__ADDED_MASSES")
+    META = load_db_table(excel_filename, db_path, "META")
+    if META is None:
+        return
+
+    DATA = load_db_table(excel_filename, db_path, Structure_name)
+
+    if DATA is None:
+        return
+    MASSES = load_db_table(excel_filename, db_path, Structure_name + "__ADDED_MASSES")
+
+    if MASSES is None:
+        return
 
     META_relevant = META.loc[META["Identifier"] == Structure_name]
 
@@ -548,7 +593,9 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
         _ = ex.show_message_box(excel_filename, f"No changes detected.")
         return False, _
 
-    META_FULL = load_db_table(db_path, "META")
+    META_FULL = load_db_table(excel_filename, db_path, "META")
+    if META_FULL is None:
+        return
     META_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META", dtype=str)
     META_CURR_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META_NEW", dtype=str)
     DATA_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_DATA")
@@ -564,8 +611,12 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
     META_DB = META_FULL.loc[META_FULL["Identifier"] == selected_structure]
 
     if selected_structure != "":
-        DATA_DB = load_db_table(db_path, selected_structure)
-        MASSES_DB = load_db_table(db_path, selected_structure + "__ADDED_MASSES")
+        DATA_DB = load_db_table(excel_filename, db_path, selected_structure)
+        if DATA_DB is None:
+            return
+        MASSES_DB = load_db_table(excel_filename, db_path, selected_structure + "__ADDED_MASSES")
+        if MASSES_DB is None:
+            return
     else:
         DATA_DB = pd.DataFrame()
         MASSES_DB = pd.DataFrame()
@@ -1006,7 +1057,10 @@ def load_RNA_DATA(excel_caller, db_path):
 
     sheet_name_structure_loading = "BuildYourStructure"
 
-    data = load_db_table(db_path, "data")
+    data = load_db_table(excel_filename, db_path, "data")
+    if data is None:
+        return
+
     ex.set_dropdown_values(
         excel_filename,
         sheet_name_structure_loading,
