@@ -229,7 +229,7 @@ def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, M
     if len(Meta_values) != len(meta_columns):
         ex.show_message_box(
             excel_filename,
-            f"The number of provided metadata values ({len(Meta_values)}) does not match the expected number of columns ({len(meta_columns)})."
+            f"The number of provided meta data values ({len(Meta_values)}) does not match to the expected number of columns ({len(meta_columns)})."
         )
         return False
 
@@ -558,7 +558,7 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
         if meta_new_populated:
             if ((META_CURR_NEW.values[0][0:-1] == '').any()):
                 _ = ex.show_message_box(excel_filename,
-                                        "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded Structure")
+                                        "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded structure.")
                 return False, _
 
             sucess = add_db_element(excel_filename, db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW.values[0])
@@ -570,10 +570,10 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
 
         if meta_loaded_changed:
             if not ((META_CURR.values[0][0:-1] != None).all()):
-                _ = ex.show_message_box(excel_filename, "Please fully populate the Current Meta table to modify the DB entry.")
+                _ = ex.show_message_box(excel_filename, "Please fully populate the current Meta table to modify the DB entry.")
                 return False, _
             if selected_structure == "":
-                _ = ex.show_message_box(excel_filename, "Now database loaded. Please enter data into \"NEW\" datafield to create new database.")
+                _ = ex.show_message_box(excel_filename, "Now database loaded. Please enter data into \"NEW\" data field to create new database.")
 
             sucess = replace_db_element(excel_filename, db_path, DATA_CURR, MASSES_CURR, META_CURR.values[0], selected_structure)
 
@@ -712,7 +712,7 @@ def load_MP_from_MPTool(excel_caller, MP_path):
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "MP_DATA", Data)
     except Exception as e:
         ex.show_message_box(excel_filename,
-                            f"Error reading {MP_path} TP and MP. Please make shure, the path leads to a valid MP_tool xlsm file and has the TP data on the 'Geometry' sheet 3 rows under the second 'Section' heeader, empty rows allowed. Error trown by Python: {e}")
+                            f"Error reading {MP_path} TP and MP. Please make sure, the path leads to a valid MP_tool xlsm file and has the TP data on the 'Geometry' sheet 3 rows under the second 'Section' header, empty rows allowed. Error thrown by Python: {e}.")
         return
 
     try:
@@ -742,7 +742,7 @@ def load_MP_from_MPTool(excel_caller, MP_path):
 
     except Exception as e:
         ex.show_message_box(excel_filename,
-                            f"Error reading {MP_path} Waterlevel data. Please make shure, the path leads to a valid MP_tool xlsm file and has the data on the 'Control' sheet in ther range E:F, empty rows allowed. The Values  are identified by the Keywords 'Reference level' and 'Mudline'. Error trown by Python: {e}")
+                            f"Error reading {MP_path} water level. Please make sure, the path leads to a valid MP_tool xlsm file and has the data on the 'Control' sheet in the range E:F, empty rows allowed. The Values are identified by the Keywords 'Reference level' and 'Mudline'. Error thrown by Python: {e}.")
         return
 
     return
@@ -752,7 +752,7 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
+        Data_temp = ex.read_excel_range(GeomConv_path, "Additional entries", "K11:M1000", use_header=False)
         Data_temp = Data_temp.dropna(how="all")
         Data = pd.DataFrame({
             "Name": Data_temp.iloc[:, 2],
@@ -774,7 +774,7 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         if len(Structure) == 0:
             ex.show_message_box(excel_filename,
-                                f"Please provide MP Data")
+                                f"Please provide MP Data.")
             return
 
         heigt_range = (Structure.loc[0, "Top [m]"], Structure.loc[len(Structure) - 1, "Bottom [m]"])
@@ -793,7 +793,7 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
     except Exception as e:
         ex.show_message_box(excel_filename,
-                            f"Error reading MP Masses from {GeomConv_path}. Please make shure, the path leads to a valid GeometrieConverter xlsm file and has the Masses data on the 'Zusätzliche Eingaben' sheet in columns K11:M1000. Error trown by Python: {e}")
+                            f"Error reading MP masses from {GeomConv_path}. Please make sure, the path leads to a valid GeometrieConverter xlsm file and has the masses data on the 'Zusätzliche Eingaben' sheet in columns K11:M1000. Error thrown by Python: {e}.")
         return
     return
 
@@ -855,7 +855,7 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
+        Data_temp = ex.read_excel_range(GeomConv_path, "Additional Entries", "K11:M1000", use_header=False)
         Data_temp = Data_temp.dropna(how="all")
         Data = pd.DataFrame({
             "Name": Data_temp.iloc[:, 2],
@@ -877,7 +877,7 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         if len(Structure) == 0:
             ex.show_message_box(excel_filename,
-                                f"Please provide TP Data")
+                                f"Please provide TP data.")
             return
 
         heigt_range = (Structure.loc[0, "Top [m]"], Structure.loc[len(Structure) - 1, "Bottom [m]"])
@@ -896,7 +896,7 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
     except Exception as e:
         ex.show_message_box(excel_filename,
-                            f"Error reading TP Masses from {GeomConv_path}. Please make shure, the path leads to a valid GeometrieConverter xlsm file and has the Masses data on the 'Zusätzliche Eingaben' sheet in columns K11:M1000. Error trown by Python: {e}")
+                            f"Error reading TP masses from {GeomConv_path}. Please make sure, the path leads to a valid GeometrieConverter xlsm file and has the masses data on the 'Zusätzliche Eingaben' sheet in columns K11:M1000. Error thrown by Python: {e}.")
         return
     return
 
@@ -967,7 +967,7 @@ def load_TP_from_MPTool(excel_caller, MP_path):
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "TP_DATA", Data)
     except Exception as e:
         ex.show_message_box(excel_filename,
-                            f"Error reading {MP_path} TP and MP. Please make shure, the path leads to a valid MP_tool xlsm file and has the TP data on the 'Geometry' sheet 3 rows under the first 'Section' heeader, empty rows allowed. Error trown by Python: {e}")
+                            f"Error reading {MP_path} TP and MP. Please make sure, the path leads to a valid MP_tool xlsm file and has the TP data on the 'Geometry' sheet 3 rows under the first 'Section' header, empty rows allowed. Error thrown by Python: {e}.")
 
     try:
         Parameter_col = ex.read_excel_range(MP_path, "Control", "E1:E1000", dtype=str, use_header=False)
@@ -990,13 +990,13 @@ def load_TP_from_MPTool(excel_caller, MP_path):
         META_NEW.loc[0, "Structure ID"] = os.path.basename(MP_path).replace(".xlsm", "")
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "TP_META_NEW", META_NEW)
 
-        # update porject name geneatation
+        # update project name generation
         wb = xw.Book(excel_filename)
         wb.macro('UpdateIdentifierColumn')("BuildYourStructure", "TP_META")
 
     except Exception as e:
         ex.show_message_box(excel_filename,
-                            f"Error reading {MP_path} Waterlevel data. Please make shure, the path leads to a valid MP_tool xlsm file and has the data on the 'Control' sheet in ther range E:F, empty rows allowed. The Values  are identified by the Keywords 'Reference level' and 'Mudline'. Error trown by Python: {e}")
+                            f"Error reading {MP_path} water level data. Please make sure, the path leads to a valid MP_tool xlsm file and has the data on the 'Control' sheet in the range E:F, empty rows allowed. The Values are identified by the Keywords 'Reference level' and 'Mudline'. Error thrown by Python: {e}.")
 
     return
 
@@ -1005,7 +1005,7 @@ def load_TOWERMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
+        Data_temp = ex.read_excel_range(GeomConv_path, "Additional Entries", "K11:M1000", use_header=False)
         Data_temp = Data_temp.dropna(how="all")
         Data = pd.DataFrame({
             "Name": Data_temp.iloc[:, 2],
@@ -1046,7 +1046,7 @@ def load_TOWERMasses_from_GeomConv(excel_caller, GeomConv_path):
 
     except Exception as e:
         ex.show_message_box(excel_filename,
-                            f"Error reading TOWER Masses from {GeomConv_path}. Please make shure, the path leads to a valid GeometrieConverter xlsm file and has the Masses data on the 'Zusätzliche Eingaben' sheet in columns K11:M1000. Error trown by Python: {e}")
+                            f"Error reading TOWER masses from {GeomConv_path}. Please make sure, the path leads to a valid GeometrieConverter xlsm file and has the masses data on the 'Zusätzliche Eingaben' sheet in columns K11:M1000. Error thrown by Python: {e}.")
         return
     return
 
@@ -1081,7 +1081,3 @@ def save_RNA_data(excel_caller, db_path, selected_structure):
 
     return
 
-# %%
-
-
-#load_MPMasses_from_GeomConv("NEW_Generic.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/Validation_Generic/OLD_Generic.xlsm")

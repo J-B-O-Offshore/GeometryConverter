@@ -19,7 +19,7 @@ def sanity_check_structure(excel_filename, df):
     height_diff = (df["Top [m]"].values[1:] - df["Bottom [m]"].values[:-1]) == 0
     if not all(height_diff):
         missaligned_sections = [int(df.iloc[i, 0]) for i, value in enumerate(height_diff) if not value]
-        ex.show_message_box(excel_filename, f"The Sections are overlapping or have space in between at Section(s): {missaligned_sections} ")
+        ex.show_message_box(excel_filename, f"The sections overlap or have gaps between them - at section(s): {missaligned_sections}.")
         return False
     else:
         return True
@@ -28,7 +28,7 @@ def sanity_check_structure(excel_filename, df):
 def check_convert_structure(excel_filename, df: pd.DataFrame, Table):
     success, df = valid_data(df)
     if not success:
-        ex.show_message_box(excel_filename, f"The {Table} Table containes invalid data (nan or non numerical)")
+        ex.show_message_box(excel_filename, f"The {Table} table contains invalid data (nan or non numerical).")
         return success, df
 
     success = sanity_check_structure
@@ -169,14 +169,14 @@ def add_element(df, z_new, defaults=None, add_outside_bound=False):
 
     if len(id_inter) == 0:
         if not add_outside_bound:
-            print("interpolation not possible, outside bounds")
+            print("Interpolation not possible, outside bounds.")
             return df
         else:
             print("No segment contains z_new, but add_outside_bound=True. No interpolation performed.")
             return df
 
     if len(id_inter) > 1:
-        print("interpolation not possible, structure not consecutive")
+        print("Interpolation not possible, structure not consecutive.")
         return df
 
     id_inter = id_inter[0]
@@ -309,7 +309,7 @@ def assemble_structure(MP_DATA, TP_DATA, TOWER_DATA=None, MP_MASSES=None, TP_MAS
 
     if interactive:
         if excel_caller is None:
-            raise ValueError("excel_caller is None, has to be defined whem interactive is True")
+            raise ValueError("excel_caller is None, has to be defined when interactive is True")
 
     WHOLE_STRUCTURE = MP_DATA
 
@@ -329,7 +329,7 @@ def assemble_structure(MP_DATA, TP_DATA, TOWER_DATA=None, MP_MASSES=None, TP_MAS
             elif overlapp_mode == "Skirt":
                 result = "No"
             else:
-                raise ValueError("overlapp_mode has to be Skirt or Grout")
+                raise ValueError("overlapp_mode has to be Skirt or Grout.")
 
         if result == "Yes":
 
@@ -364,13 +364,13 @@ def assemble_structure(MP_DATA, TP_DATA, TOWER_DATA=None, MP_MASSES=None, TP_MAS
     elif MP_top < TP_bot:
         if interactive:
             ex.show_message_box(excel_caller,
-                               f"The Top of the MP at {range_MP[0]} is lower than the Bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. This cant work, aborting.")
+                               f"The top of the MP at {range_MP[0]} is lower than the bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. This can't work, aborting.")
         if not ignore_hovering:
             raise ValueError
 
     else:
         if interactive:
-            ex.show_message_box(excel_caller, f"The MP and the TP are fitting together perfectly")
+            ex.show_message_box(excel_caller, f"The MP and the TP are fitting together perfectly.")
 
         WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
 
@@ -444,11 +444,11 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
     # RNA choosing
     if RNA_config == "":
         ex.show_message_box(excel_filename,
-                            f"Caution, no RNA selected")
+                            f"Caution, no RNA selected.")
     else:
         if not RNA_config in RNA_DATA["Identifier"].values:
             ex.show_message_box(excel_filename,
-                                f"Choosen RNA not in RNA dropdown menu. Aborting")
+                                f"Chosen RNA not in RNA dropdown menu. Aborting.")
             return None
         else:
             RNA = RNA_DATA.loc[RNA_DATA["Identifier"] == RNA_config, :]
@@ -461,7 +461,7 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
 
     if not all_same_ignoring_none(WL_ref_MP, WL_ref_MT, WL_ref_TOWER):
         answer = ex.show_message_box(excel_filename,
-                                     f"Warning, not all height references are the same (MP: {WL_ref_MP}, TP: {WL_ref_MT}, TOWER: {WL_ref_TOWER}). Assable anyway?",
+                                     f"Warning, not all height references are the same (MP: {WL_ref_MP}, TP: {WL_ref_MT}, TOWER: {WL_ref_TOWER}). Assemble anyway?",
                                      buttons="vbYesNo", icon="warning")
         if answer == "No":
             return

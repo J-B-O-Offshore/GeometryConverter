@@ -398,7 +398,7 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE
     if waterlevel not in NODES["Elevation [m]"].values:
         NODES = add_node(NODES, waterlevel, defaults={"float": 0})
         GEOMETRY = mc.add_element(GEOMETRY, waterlevel)
-        NODES.loc[NODES["Elevation [m]"] == waterlevel, "comment"] = "watelevel "
+        NODES.loc[NODES["Elevation [m]"] == waterlevel, "comment"] = "water level "
         NODES.loc[NODES["Elevation [m]"] == waterlevel, "added"] = True
 
     # Add marine growth
@@ -411,7 +411,7 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE
             if not any(np.isclose(z, NODES["Elevation [m]"].values)):
                 NODES = add_node(NODES, z, defaults={"float": 0})
                 GEOMETRY = mc.add_element(GEOMETRY, z)
-                NODES.loc[NODES["Elevation [m]"] == z, "comment"] = "marine growth border "
+                NODES.loc[NODES["Elevation [m]"] == z, "comment"] = "marine growth border"
                 NODES.loc[NODES["Elevation [m]"] == z, "added"] = True
 
     NODES["pMass"] = 0.0
@@ -620,7 +620,7 @@ def create_JBOOST_proj(Parameters, marine_growth=None, modelname="struct.lua", r
        - Assumes `write_lua_variables()` is defined elsewhere to handle parameter injection.
        """
     if runFEModul and runFrequencyModul:
-        raise ValueError("RunFEModul and runFrequencyModul can not both be set to True")
+        raise ValueError("RunFEModul and runFrequencyModul can not both be set to True.")
     Proj_text = """\
 -- ++++++++++++++++++++++++++++++++++++++++ Model Data +++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -698,7 +698,7 @@ os_LoadConfigFrequModul(
 }
 )
 -- ----------------------------------------------
--- Exexute program steps
+-- Execute program steps
 -- ----------------------------------------------
 
 ?RunFeModul
@@ -947,7 +947,7 @@ def export_JBOOST(excel_caller, jboost_path):
     sucess_GEOMETRY = mc.sanity_check_structure(excel_filename, GEOMETRY)
     if not sucess_GEOMETRY:
         ex.show_message_box(excel_filename,
-                            f"Geometry is messed up. Aborting")
+                            f"Geometry is messed up. Aborting.")
         return
 
     Model_name = PARAMETERS.loc[PARAMETERS["Parameter"] == "ModelName", "Value"].values[0]
@@ -1000,7 +1000,7 @@ def export_JBOOST(excel_caller, jboost_path):
             elif s == "False":
                 return False
             else:
-                raise ValueError(f"Invalid boolean string: {s}")
+                raise ValueError(f"Invalid boolean string: {s}.")
 
         runFEModul = str_to_bool(config_data["runFEModul"])
         runFrequencyModul = str_to_bool(config_data["runFrequencyModul"])
@@ -1050,7 +1050,7 @@ def export_JBOOST(excel_caller, jboost_path):
             file.write(struct_text)
 
     ex.show_message_box(excel_filename,
-                        f"JBOOST Structure {PARAMETERS.loc[PARAMETERS['Parameter'] == 'ModelName', 'Value'].values[0]} saved sucessfully at {jboost_path}")
+                        f"JBOOST Structure {PARAMETERS.loc[PARAMETERS['Parameter'] == 'ModelName', 'Value'].values[0]} saved successfully at {jboost_path}")
 
     return
 
@@ -1090,7 +1090,7 @@ def export_WLGen(excel_caller, WLGen_path):
         model_name = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
         if model_name is None:
             model_name = "WLGen_input.lua"
-            ex.show_message_box(excel_filename, f"No model name defined in Structure Overview. File named {model_name}")
+            ex.show_message_box(excel_filename, f"No model name defined in Structure Overview. File named {model_name}.")
         else:
             model_name = model_name + ".lua"
 
@@ -1262,6 +1262,120 @@ def fill_Bladed_table(excel_caller):
 
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
+
+
+
+    return
+
+def fill_Sesam_table(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    Sesam_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Sesam_Settings", dropnan=True)
+    Sesam_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Sesam_Material", dropnan=True)
+
+    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
+    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
+    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+
+    Sesam_Elements = pd.DataFrame(columns=["Affiliation [-]", "Member [-]", "Node [-]", "Diameter [m]", "Wall thickness [mm]", "cd [-]", "cm [-]", "Marine growth [mm]", "Density [kg*m^-3]", "Material [-]", "Elevation [m]"])
+    Sesam_Nodes = pd.DataFrame(columns=["Node [-]", "Elevation [m]", "Local x [m]", "Local y [m]", "Point mass [kg]"])
+
+    create_node_tolerance = Sesam_Settings.loc[Sesam_Settings["Parameter"] == "Dimensional Tolerance for Node generating [m]", "Value"].values[0]
+    seabed_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0]
+    material = Sesam_Material.loc[0, "Material"]
+    density = Sesam_Material.loc[0, "Density"]
+
+    # Filter geometry below seabed
+    if seabed_level is not None:
+        GEOMETRY = mc.add_element(GEOMETRY, seabed_level)
+    GEOMETRY = GEOMETRY.loc[GEOMETRY["Bottom [m]"] >= seabed_level]
+
+    NODES = mc.extract_nodes_from_elements(GEOMETRY)
+
+    # Add masses
+    NODES["pMass"] = 0.0
+    NODES["pMassNames"] = None
+    NODES["added"] = False
+    NODES["comment"] = None
+
+    if MASSES is not None:
+        for idx in MASSES.index:
+            z_bot = MASSES.loc[idx, "Bottom [m]"]
+            z_Mass = (z_bot + MASSES.loc[idx, "Top [m]"]) / 2 if pd.notna(z_bot) else MASSES.loc[idx, "Top [m]"]
+
+            differences = np.abs(NODES["Elevation [m]"].values - z_Mass)
+            within_tol = np.where(differences <= create_node_tolerance)[0]
+
+            # if node is (nearly) on Node
+            if len(within_tol) > 0:
+                closest_index = within_tol[np.argmin(differences[within_tol])]
+                NODES.loc[closest_index, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
+
+                if NODES.loc[closest_index, "comment"] is None:
+                    NODES.loc[closest_index, "comment"] = MASSES.loc[idx, "Name"] + " "
+                else:
+                    NODES.loc[closest_index, "comment"] += MASSES.loc[idx, "Name"] + " "
+
+            # if node mass is over bottom
+            elif z_Mass >= GEOMETRY["Bottom [m]"].values[-1]:
+
+                # add Node
+                NODES = add_node(NODES, z_Mass, defaults={"float": 0})
+                GEOMETRY = mc.add_element(GEOMETRY, z_Mass)
+
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, "added"] = True
+
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
+
+                NODES.loc[NODES["Elevation [m]"] == z_Mass, "comment"] = MASSES.loc[idx, "Name"] + " "
+
+            else:
+                print(f"Warning! Mass '{MASSES.loc[idx, 'Name']}' not added, it is below the seabed level!")
+
+    # Nodes
+    Sesam_Nodes.loc[:, "Node [-]"] = np.linspace(1, len(NODES), len(NODES))
+    Sesam_Nodes.loc[:, "Elevation [m]"] = NODES.loc[:, "Elevation [m]"]
+    Sesam_Nodes.loc[:, "Local x [m]"] = 0.0
+    Sesam_Nodes.loc[:, "Local y [m]"] = 0.0
+    Sesam_Nodes.loc[:, "Point mass [kg]"] = NODES.loc[:, "pMass"]
+    Sesam_Nodes.loc[:, "Added"] = NODES.loc[:, "added"]
+    Sesam_Nodes.loc[:, "Comment"] = NODES.loc[:, "comment"]
+
+    # Geometry
+    GEOMETRY.loc[:, "Section"] = np.linspace(1, len(GEOMETRY), len(GEOMETRY))
+    Sesam_Elements.loc[:, "Affiliation [-]"] = np.array([[aff_elem, aff_elem] for aff_elem in GEOMETRY["Affiliation"].values]).flatten()
+    Sesam_Elements.loc[:, "Member [-]"] = np.array([[f"{int(sec_elem)} (End 1)", f"{int(sec_elem)} (End 2)"] for sec_elem in GEOMETRY["Section"].values]).flatten()
+
+    Sesam_Elements.loc[:, "Elevation [m]"] = np.array([[row["Top [m]"], row["Bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
+
+    for i, row in Sesam_Elements.iterrows():
+
+        # node
+        elevation = row["Elevation [m]"]
+        # Find matching node based on elevation
+        node = Sesam_Nodes.loc[Sesam_Nodes["Elevation [m]"] == elevation, "Node [-]"]
+        if not node.empty:
+            Sesam_Elements.at[i, "Node [-]"] = int(node.values[0])
+
+        marineGrowth = MARINE_GROWTH.loc[(MARINE_GROWTH["Bottom [m]"] < elevation) & (MARINE_GROWTH["Top [m]"] >= elevation), "Marine Growth [mm]"]
+
+        if not marineGrowth.empty:
+            Sesam_Elements.at[i, "Marine growth [mm]"] = marineGrowth.values[0]
+        else:
+            Sesam_Elements.at[i, "Marine growth [mm]"] = 0
+
+    Sesam_Elements.drop(columns=["Elevation [m]"], inplace=True)
+
+    Sesam_Elements.loc[:, "Diameter [m]"] = np.array([[row["D, top [m]"], row["D, bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
+    Sesam_Elements.loc[:, "Wall thickness [mm]"] = np.array([[row["t [mm]"], row["t [mm]"]] for i, row in GEOMETRY.iterrows()]).flatten()
+
+    Sesam_Elements.loc[:, "cd [-]"] = 0.9
+    Sesam_Elements.loc[:, "cm [-]"] = 2.0
+    Sesam_Elements.loc[:, "Density [kg*m^-3]"] = density
+    Sesam_Elements.loc[:, "Material [-]"] = material
+
+    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Sesam_Elements)
+    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Sesam_Nodes)
 
 
 

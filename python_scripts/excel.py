@@ -129,7 +129,7 @@ def write_df(workbook_name, sheet_name, upper_left_address, dataframe, include_h
         upper_left_range.value = data
 
     except Exception as e:
-        print(f"Error writing DataFrame to Excel: {e}")
+        print(f"Error writing DataFrame to Excel: {e}.")
         logger.debug(f"Error!{e}")
 
 
@@ -160,7 +160,7 @@ def write_value(workbook_name, sheet_name, cell_or_named_range, value):
         target_range.value = value
 
     except Exception as e:
-        print(f"Error writing value to Excel: {e}")
+        print(f"Error writing value to Excel: {e}.")
         logger.debug(f"Error! {e}")
 
 

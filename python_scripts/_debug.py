@@ -115,7 +115,7 @@ def add_db_element(db_path, Structure_data, added_masses_data, Meta_infos):
 
     Identifier = Meta_infos["Identifier"].values[0]
     if Identifier in META["Identifier"].values:
-        _ = ex.show_message_box("GeometrieConverter.xlsm", "The provided Identifier of the new structure is already in the database, please provide a unique name")
+        _ = ex.show_message_box("GeometrieConverter.xlsm", "The provided Identifier of the new structure is already in the database, please provide a unique name.")
         return False
 
     create_db_table(db_path, Identifier, Structure_data, if_exists='fail')
@@ -124,7 +124,7 @@ def add_db_element(db_path, Structure_data, added_masses_data, Meta_infos):
     META = pd.concat([META, Meta_infos], axis=0)
     create_db_table(db_path, "META", META, if_exists='replace')
 
-    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data saved in new Database entry {Identifier}")
+    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data saved in new database entry {Identifier}")
 
     return True
 
@@ -154,7 +154,7 @@ def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, r
 
 
     if META["Identifier"].value_counts().get(Meta_infos.iloc[0].values[0], 0) > 1:
-        _ = ex.show_message_box("GeometrieConverter.xlsm", f"{replace_id} is already taken in database, please choose a different name.")
+        _ = ex.show_message_box("GeometrieConverter.xlsm", f"{replace_id} is already used in database, please choose a different name.")
         return False
 
     drop_db_table(db_path, replace_id)
@@ -167,14 +167,14 @@ def replace_db_element(db_path, Structure_data, added_masses_data, Meta_infos, r
 
     create_db_table(db_path, "META", META, if_exists="replace")
 
-    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data in {replace_id} overwriten (now named {new_id})")
+    _ = ex.show_message_box("GeometrieConverter.xlsm", f"Data in {replace_id} overwritten (now named {new_id})")
 
     return True
 
 
 def write_db_element_data(db_path, change_id, Structure_data, added_masses_data):
     if pd.isna(Structure_data.values).any():
-        _ = ex.show_message_box("GeometrieConverter.xlsm", f"Structure data contains invalid values, please correct")
+        _ = ex.show_message_box("GeometrieConverter.xlsm", f"Structure data contains invalid values, please correct.")
         return False
 
     # if pd.isna(added_masses_data.values).any():
@@ -316,7 +316,7 @@ def save_data(Structure, db_path, selected_structure):
         if meta_new_populated:
             if not ((META_CURR_NEW.values[0][0:-1] != None).all()):
                 _ = ex.show_message_box("GeometrieConverter.xlsm",
-                                        "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded Structure")
+                                        "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded structure.")
                 return False, _
 
             sucess = add_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW)
@@ -328,7 +328,7 @@ def save_data(Structure, db_path, selected_structure):
 
         if meta_loaded_changed:
             if not ((META_CURR.values[0][0:-1] != None).all()):
-                _ = ex.show_message_box("GeometrieConverter.xlsm", "Please fully populate the Current Meta table to modify the DB entry.")
+                _ = ex.show_message_box("GeometrieConverter.xlsm", "Please fully populate the current Meta table to modify the DB entry.")
                 return False, _
 
             sucess = replace_db_element(db_path, DATA_CURR, MASSES_CURR, META_CURR, selected_structure)
@@ -510,4 +510,4 @@ def delete_TOWER_data(db_path, selected_structure):
 
 
 selected_structure = "24A535_FEED_DP-A1_L0_G0_S0"
-save_MP_data("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/databases/MP.db",selected_structure)
+save_MP_data("C:/temp/_dev/_checks/GeometrieConverter/databases/MP.db",selected_structure)

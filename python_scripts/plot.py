@@ -55,8 +55,8 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
     axis.set_xticks(ticks[ticks >= 0])
     axis.set_xticklabels([f"{2 * t:.0f}" for t in ticks if t >= 0])
     axis.set_xlim(left - 0.4 * abs(right), right + 0.4 * abs(right))
-    axis.set_xlabel("Diameter in [m]")
-    axis.set_ylabel(f"z in m{height_ref}")
+    axis.set_xlabel("Diameter [m]")
+    axis.set_ylabel(f"z [m{height_ref}]")
     axis.set_title("Overview and Diameter")
 
     # Plot 2: Added masses
@@ -156,7 +156,7 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
         axis2.xaxis.set_label_position('top')
         axis2.xaxis.tick_top()
 
-        line1 = axis.stairs(slope_steps, z_nodes, orientation="horizontal", label="slope (where not 0)", color="C1", baseline=None)
+        line1 = axis.stairs(slope_steps, z_nodes, orientation="horizontal", label="slope (where not 0 degree)", color="C1", baseline=None)
         line2 = axis.stairs(t, z_nodes, label="t [mm]", orientation="horizontal", color="C2", baseline=None)
 
         lines = [line1, line2]
@@ -356,7 +356,7 @@ def plot_Assambly_Build(excel_caller):
     else:
         WHOLE_STRUCTURE = pd.DataFrame(columns=["Affiliation"])
         SKIRT = None
-        ex.show_message_box(excel_filename, "Please fill MP and/or TP section to plot whole structure" )
+        ex.show_message_box(excel_filename, "Please fill MP and/or TP section to plot whole structure." )
 
     Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0, height_ref=height_ref)
     ex.insert_plot(Fig, excel_filename, "BuildYourStructure", f"Assambly_plot")
