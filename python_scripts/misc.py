@@ -297,10 +297,21 @@ def assemble_structure(MP_DATA, TP_DATA, TOWER_DATA=None, MP_MASSES=None, TP_MAS
     - The function currently only implements the "Skirt" resolution mode.
     - Elevations are adjusted to ensure structural continuity from MP → TP → Tower.
     """
+    if "Affiliation" not in MP_DATA.columns:
+        MP_DATA.insert(0, "Affiliation", "MP")
+    else:
+        MP_DATA["Affiliation"] = "MP"
 
-    MP_DATA.insert(0, "Affiliation", "MP")
-    TP_DATA.insert(0, "Affiliation", "TP")
-    TOWER_DATA.insert(0, "Affiliation", "TOWER")
+    if "Affiliation" not in TP_DATA.columns:
+        TP_DATA.insert(0, "Affiliation", "TP")
+    else:
+        TP_DATA["Affiliation"] = "TP"
+
+    if "Affiliation" not in TOWER_DATA.columns:
+        TOWER_DATA.insert(0, "Affiliation", "TOWER")
+    else:
+        TOWER_DATA["Affiliation"] = "TOWER"
+
     SKIRT = None
     SKIRT_POINTMASS = None
     # Extract ranges
@@ -362,12 +373,18 @@ def assemble_structure(MP_DATA, TP_DATA, TOWER_DATA=None, MP_MASSES=None, TP_MAS
             SKIRT_POINTMASS.loc[:, "comment"] = "Skirt"
 
     elif MP_top < TP_bot:
-        if interactive:
-            ex.show_message_box(excel_caller,
-                               f"The top of the MP at {range_MP[0]} is lower than the bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. This can't work, aborting.")
         if not ignore_hovering:
-            raise ValueError
+            if interactive:
+                ex.show_message_box(excel_caller,
+                                    f"The top of the MP at {range_MP[0]} is lower than the bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. This can't work, aborting.")
 
+            raise ValueError
+        else:
+            if interactive:
+                ex.show_message_box(excel_caller,
+                                        f"The top of the MP at {range_MP[0]} is lower than the bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. Not aborting because of function setting ignore_hovering=True.")
+
+            WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
     else:
         if interactive:
             ex.show_message_box(excel_caller, f"The MP and the TP are fitting together perfectly.")
@@ -376,11 +393,7 @@ def assemble_structure(MP_DATA, TP_DATA, TOWER_DATA=None, MP_MASSES=None, TP_MAS
 
     if TOWER_DATA is not None:
         # Add Tower
-        tower_offset = WHOLE_STRUCTURE["Top [m]"].values[0] - TOWER_DATA["Bottom [m]"].values[-1]
-        TOWER_DATA["Top [m]"] = TOWER_DATA["Top [m]"] + tower_offset
-        TOWER_DATA["Bottom [m]"] = TOWER_DATA["Bottom [m]"] + tower_offset
-
-        WHOLE_STRUCTURE = pd.concat([TOWER_DATA, WHOLE_STRUCTURE], axis=0)
+        WHOLE_STRUCTURE, tower_offset = add_tower_on_top(WHOLE_STRUCTURE, TOWER_DATA)
 
         WHOLE_STRUCTURE.rename(columns={"Section": "local Section"}, inplace=True)
         WHOLE_STRUCTURE = WHOLE_STRUCTURE.reset_index(drop=True)
@@ -595,3 +608,40 @@ def extract_nodes_from_elements(df_elements: pd.DataFrame) -> pd.DataFrame:
 
     return pd.DataFrame(nodes)
 
+
+def add_tower_on_top(STRUCTURE, TOWER):
+    """
+       Attach a tower section on top of an existing structure by vertically aligning
+       their boundaries and merging them into one continuous structure.
+
+       The function computes the required vertical offset so that the bottom of the
+       tower aligns exactly with the top of the existing structure. It then shifts
+       the tower section accordingly and concatenates both parts.
+
+       Parameters
+       ----------
+       STRUCTURE : pandas.DataFrame
+           DataFrame describing the existing structure with at least the columns
+           "Top [m]" and "Bottom [m]". The topmost elevation is taken from the first row.
+       TOWER : pandas.DataFrame
+           DataFrame describing the tower section with at least the columns
+           "Top [m]" and "Bottom [m]". The bottommost elevation is taken from the last row.
+
+       Returns
+       -------
+       WHOLE_STRUCTURE : pandas.DataFrame
+           Combined DataFrame representing the full structure with the tower placed
+           on top of the existing structure.
+
+       Notes
+       -----
+       - The order of rows in the resulting DataFrame is `[TOWER, STRUCTURE]`.
+       - Assumes both inputs follow a consistent convention for elevations in meters.
+       """
+    tower_offset = STRUCTURE["Top [m]"].values[0] - TOWER["Bottom [m]"].values[-1]
+    TOWER["Top [m]"] = TOWER["Top [m]"] + tower_offset
+    TOWER["Bottom [m]"] = TOWER["Bottom [m]"] + tower_offset
+
+    WHOLE_STRUCTURE = pd.concat([TOWER, STRUCTURE], axis=0)
+
+    return WHOLE_STRUCTURE, tower_offset

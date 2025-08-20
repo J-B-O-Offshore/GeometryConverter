@@ -338,6 +338,10 @@ def plot_Assambly_Build(excel_caller):
     TOWER = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TOWER_DATA", dtype=float, dropnan=True)
     META_MP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META", dropnan=True)
 
+    MP["Affiliation"] = "MP"
+    TP["Affiliation"] = "TP"
+    TOWER["Affiliation"] = "TOWER"
+
     if len(META_MP) != 0:
 
         value = META_MP.loc[0, "Water Depth [m]"]
@@ -350,13 +354,22 @@ def plot_Assambly_Build(excel_caller):
         seabed = None
         height_ref = None
 
+    SKIRT = None
     if len(MP) > 0 and len(TP) > 0:
         WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
-
+    elif len(TP) > 0:
+        WHOLE_STRUCTURE = TP
+        if len(TOWER) > 0:
+            WHOLE_STRUCTURE, _ = mc.add_tower_on_top(WHOLE_STRUCTURE, TOWER)
+    elif len(MP) > 0:
+        WHOLE_STRUCTURE = MP
+        if len(TOWER) > 0:
+            WHOLE_STRUCTURE, _ = mc.add_tower_on_top(WHOLE_STRUCTURE, TOWER)
     else:
-        WHOLE_STRUCTURE = pd.DataFrame(columns=["Affiliation"])
-        SKIRT = None
-        ex.show_message_box(excel_filename, "Please fill MP and/or TP section to plot whole structure." )
+        if len(TOWER) > 0:
+            WHOLE_STRUCTURE = TOWER
+        else:
+            WHOLE_STRUCTURE = pd.DataFrame(columns=["Affiliation"])
 
     Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0, height_ref=height_ref)
     ex.insert_plot(Fig, excel_filename, "BuildYourStructure", f"Assambly_plot")
