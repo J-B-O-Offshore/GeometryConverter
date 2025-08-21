@@ -28,8 +28,10 @@ End Sub
 Sub load_MP_DB()
     Dim prevValue As Variant
     Dim db_path As String
-    
-    db_path = ActiveSheet.Range("TextBox_MP_db_path").Value
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("BuildYourStructure")
+    db_path = ws.Range("TextBox_MP_db_path").Value
+
     
     ClearTableContents "BuildYourStructure", "MP_DATA_TRUE"
     ClearTableContents "BuildYourStructure", "MP_DATA"
@@ -48,22 +50,14 @@ Sub load_MP_DB()
 
 End Sub
 
-Sub reload_MP_DB():
-    load_MP_META
-    ClearTableContents "BuildYourStructure", "MP_DATA_TRUE"
-    ClearTableContents "BuildYourStructure", "MP_DATA"
-    ClearTableContents "BuildYourStructure", "MP_META_TRUE"
-    ClearTableContents "BuildYourStructure", "MP_META"
-    ClearTableContents "BuildYourStructure", "MP_META_NEW", 1, 6
-    ClearTableContents "BuildYourStructure", "MP_MASSES_TRUE"
-    ClearTableContents "BuildYourStructure", "MP_MASSES"
-End Sub
 
 Sub load_TP_DB()
 
     Dim db_path As String
-    
-    db_path = ActiveSheet.Range("TextBox_TP_db_path").Value
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("BuildYourStructure")
+    db_path = ws.Range("TextBox_TP_db_path").Value
+
         
     ClearTableContents "BuildYourStructure", "TP_DATA_TRUE"
     ClearTableContents "BuildYourStructure", "TP_DATA"
@@ -85,7 +79,10 @@ End Sub
 
 Sub load_RNA_DB()
     Dim db_path As String
-    db_path = ActiveSheet.Range("TextBox_RNA_db_path").Value
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("BuildYourStructure")
+    db_path = ws.Range("TextBox_RNA_db_path").Value
+
     ClearTableContents "BuildYourStructure", "TP_DATA_TRUE"
     ClearFormDropDown "BuildYourStructure", "Dropdown_RNA_Structures"
     
@@ -97,22 +94,14 @@ Sub load_RNA_DB()
 
 End Sub
 
-Sub reload_TP_DB():
-    load_TP_META
-    ClearTableContents "BuildYourStructure", "TP_DATA_TRUE"
-    ClearTableContents "BuildYourStructure", "TP_DATA"
-    ClearTableContents "BuildYourStructure", "TP_META_TRUE"
-    ClearTableContents "BuildYourStructure", "TP_META"
-    ClearTableContents "BuildYourStructure", "TP_META_NEW", 1, 6
-    ClearTableContents "BuildYourStructure", "TP_MASSES_TRUE"
-    ClearTableContents "BuildYourStructure", "MP_MASSES"
-End Sub
 
 Sub load_TOWER_DB()
 
     Dim db_path As String
-    
-    db_path = ActiveSheet.Range("TextBox_TOWER_db_path2").Value
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("BuildYourStructure")
+    db_path = ws.Range("TextBox_TOWER_db_path2").Value
+
         
     ClearTableContents "BuildYourStructure", "TOWER_DATA_TRUE"
     ClearTableContents "BuildYourStructure", "TOWER_DATA"
@@ -132,20 +121,6 @@ Sub load_TOWER_DB()
 
 End Sub
 
-Sub reload_TOWER_DB():
-    load_TOWER_META
-    ClearTableContents "BuildYourStructure", "TOWER_DATA_TRUE"
-    ClearTableContents "BuildYourStructure", "TOWER_DATA"
-    ClearTableContents "BuildYourStructure", "TOWER_META_TRUE"
-    ClearTableContents "BuildYourStructure", "TOWER_META"
-    ClearTableContents "BuildYourStructure", "TOWER_META_NEW", 1, 6
-    ClearTableContents "BuildYourStructure", "TOWER_MASSES_TRUE"
-    ClearTableContents "BuildYourStructure", "TOWER_MASSES"
-End Sub
-
-Sub reload_RNA_DB():
-    load_RNA_DATA
-End Sub
 '==============================================================================
 ' Database Metadata Loading Subroutines
 ' Purpose: Load metadata from different databases (MP, TP, TOWER) by reading
