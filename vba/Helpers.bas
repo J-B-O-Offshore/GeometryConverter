@@ -154,7 +154,8 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     
     ' Run Python
     If showShell Then
-        Shell cmd, vbNormalFocus   ' show and focus the shell
+        ' Keep shell open in debug mode
+        Shell "cmd /k " & cmd, vbNormalFocus
     Else
         Shell cmd, vbHide          ' run hidden
     End If

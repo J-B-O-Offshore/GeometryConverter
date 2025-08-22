@@ -1,6 +1,6 @@
 Attribute VB_Name = "MsgBoxTemp"
 
     Function ShowMessageBox() As Integer
-        ShowMessageBox = MsgBox("The MP and the TP are fitting together perfectly.", 64, "Message")
+        ShowMessageBox = MsgBox("Height references are the same or not defined. (MP: None, TP: LAT, TOWER: None).", 64, "Message")
     End Function
     
