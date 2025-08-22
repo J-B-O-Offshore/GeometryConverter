@@ -451,6 +451,11 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
     sucess_TP, TP_DATA = check_convert_structure(excel_filename, TP_DATA, "TP")
     sucess_TOWER, TOWER_DATA = check_convert_structure(excel_filename, TOWER_DATA, "TOWER")
 
+    if len(TOWER_DATA) == 0:
+        TOWER_DATA = None
+    if len(TOWER_MASSES) == 0:
+        TOWER_MASSES = None
+
     if not all([sucess_MP, sucess_TP, sucess_TOWER]):
         return
 
@@ -499,7 +504,7 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
     ex.write_df_to_table(excel_filename, "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
 
     if SKIRT is not None:
-        ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT", SKIRT)
+            ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT", SKIRT)
     if SKIRT_POINTMASS is not None:
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT_POINTMASS", SKIRT_POINTMASS)
 
