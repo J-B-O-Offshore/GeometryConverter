@@ -138,7 +138,9 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
     if not structure_empty:
         z_nodes = list(Structure["Top [m]"]) + [Structure["Bottom [m]"].values[-1]]
         t = list(Structure["t [mm]"] / 1000)
-        slope = -(Structure["D, top [m]"] - Structure["D, bottom [m]"]) / (Structure["Top [m]"] - Structure["Bottom [m]"])
+        slope = -(Structure["D, top [m]"] - Structure["D, bottom [m]"]) / (
+                Structure["Top [m]"] - Structure["Bottom [m]"]
+        )
         D_nodes = list(Structure["D, top [m]"]) + [Structure["D, bottom [m]"].values[-1]]
 
         # D/t
@@ -151,13 +153,29 @@ def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", wate
 
         slope_steps = [np.nan if s == 0 else s for s in slope]
 
+        # upper axis (D/t)
         axis2.plot(d_by_t, z_d_by_t, label="D/t", color="C0")
-        axis2.set_xlabel("D/t [-]")
-        axis2.xaxis.set_label_position('top')
+        axis2.xaxis.set_label_position("top")
         axis2.xaxis.tick_top()
+        axis2.set_xlabel("D/t [-]")
 
-        line1 = axis.stairs(slope_steps, z_nodes, orientation="horizontal", label="slope (where not 0 degree)", color="C1", baseline=None)
-        line2 = axis.stairs(t, z_nodes, label="t [mm]", orientation="horizontal", color="C2", baseline=None)
+        # make upper axis blue (no grid)
+        axis2.tick_params(axis="x", colors="C0")
+        axis2.xaxis.label.set_color("C0")
+        axis2.spines["top"].set_color("C0")
+
+        # lower axis (slope + t)
+        line1 = axis.stairs(
+            slope_steps,
+            z_nodes,
+            orientation="horizontal",
+            label="slope (where not 0 degree)",
+            color="C1",
+            baseline=None,
+        )
+        line2 = axis.stairs(
+            t, z_nodes, label="t [mm]", orientation="horizontal", color="C2", baseline=None
+        )
 
         lines = [line1, line2]
         labels = [line.get_label() for line in lines]
@@ -356,7 +374,11 @@ def plot_Assambly_Build(excel_caller):
 
     SKIRT = None
     if len(MP) > 0 and len(TP) > 0:
-        WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
+        if len(TOWER) > 0:
+            WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
+        else:
+            WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
+
     elif len(TP) > 0:
         WHOLE_STRUCTURE = TP
         if len(TOWER) > 0:

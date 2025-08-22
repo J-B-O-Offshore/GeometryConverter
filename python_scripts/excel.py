@@ -51,7 +51,6 @@ def set_dropdown_values(workbook_name, sheet_name, dropdown_name, items):
         True if successful, False otherwise.
     """
 
-    logger = setup_logger()
 
     try:
         for app in xw.apps:
@@ -61,8 +60,6 @@ def set_dropdown_values(workbook_name, sheet_name, dropdown_name, items):
                         sheet = wb.sheets[sheet_name]
                         dropdown = sheet.api.Shapes(dropdown_name).ControlFormat
                         dropdown.RemoveAllItems()
-                        logger.debug(dropdown)
-                        logger.debug(items)
                         for item in items:
                             dropdown.AddItem(item)
                         return True
@@ -105,7 +102,6 @@ def write_df(workbook_name, sheet_name, upper_left_address, dataframe, include_h
      dataframe (pd.DataFrame): The Pandas DataFrame to write to the Excel sheet.
      include_headers (bool): Whether to include column names as headers in Excel (default is True).
      """
-    logger = setup_logger()
 
     try:
         # Connect to the already open workbook
@@ -143,7 +139,6 @@ def write_value(workbook_name, sheet_name, cell_or_named_range, value):
     cell_or_named_range (str): Excel address (e.g., 'B2') or a named range where the value should be written.
     value (any): The value to write into the cell.
     """
-    logger = setup_logger()
 
     try:
         # Connect to the already open workbook

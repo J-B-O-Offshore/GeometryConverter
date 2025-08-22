@@ -1,64 +1,21 @@
+Aaron
+x- plot current build without Tower buggy 
+- RNA table bug
+x - import mp tool excel filtern
+- alle namen klein
+x - übersichtsgrafik D/t blau
+x - logs deaktivieren
 
-When trying to save TOWER data, Dropdown is not set for some reason 
+future: 
+- in Zeichnung Punkt für RNA
+- Rna skizze 
 
----------------------------
-Error
----------------------------
-Traceback (most recent call last):
+Heike
+- Datebanken einpflegen (Dreekant (24A525), Windbostel(25A518))
+- copy to clipboard
 
-  File "<string>", line 1, in <module>
-
-  File "C:\Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/python_scripts\db_handling.py", line 887, in save_TOWER_data
-
-    save_data(excel_filename, "TOWER", db_path, selected_structure)
-
-  File "C:\Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/python_scripts\db_handling.py", line 575, in save_data
-
-    load_DATA(excel_filename, Structure, structure_load_after, db_path)
-
-  File "C:\Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/python_scripts\db_handling.py", line 444, in load_DATA
-
-    ex.call_vba_dropdown_macro(excel_filename, sheet_name_structure_loading, f"Dropdown_{Structure}_Structures", Structure_name)
-
-  File "C:\Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/python_scripts\excel.py", line 511, in call_vba_dropdown_macro
-
-    wb.macro('set_dropdown_value')(sheet_name, dropdown_name, new_value)
-
-  File "C:\Users\aaron.lange\AppData\Local\Programs\Python\Python312\Lib\site-packages\xlwings\main.py", line 4881, in run
-
-    return self.app.impl.run(self.macro, args)
-
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-  File "C:\Users\aaron.lange\AppData\Local\Programs\Python\Python312\Lib\site-packages\xlwings\_xlwindows.py", line 708, in run
-
-    return self.xl.Run(macro, *args)
-
-           ^^^^^^^^^^^^^^^^^^^^^^^^^
-
-  File "C:\Users\aaron.lange\AppData\Local\Programs\Python\Python312\Lib\site-packages\xlwings\_xlwindows.py", line 122, in __call__
-
-    v = self.__method(*args, **kwargs)
-
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-  File "C:\Users\AARON~1.LAN\AppData\Local\Temp\gen_py\3.12\00020813-0000-0000-C000-000000000046x0x1x9.py", line 44766, in Run
-
-    return self._ApplyTypes_(259, 1, (12, 0), ((12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17), (12, 17)), 'Run', None,Macro
-
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-  File "C:\Users\aaron.lange\AppData\Local\Programs\Python\Python312\Lib\site-packages\win32com\client\__init__.py", line 574, in _ApplyTypes_
-
-    self._oleobj_.InvokeTypes(dispid, 0, wFlags, retType, argTypes, *args),
-
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-pywintypes.com_error: (-2147352567, 'Exception occurred.', (0, None, None, None, 0, -2146777998), None)
-
-
-
-Press Ctrl+C to copy this message to the clipboard.
----------------------------
-OK   
----------------------------
+allg.
+- Anleitungs videos
+- wiki updaten
+- markos aktivieren anleitung
+- xlwings installation anleitung 

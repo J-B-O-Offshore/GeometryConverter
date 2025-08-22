@@ -751,7 +751,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, ski
     APPURTANCES : pd.DataFrame
         Table containing appurtenance data. Required columns:
         'Top [m]', 'Bottom [m]', 'Mass [kg]', 'Diameter [m]', 'Orientation [°]',
-        'Surface roughness [m]', 'Distance Axis to Axis', 'Gap between surfaces', 'Name'.
+        'Surface roughness [m]', 'Distance Axis to Axis [m]', 'Gap between surfaces [m]', 'Name'.
     ADDITIONAL_MASSES : pd.DataFrame
         Table of additional point masses. Required columns:
         'Top [m]', 'Bottom [m]', 'Mass [kg]', 'Name'.
@@ -801,7 +801,7 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, ski
             return False, f"Missing values in {name}:\n" + "\n".join(missing_vals)
 
     # Additional check: ensure APPURTANCES has the mutually exclusive columns
-    for col in ["Distance Axis to Axis", "Gap between surfaces"]:
+    for col in ["Distance Axis to Axis [m]", "Gap between surfaces [m]"]:
         if col not in APPURTANCES.columns:
             return False, f"Missing required column '{col}' in APPURTANCES."
 
@@ -812,13 +812,13 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, ski
     err_list = []
     for idx, row in APPURTANCES.iterrows():
         row_num = idx + 1
-        axis_to_axis = row["Distance Axis to Axis"]
-        gap_between = row["Gap between surfaces"]
+        axis_to_axis = row["Distance Axis to Axis [m]"]
+        gap_between = row["Gap between surfaces [m]"]
 
         if pd.isna(axis_to_axis) and pd.isna(gap_between):
-            err_list.append(f"Row {row_num}: Define either 'Distance Axis to Axis' or 'Gap between surfaces'.")
+            err_list.append(f"Row {row_num}: Define either 'Distance Axis to Axis [m]' or 'Gap between surfaces [m]'.")
         elif not pd.isna(axis_to_axis) and not pd.isna(gap_between):
-            err_list.append(f"Row {row_num}: Define only one of 'Distance Axis to Axis' or 'Gap between surfaces', not both.")
+            err_list.append(f"Row {row_num}: Define only one of 'Distance Axis to Axis [m]' or 'Gap between surfaces [m]', not both.")
 
     if err_list:
         return False, "Geometry specification issues in APPURTANCES:\n" + "\n".join(err_list)
@@ -891,10 +891,10 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, ski
             f" mass = {row['Mass [kg]']:01.1f}",
             f" surface_roughness = {row['Surface roughness [m]']:01.3f}"
         ]
-        if pd.notna(row['Gap between surfaces']):
-            parts.insert(6, f" gap_between_surfaces = {row['Gap between surfaces']}")
-        if pd.notna(row['Distance Axis to Axis']):
-            parts.insert(6, f" distance_axis_to_axis = {row['Distance Axis to Axis']}")
+        if pd.notna(row['Gap between surfaces [m]']):
+            parts.insert(6, f" gap_between_surfaces = {row['Gap between surfaces [m]']}")
+        if pd.notna(row['Distance Axis to Axis [m]']):
+            parts.insert(6, f" distance_axis_to_axis = {row['Distance Axis to Axis [m]']}")
         Data_Appurtenances.append(" Data_Appurtenances{" + ", ".join(parts) + "}")
 
     Data_MarineGrowth = [
@@ -1118,8 +1118,8 @@ def fill_WLGenMasses(excel_caller):
         has_orientation = not pd.isna(row['Orientation [°]'])
         has_roughness = not pd.isna(row['Surface roughness [m]'])
 
-        has_axis_to_axis = not pd.isna(row['Distance Axis to Axis'])
-        has_gap = not pd.isna(row['Gap between surfaces'])
+        has_axis_to_axis = not pd.isna(row['Distance Axis to Axis [m]'])
+        has_gap = not pd.isna(row['Gap between surfaces [m]'])
         # xor_axis_gap = has_axis_to_axis != has_gap  # exclusive OR
 
         if all([has_bottom, has_diameter, has_orientation, has_roughness]) and (has_axis_to_axis or has_gap):

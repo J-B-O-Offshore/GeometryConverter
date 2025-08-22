@@ -12,7 +12,6 @@ class ConciveError(Exception):
 
     pass
 
-log = ex.setup_logger()
 
 
 def drop_db_table(db_path, Identifier):
@@ -203,7 +202,6 @@ def load_META(Structure, db_path):
     Returns:
         None
     """
-    logger = ex.setup_logger()
     sheet_name_structure_loading = "BuildYourStructure"
 
     META = load_db_table(db_path, "META")
@@ -230,7 +228,6 @@ def load_DATA(Structure, Structure_name, db_path):
     Returns:
         None
     """
-    logger = ex.setup_logger()
     sheet_name_structure_loading = "BuildYourStructure"
 
     META = load_db_table(db_path, "META")
@@ -361,8 +358,6 @@ def save_data(Structure, db_path, selected_structure):
 def delete_data(Structure, db_path, selected_structure):
     answer = ex.show_message_box("GeometrieConverter.xlsm", f"Are you sure you want to delete the structure {selected_structure} from the database?", icon="vbYesNo",
                                  buttons="vbYesNo")
-    logger = ex.setup_logger()
-    logger.debug(answer)
     if answer == "Yes":
         delete_db_element(db_path, selected_structure)
 

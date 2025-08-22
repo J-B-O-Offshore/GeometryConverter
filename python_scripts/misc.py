@@ -306,11 +306,11 @@ def assemble_structure(MP_DATA, TP_DATA, TOWER_DATA=None, MP_MASSES=None, TP_MAS
         TP_DATA.insert(0, "Affiliation", "TP")
     else:
         TP_DATA["Affiliation"] = "TP"
-
-    if "Affiliation" not in TOWER_DATA.columns:
-        TOWER_DATA.insert(0, "Affiliation", "TOWER")
-    else:
-        TOWER_DATA["Affiliation"] = "TOWER"
+    if TOWER_DATA is not None:
+        if "Affiliation" not in TOWER_DATA.columns:
+            TOWER_DATA.insert(0, "Affiliation", "TOWER")
+        else:
+            TOWER_DATA["Affiliation"] = "TOWER"
 
     SKIRT = None
     SKIRT_POINTMASS = None

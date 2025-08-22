@@ -83,7 +83,7 @@ Sub load_RNA_DB()
     Set ws = ThisWorkbook.Sheets("BuildYourStructure")
     db_path = ws.Range("TextBox_RNA_db_path").Value
 
-    ClearTableContents "BuildYourStructure", "TP_DATA_TRUE"
+    ClearTableContents "BuildYourStructure", "RNA_DATA_TRUE"
     ClearFormDropDown "BuildYourStructure", "Dropdown_RNA_Structures"
     
     If Not CheckPath(db_path, "db") Then
@@ -350,8 +350,8 @@ End Sub
 Sub import_MP_from_MPTool()
     
     Dim path As String
-    
-    OpenFileDialog ("TextBox_Import_MP_path")
+
+    OpenFileDialog "TextBox_Import_MP_path", "select MP Tool file", "Excel files", "*.xlsm"
     path = ActiveSheet.Range("TextBox_Import_MP_path").Value
     If path = "" Then
         Exit Sub
@@ -398,7 +398,7 @@ Sub import_Masses_from_GConverter()
     
     Dim path As String
     
-    OpenFileDialog ("Import_GeomConv_path")
+    OpenFileDialog "Import_GeomConv_path", "select a file", "Excel files", "*.xlsm"
     path = ActiveSheet.Range("Import_GeomConv_path").Value
     If path = "" Then
         Exit Sub

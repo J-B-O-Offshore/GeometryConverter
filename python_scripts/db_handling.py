@@ -16,9 +16,6 @@ class ConciveError(Exception):
     pass
 
 
-log = ex.setup_logger()
-
-
 def drop_db_table(excel_filename, db_path, Identifier):
     """
     Drops (deletes) a table from an SQLite database.
@@ -430,7 +427,6 @@ def load_META(excel_filename, Structure, db_path):
     Returns:
         None
     """
-    logger = ex.setup_logger()
     sheet_name_structure_loading = "BuildYourStructure"
 
     META = load_db_table(excel_filename, db_path, "META")
@@ -632,8 +628,6 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
 def delete_data(excel_filename, Structure, db_path, selected_structure):
     answer = ex.show_message_box(excel_filename, f"Are you sure you want to delete the structure {selected_structure} from the database?", icon="vbYesNo",
                                  buttons="vbYesNo")
-    logger = ex.setup_logger()
-    logger.debug(answer)
     if answer == "Yes":
         delete_db_element(excel_filename, db_path, selected_structure)
 
