@@ -770,3 +770,50 @@ Public Function RangeFromNameOrTable(ws As Worksheet, name As String) As Range
     End If
     On Error GoTo 0
 End Function
+Sub InstallPythonRequirements()
+    Dim ws As Worksheet
+    Dim tbl As ListObject
+    Dim pyPath As String
+    Dim reqCell As Range
+    Dim reqList As String
+    Dim cmd As String
+    
+    ' Set the worksheet
+    Set ws = ThisWorkbook.Sheets("GlobalConfig")
+    
+    ' Get Python path from named range
+    pyPath = ws.Range("python_path").Value
+    If pyPath = "" Then
+        MsgBox "Python path is not defined in named range 'python_path'.", vbCritical
+        Exit Sub
+    End If
+    
+    ' Get the table
+    On Error Resume Next
+    Set tbl = ws.ListObjects("requirements")
+    On Error GoTo 0
+    If tbl Is Nothing Then
+        MsgBox "Table 'requirements' not found on sheet 'GlobalConfig'.", vbCritical
+        Exit Sub
+    End If
+    
+    ' Build space-separated list of packages
+    reqList = ""
+    For Each reqCell In tbl.ListColumns(1).DataBodyRange
+        If Trim(reqCell.Value) <> "" Then
+            reqList = reqList & " " & Trim(reqCell.Value)
+        End If
+    Next reqCell
+    
+    If reqList = "" Then
+        MsgBox "No requirements found in table.", vbExclamation
+        Exit Sub
+    End If
+    
+    ' Build command to run in cmd and leave window open
+    ' /K keeps the cmd window open after execution
+    cmd = "cmd /K """ & pyPath & " -m pip install" & reqList & """"
+    
+    ' Run command
+    Shell cmd, vbNormalFocus
+End Sub
