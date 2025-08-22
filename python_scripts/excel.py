@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import re
 import tempfile
+import textwrap
 from collections import defaultdict
 
 def setup_logger():
@@ -126,7 +127,6 @@ def write_df(workbook_name, sheet_name, upper_left_address, dataframe, include_h
 
     except Exception as e:
         print(f"Error writing DataFrame to Excel: {e}.")
-        logger.debug(f"Error!{e}")
 
 
 def write_value(workbook_name, sheet_name, cell_or_named_range, value):
@@ -156,7 +156,6 @@ def write_value(workbook_name, sheet_name, cell_or_named_range, value):
 
     except Exception as e:
         print(f"Error writing value to Excel: {e}.")
-        logger.debug(f"Error! {e}")
 
 
 def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
@@ -210,11 +209,7 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     )
     table.Resize(new_range.api)
 
-import xlwings as xw
 
-
-import xlwings as xw
-import textwrap
 
 def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation",
                      default="vbDefaultButton1", title="Message"):
@@ -283,7 +278,7 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
 
     # Split into safe chunks to avoid line overflow in VBA
     max_chunk_length = 900
-    chunks = textwrap.wrap(message_escaped, max_chunk_length)
+    chunks = textwrap.wrap(str(message_escaped), width=max_chunk_length)
     message_vba = ' & _\n    '.join(f'"{chunk}"' for chunk in chunks)
 
     # --- VBA code injection ---

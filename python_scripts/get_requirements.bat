@@ -1,2 +1,0 @@
-pipreqs --f . 
-pause

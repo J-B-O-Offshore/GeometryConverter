@@ -14,6 +14,15 @@ from math import isnan, isfinite
 
 
 # %% helpers
+import os
+os.environ["MPLBACKEND"] = "Agg"  # kein GUI nötig
+
+# optional zusätzlich:
+try:
+    import matplotlib
+    matplotlib.use("Agg", force=True)
+except Exception:
+    pass
 
 def add_node(df, z_new, defaults=None, add_outside_bound=False):
     """
