@@ -86,44 +86,55 @@ NoCell:
     MsgBox "Target cell not found: " & Target_cell, vbExclamation
 End Sub
 '*******************************************************************************
-' RunPythonWrapper
+' RunPythonWrapper (Shell version, no xlwings)
 '
 ' Description:
-'   Runs a Python function from a script in the "python_scripts" folder,
-'   passing either a string or a list of strings (from a Range).
+'   Runs a Python function from a script in the "python_scripts" folder
+'   by launching Python via the Shell.
 '
 ' Parameters:
-'   function_name (String) - Name of the Python module (no .py) and function to run (assumes .main)
-'   Optional args          - Either a string (e.g., a path) or a Range of strings (list)
+'   module_name (String)     - Python module name (without .py)
+'   Optional function_name   - Function to run inside module (default = "main")
+'   Optional args            - Either a string (path) or a Range/Collection of strings
 '
 ' Example Usage:
-'   RunPythonWrapper "load_MP_META", "C:\my\path\file.db"
-'   RunPythonWrapper "my_script", Range("A1:A5")
-'
-' Notes:
-'   You don’t need to quote or format the arguments yourself — the function takes care of it.
+'   RunPythonWrapper "load_MP_META", "main", "C:\my\path\file.db"
+'   RunPythonWrapper "my_script", "main", Range("A1:A5")
 '*******************************************************************************
 Sub RunPythonWrapper(module_name As String, Optional function_name As String = "main", Optional args As Variant)
     Dim scriptPath As String
-    Dim pythonCall As String
+    Dim pythonExe As String
     Dim argsString As String
     Dim excelFileName As String
     Dim item As Variant
+    Dim cmd As String
+    Dim showShell As Boolean
+    
+    ' Check debug mode
+    On Error Resume Next
+    showShell = Sheets("GlobalConfig").Range("debug_mode").Value
+    On Error GoTo 0
+    
+    ' Get Python executable from config
+    On Error GoTo PythonPathError
+    pythonExe = Sheets("GlobalConfig").Range("python_path").Value
+    On Error GoTo 0
+    If InStr(pythonExe, " ") > 0 And Left(pythonExe, 1) <> """" Then
+        pythonExe = """" & pythonExe & """"
+    End If
     
     ' Get the script path from the named range
-    On Error GoTo NamedRangeError
+    On Error GoTo ScriptPathError
     scriptPath = Range("python_script_path").Value
-    On Error GoTo 0  ' Reset error handling
-
-    ' Ensure no trailing backslash
+    On Error GoTo 0
     If Right(scriptPath, 1) = "\" Or Right(scriptPath, 1) = "/" Then
         scriptPath = Left(scriptPath, Len(scriptPath) - 1)
     End If
-
-    ' Get the Excel filename (full path)
+    
+    ' Always include Excel filename first
     excelFileName = ThisWorkbook.FullName
     argsString = ProcessArgument(excelFileName)
-
+    
     ' Append other arguments
     If Not IsMissing(args) Then
         If TypeName(args) = "Collection" Then
@@ -134,29 +145,44 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
             argsString = argsString & ", " & ProcessArgument(args)
         End If
     End If
-
-    ' Compose the Python function call
-    pythonCall = module_name & "." & function_name & "(" & argsString & ")"
-
-    ' Run the Python script using xlwings
-    RunPython "import sys; sys.path.append(r'" & scriptPath & "'); import " & module_name & "; " & pythonCall
+    
+    ' Build full command line
+    cmd = pythonExe & " -c " & _
+          """import sys; sys.path.append(r'" & scriptPath & "'); " & _
+          "import " & module_name & "; " & _
+          module_name & "." & function_name & "(" & argsString & ")"""
+    
+    ' Run Python
+    If showShell Then
+        Shell cmd, vbNormalFocus   ' show and focus the shell
+    Else
+        Shell cmd, vbHide          ' run hidden
+    End If
+    
     Exit Sub
-
-NamedRangeError:
-    MsgBox "Named range 'python_script_path' not found or has invalid value.", vbCritical
+    
+PythonPathError:
+    MsgBox "Named range 'python_path' not found on sheet 'GlobalConfig'.", vbCritical
+    Exit Sub
+    
+ScriptPathError:
+    MsgBox "Named range 'python_script_path' not found or invalid.", vbCritical
+    Exit Sub
 End Sub
 
-' Helper function to process individual arguments and return the appropriate string
+'------------------------------------------------------------------------------
+' Helper: turns VBA args into proper Python literal strings
+'------------------------------------------------------------------------------
 Function ProcessArgument(item As Variant) As String
     Dim result As String
-
+    Dim i As Long
+    
     If TypeName(item) = "Range" Then
-        result = "'" & item.Address & "'"
+        result = "'" & Replace(item.Value, "'", "''") & "'"
     ElseIf TypeName(item) = "String" Then
         result = "r'" & Replace(item, "\", "\\") & "'"
     ElseIf IsArray(item) Then
         result = "["
-        Dim i As Integer
         For i = LBound(item) To UBound(item)
             result = result & "r'" & Replace(item(i), "\", "\\") & "', "
         Next i
@@ -165,9 +191,9 @@ Function ProcessArgument(item As Variant) As String
         End If
         result = result & "]"
     Else
-        result = item
+        result = CStr(item)
     End If
-
+    
     ProcessArgument = result
 End Function
 '------------------------------------------------------------------------------
