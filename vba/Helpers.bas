@@ -109,12 +109,21 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     Dim item As Variant
     Dim cmd As String
     Dim showShell As Boolean
+    Dim wsh As Object
+    Dim retCode As Long
     
+    ' Turn off Excel updates for speed & stability
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
+    
+    On Error GoTo CleanFail
+
     ' Check debug mode
     On Error Resume Next
     showShell = Sheets("GlobalConfig").Range("debug_mode").Value
     On Error GoTo 0
-    
+
     ' Get Python executable from config
     On Error GoTo PythonPathError
     pythonExe = Sheets("GlobalConfig").Range("python_path").Value
@@ -122,7 +131,7 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     If InStr(pythonExe, " ") > 0 And Left(pythonExe, 1) <> """" Then
         pythonExe = """" & pythonExe & """"
     End If
-    
+
     ' Get the script path from the named range
     On Error GoTo ScriptPathError
     scriptPath = Range("python_script_path").Value
@@ -130,11 +139,11 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     If Right(scriptPath, 1) = "\" Or Right(scriptPath, 1) = "/" Then
         scriptPath = Left(scriptPath, Len(scriptPath) - 1)
     End If
-    
+
     ' Always include Excel filename first
     excelFileName = ThisWorkbook.FullName
     argsString = ProcessArgument(excelFileName)
-    
+
     ' Append other arguments
     If Not IsMissing(args) Then
         If TypeName(args) = "Collection" Then
@@ -145,30 +154,45 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
             argsString = argsString & ", " & ProcessArgument(args)
         End If
     End If
-    
+
     ' Build full command line
     cmd = pythonExe & " -c " & _
           """import sys; sys.path.append(r'" & scriptPath & "'); " & _
           "import " & module_name & "; " & _
           module_name & "." & function_name & "(" & argsString & ")"""
-    
-    ' Run Python
+
+    ' Run Python synchronously
+    Set wsh = CreateObject("WScript.Shell")
     If showShell Then
         ' Keep shell open in debug mode
-        Shell "cmd /k " & cmd, vbNormalFocus
+        retCode = wsh.Run("cmd /k " & cmd, 1, True)
     Else
-        Shell cmd, vbHide          ' run hidden
+        ' Run hidden and wait until finished
+        retCode = wsh.Run("cmd /c " & cmd, 0, True)
     End If
     
-    Exit Sub
+    If ThisWorkbook.ActiveSheet.name = "BuildYourStructure" Then
+        BuildYourStructureChange ThisWorkbook.Sheets("BuildYourStructure").Range("A1"), True
+    End If
     
+CleanExit:
+    ' Re-enable Excel updates
+    Application.Calculation = xlCalculationAutomatic
+    Application.EnableEvents = True
+    Application.ScreenUpdating = True
+    Exit Sub
+
 PythonPathError:
     MsgBox "Named range 'python_path' not found on sheet 'GlobalConfig'.", vbCritical
-    Exit Sub
-    
+    Resume CleanExit
+
 ScriptPathError:
     MsgBox "Named range 'python_script_path' not found or invalid.", vbCritical
-    Exit Sub
+    Resume CleanExit
+
+CleanFail:
+    MsgBox "Error in RunPythonWrapper: " & Err.Description, vbCritical
+    Resume CleanExit
 End Sub
 
 '------------------------------------------------------------------------------

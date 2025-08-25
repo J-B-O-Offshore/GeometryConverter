@@ -701,7 +701,7 @@ def load_MP_from_MPTool(excel_caller, MP_path):
         Section_col = Section_col.iloc[:, 0].dropna()
         row_MP = Section_col[Section_col == "Section"].index.values[1]
 
-        Data = ex.read_excel_range(MP_path, "Geometry", f"C{row_MP + 3}:H1000", dtype=float)
+        Data = ex.read_static_excel_range(MP_path, "Geometry", f"C{row_MP + 3}:H1000", dtype=float)
         Data = Data.dropna(how="all")
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "MP_DATA", Data)
     except Exception as e:
@@ -710,14 +710,14 @@ def load_MP_from_MPTool(excel_caller, MP_path):
         return
 
     try:
-        Parameter_col = ex.read_excel_range(MP_path, "Control", "E1:E1000", dtype=str, use_header=False)
+        Parameter_col = ex.read_static_excel_range(MP_path, "Control", "E1:E1000", dtype=str, use_header=False)
         Parameter_col = Parameter_col.iloc[:, 0].dropna()
 
         row_RL = Parameter_col[Parameter_col.str.strip() == "Reference level"].index[0]
         row_ML = Parameter_col[Parameter_col.str.strip() == "Mudline"].index.values[0]
 
-        Refercene_Level = ex.read_excel_range(MP_path, "Control", f"F{row_RL + 1}", dtype=str, use_header=False)
-        Mudline = ex.read_excel_range(MP_path, "Control", f"F{row_ML + 1}", dtype=float, use_header=False)
+        Refercene_Level = ex.read_static_excel_range(MP_path, "Control", f"F{row_RL + 1}", dtype=str, use_header=False)
+        Mudline = ex.read_static_excel_range(MP_path, "Control", f"F{row_ML + 1}", dtype=float, use_header=False)
 
         META_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META_NEW", dtype=str)
 
@@ -1063,15 +1063,18 @@ def load_RNA_DATA(excel_caller, db_path):
     )
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"RNA_DATA", data)
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"RNA_DATA_TRUE", data)
-    ex.set_dropdown_values(excel_filename, sheet_name_structure_loading, "Dropdown_RNA_Structures", list(data.loc[:, "Identifier"].values))
 
 
 def save_RNA_data(excel_caller, db_path, selected_structure):
     excel_filename = os.path.basename(excel_caller)
 
     DATA_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"RNA_DATA", dtype=str)
-
-    create_db_table(excel_filename, db_path, "data", DATA_CURR, if_exists='replace')
-
+    is_unique = DATA_CURR['Identifier'].is_unique
+    if is_unique:
+        create_db_table(excel_filename, db_path, "data", DATA_CURR, if_exists='replace')
+        load_RNA_DATA(excel_caller, db_path)
+    else:
+        ex.show_message_box(excel_filename, "RNA table contains duplicate identifiers. Please privide a unique identifier for each row. Aborting.")
     return
+
 

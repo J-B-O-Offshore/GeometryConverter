@@ -1,13 +1,13 @@
-import xlwings as xw
-import os
 import logging
 from datetime import datetime
 import pandas as pd
 import numpy as np
 import re
-import tempfile
 import textwrap
-from collections import defaultdict
+import os
+import time
+import tempfile
+import pywintypes
 
 def setup_logger():
     logger = logging.getLogger()
@@ -157,12 +157,13 @@ def write_value(workbook_name, sheet_name, cell_or_named_range, value):
     except Exception as e:
         print(f"Error writing value to Excel: {e}.")
 
+import xlwings as xw
 
 def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     """
     Replace the contents of an existing Excel table with a pandas DataFrame using xlwings.
 
-    If the DataFrame is empty, the table is cleared but not resized or filled with rows.
+    If the DataFrame is empty, the table is resized to only contain the header row.
 
     Parameters:
     - workbook_name: str, name of the open Excel workbook (no path needed if open).
@@ -180,17 +181,12 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     except Exception as e:
         raise ValueError(f"Table '{table_name}' not found in sheet '{sheet_name}'.") from e
 
-    # Get the header range and data body range
+    # Get the header range
     header_range = table.HeaderRowRange
-    data_body_range = table.DataBodyRange
 
-    # Clear existing table data (keep headers)
-    if data_body_range is not None:
-        if data_body_range.Rows.Count > 0:
-            data_body_range.ClearContents()
-
-    # If the DataFrame is empty, return early after clearing
+    # If the DataFrame is empty -> shrink table to only headers and exit
     if dataframe.empty:
+        table.Resize(header_range)
         return
 
     # Clean DataFrame to avoid writing the index
@@ -208,6 +204,57 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
         (last_row, last_col)
     )
     table.Resize(new_range.api)
+
+# def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
+#     """
+#     Replace the contents of an existing Excel table with a pandas DataFrame using xlwings.
+#
+#     If the DataFrame is empty, the table is cleared but not resized or filled with rows.
+#
+#     Parameters:
+#     - workbook_name: str, name of the open Excel workbook (no path needed if open).
+#     - sheet_name: str, name of the sheet containing the table.
+#     - table_name: str, name of the Excel table (ListObject) to manipulate.
+#     - dataframe: pandas DataFrame to replace the table's data (same number of columns).
+#     """
+#     # Connect to the open workbook
+#     wb = xw.books[workbook_name]
+#     ws = wb.sheets[sheet_name]
+#
+#     # Find the table (ListObject)
+#     try:
+#         table = ws.api.ListObjects(table_name)
+#     except Exception as e:
+#         raise ValueError(f"Table '{table_name}' not found in sheet '{sheet_name}'.") from e
+#
+#     # Get the header range and data body range
+#     header_range = table.HeaderRowRange
+#     data_body_range = table.DataBodyRange
+#
+#     # Clear existing table data (keep headers)
+#     if data_body_range is not None:
+#         if data_body_range.Rows.Count > 0:
+#             data_body_range.ClearContents()
+#
+#     # If the DataFrame is empty, return early after clearing
+#     if dataframe.empty:
+#         return
+#
+#     # Clean DataFrame to avoid writing the index
+#     df_clean = dataframe.reset_index(drop=True)
+#
+#     # Write the new DataFrame below the headers
+#     start_cell = ws.range((header_range.Row + 1, header_range.Column))
+#     start_cell.options(index=False, header=False).value = df_clean
+#
+#     # Resize the table to match the new data
+#     last_row = header_range.Row + df_clean.shape[0]
+#     last_col = header_range.Column + df_clean.shape[1] - 1
+#     new_range = ws.range(
+#         (header_range.Row, header_range.Column),
+#         (last_row, last_col)
+#     )
+#     table.Resize(new_range.api)
 
 
 
@@ -413,6 +460,60 @@ def read_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
         app.quit()
     return data
 
+def read_static_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
+    """
+    Read a specific Excel range or cell from an Excel file using pandas.
+
+    Parameters:
+        path (str or Path): Full path to the Excel workbook.
+        sheet_name (str): The name of the sheet containing the range.
+        cell_range (str): Excel reference (e.g., "B14:L30", "F", "F10").
+        dtype (dict or type, optional): Data type(s) to apply to the DataFrame.
+        use_header (bool): If True, use the first row of the range as column headers.
+
+    Returns:
+        pd.DataFrame or single value
+    """
+    path = Path(path)
+
+    # Case 1: Single cell like "F10"
+    if re.fullmatch(r"[A-Z]+[0-9]+", cell_range, re.IGNORECASE):
+        row, col = coordinate_to_tuple(cell_range)  # (row, col)
+        df = pd.read_excel(path, sheet_name=sheet_name, header=None, engine="openpyxl")
+        return df.iat[row-1, col-1]
+
+    # Case 2: Single column like "F"
+    elif re.fullmatch(r"[A-Z]+", cell_range, re.IGNORECASE):
+        col = cell_range.upper()
+        df = pd.read_excel(path, sheet_name=sheet_name, usecols=col, header=0 if use_header else None, engine="openpyxl")
+        if not use_header:
+            df.columns = ["Column1"]
+        return df if dtype is None else df.astype(dtype)
+
+    # Case 3: Range like "B14:L30"
+    else:
+        # Parse coordinates
+        start_col, start_row = re.match(r"([A-Z]+)(\d+)", cell_range.split(":")[0]).groups()
+        end_col, end_row = re.match(r"([A-Z]+)(\d+)", cell_range.split(":")[1]).groups()
+
+        # Column letters range
+        col_range = f"{start_col}:{end_col}"
+
+        # Read only the necessary columns
+        df = pd.read_excel(path, sheet_name=sheet_name, usecols=col_range, header=None, engine="openpyxl")
+
+        # Slice rows (Excel is 1-based, pandas is 0-based, and header may shift things)
+        start_row, end_row = int(start_row), int(end_row)
+        df = df.iloc[start_row-1:end_row]
+
+        if use_header:
+            df.columns = df.iloc[0]
+            df = df.iloc[1:]
+
+        if not use_header:
+            df.columns = [f"Column{i+1}" for i in range(df.shape[1])]
+
+        return df if dtype is None else df.astype(dtype)
 
 def clear_excel_table_contents(workbook_name, sheet_name, table_name):
     """
@@ -507,7 +608,37 @@ def call_vba_dropdown_macro(workbook_name: str, sheet_name: str, dropdown_name: 
     wb = xw.Book(workbook_name)  # Adjust path or use xw.Book.caller()
     wb.macro('set_dropdown_value')(sheet_name, dropdown_name, new_value)
 
-def insert_plot(fig, workbook_name, sheet_name, named_range):
+# def insert_plot(fig, workbook_name, sheet_name, named_range):
+#     """
+#     Insert a Matplotlib Figure into an already open Excel workbook at the named range.
+#
+#     Parameters:
+#     - fig: matplotlib.figure.Figure object
+#     - workbook_name: str, name of the open Excel workbook (e.g., 'file.xlsx')
+#     - sheet_name: str, name of the sheet in the workbook
+#     - named_range: str, named range in the sheet to place the image at
+#     """
+#
+#     app = xw.apps.active
+#     wb = app.books[workbook_name]
+#     sheet = wb.sheets[sheet_name]
+#     rng = sheet.range(named_range)
+#
+#     with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmpfile:
+#         fig.savefig(tmpfile.name, bbox_inches='tight')
+#         tmpfile.flush()
+#
+#         sheet.pictures.add(tmpfile.name,
+#                            name=f"Fig_{named_range}",
+#                            update=True,
+#                            top=rng.top,
+#                            left=rng.left)
+#     os.remove(tmpfile.name)
+#
+
+
+
+def insert_plot(fig, workbook_name, sheet_name, named_range, retries=5, delay=0.5):
     """
     Insert a Matplotlib Figure into an already open Excel workbook at the named range.
 
@@ -516,6 +647,8 @@ def insert_plot(fig, workbook_name, sheet_name, named_range):
     - workbook_name: str, name of the open Excel workbook (e.g., 'file.xlsx')
     - sheet_name: str, name of the sheet in the workbook
     - named_range: str, named range in the sheet to place the image at
+    - retries: int, number of retries if Excel is busy
+    - delay: float, seconds to wait between retries
     """
 
     app = xw.apps.active
@@ -524,14 +657,34 @@ def insert_plot(fig, workbook_name, sheet_name, named_range):
     rng = sheet.range(named_range)
 
     with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmpfile:
-        fig.savefig(tmpfile.name, bbox_inches='tight')
+        fig.savefig(tmpfile.name, bbox_inches='tight', dpi=300)
         tmpfile.flush()
 
-        sheet.pictures.add(tmpfile.name,
-                           name=f"Fig_{named_range}",
-                           update=True,
-                           top=rng.top,
-                           left=rng.left)
+        for attempt in range(retries):
+            try:
+                # remove old picture with same name if it exists
+                pic_name = f"Fig_{named_range}"
+                try:
+                    sheet.pictures[pic_name].delete()
+                except Exception:
+                    pass
+
+                # insert picture
+                pic = sheet.pictures.add(
+                    tmpfile.name,
+                    name=pic_name,
+                    update=True,
+                    top=rng.top,
+                    left=rng.left
+                )
+                return pic  # success
+            except Exception as e:
+                if isinstance(e, pywintypes.com_error) and e.hresult == -2146777998:
+                    time.sleep(delay)  # Excel is busy → wait and retry
+                else:
+                    raise
+        raise RuntimeError(
+            f"Failed to insert plot at named range '{named_range}' "
+            f"in sheet '{sheet_name}' after {retries} retries."
+        )
     os.remove(tmpfile.name)
-
-

@@ -84,6 +84,7 @@ Sub load_RNA_DB()
     db_path = ws.Range("TextBox_RNA_db_path").Value
 
     ClearTableContents "BuildYourStructure", "RNA_DATA_TRUE"
+    ClearTableContents "BuildYourStructure", "RNA_DATA"
     ClearFormDropDown "BuildYourStructure", "Dropdown_RNA_Structures"
     
     If Not CheckPath(db_path, "db") Then
@@ -254,7 +255,6 @@ Sub save_RNA_Data()
     args.Add selected_structure
     RunPythonWrapper "db_handling", "save_RNA_data", args
     
-    load_RNA_DATA
 End Sub
 
 
@@ -507,3 +507,93 @@ Sub plot_Assambly()
     RunPythonWrapper "plot", "plot_Assambly_Build"
 End Sub
 
+
+
+Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceUpdate As Boolean = False)
+
+    On Error GoTo CleanExit
+    Application.EnableEvents = False
+    Application.ScreenUpdating = False
+
+    Dim section As Variant
+    Dim tblName As String
+    Dim watchRng As Range
+    Dim idCol As Range
+    Dim sections As Variant
+    Dim ws As Worksheet
+    
+    Set ws = ThisWorkbook.Sheets("BuildYourStructure")
+    
+    ' --- Special case for RNA ---
+    Set watchRng = RangeFromNameOrTable(ws, "RNA_DATA")
+    If Not watchRng Is Nothing Then
+        If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+            CompareTablesAndHighlightDifferences "BuildYourStructure", "RNA_DATA_TRUE", "BuildYourStructure", "RNA_DATA", , RGB(255, 199, 206)
+        End If
+    End If
+    
+    sections = Array("MP", "TP", "TOWER")
+    
+    ' Loop through all sections
+    For Each section In sections
+        
+        ' --- Path ---
+        Set watchRng = RangeFromNameOrTable(ws, "TextBox_" & section & "_db_path")
+        If Not watchRng Is Nothing Then
+            If Not Intersect(Target, watchRng) Is Nothing Then
+                CallByName ws, "load_" & section & "_DB", VbMethod
+            End If
+        End If
+
+        ' --- Data ---
+        tblName = section & "_DATA"
+        Set watchRng = RangeFromNameOrTable(ws, tblName)
+        If Not watchRng Is Nothing Then
+            If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+                CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
+                ResizeTableToData tblName
+            End If
+        End If
+
+        ' --- Masses ---
+        tblName = section & "_MASSES"
+        Set watchRng = RangeFromNameOrTable(ws, tblName)
+        If Not watchRng Is Nothing Then
+            If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+                CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
+                ResizeTableToData tblName
+            End If
+        End If
+
+        ' --- Meta ---
+        tblName = section & "_META"
+        Set watchRng = RangeFromNameOrTable(ws, tblName)
+        If Not watchRng Is Nothing Then
+            If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+                Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
+                If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
+                    UpdateIdentifierColumn "BuildYourStructure", tblName
+                End If
+                CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
+            End If
+        End If
+
+        ' --- Meta new ---
+        tblName = section & "_META_NEW"
+        Set watchRng = RangeFromNameOrTable(ws, tblName)
+        If Not watchRng Is Nothing Then
+            If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+                Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
+                If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
+                    UpdateIdentifierColumn "BuildYourStructure", tblName
+                End If
+            End If
+        End If
+
+    Next section
+
+CleanExit:
+    Application.EnableEvents = True
+    Application.ScreenUpdating = True
+
+End Sub
