@@ -524,7 +524,16 @@ Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceU
     
     Set ws = ThisWorkbook.Sheets("BuildYourStructure")
     
-    ' --- Special case for RNA ---
+    ' --- Special case for RNA path ---
+    Set watchRng = RangeFromNameOrTable(ws, "TextBox_RNA_db_path")
+    If Not watchRng Is Nothing Then
+        If Not Intersect(Target, watchRng) Is Nothing Then
+            ' Add code to handle RNA path changes (similar to MP/TP/TOWER)
+            load_RNA_DB
+        End If
+    End If
+    
+    ' --- Special case for RNA data ---
     Set watchRng = RangeFromNameOrTable(ws, "RNA_DATA")
     If Not watchRng Is Nothing Then
         If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
@@ -541,7 +550,11 @@ Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceU
         Set watchRng = RangeFromNameOrTable(ws, "TextBox_" & section & "_db_path")
         If Not watchRng Is Nothing Then
             If Not Intersect(Target, watchRng) Is Nothing Then
-                CallByName ws, "load_" & section & "_DB", VbMethod
+                 Select Case section
+                    Case "MP": load_MP_DB
+                    Case "TP": load_TP_DB
+                    Case "TOWER": load_TOWER_DB
+                 End Select
             End If
         End If
 
