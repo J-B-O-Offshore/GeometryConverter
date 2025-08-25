@@ -15,7 +15,7 @@ Sub load_TP_dialog()
 End Sub
 
 Sub load_TOWER_dialog()
-    OpenFileDialog "TextBox_TOWER_db_path2", "Select a TOWER database file", "sql lite database", "*.db"
+    OpenFileDialog "TextBox_TOWER_db_path", "Select a TOWER database file", "sql lite database", "*.db"
     load_TOWER_DB
 End Sub
 
@@ -37,6 +37,7 @@ Sub load_MP_DB()
     ClearTableContents "BuildYourStructure", "MP_DATA"
     ClearTableContents "BuildYourStructure", "MP_META_TRUE"
     ClearTableContents "BuildYourStructure", "MP_META"
+    ClearTableContents "BuildYourStructure", "MP_META_FULL"
     ClearTableContents "BuildYourStructure", "MP_META_NEW", 1, 6
     ClearTableContents "BuildYourStructure", "MP_MASSES_TRUE"
     ClearTableContents "BuildYourStructure", "MP_MASSES"
@@ -63,6 +64,7 @@ Sub load_TP_DB()
     ClearTableContents "BuildYourStructure", "TP_DATA"
     ClearTableContents "BuildYourStructure", "TP_META_TRUE"
     ClearTableContents "BuildYourStructure", "TP_META"
+    ClearTableContents "BuildYourStructure", "TP_META_FULL"
     ClearTableContents "BuildYourStructure", "TP_META_NEW", 1, 6
     ClearTableContents "BuildYourStructure", "TP_MASSES_TRUE"
     ClearTableContents "BuildYourStructure", "TP_MASSES"
@@ -101,13 +103,14 @@ Sub load_TOWER_DB()
     Dim db_path As String
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("BuildYourStructure")
-    db_path = ws.Range("TextBox_TOWER_db_path2").Value
+    db_path = ws.Range("TextBox_TOWER_db_path").Value
 
         
     ClearTableContents "BuildYourStructure", "TOWER_DATA_TRUE"
     ClearTableContents "BuildYourStructure", "TOWER_DATA"
     ClearTableContents "BuildYourStructure", "TOWER_META_TRUE"
     ClearTableContents "BuildYourStructure", "TOWER_META"
+    ClearTableContents "BuildYourStructure", "TOWER_META_FULL"
     ClearTableContents "BuildYourStructure", "TOWER_META_NEW", 1, 6
     ClearTableContents "BuildYourStructure", "TOWER_MASSES_TRUE"
     ClearTableContents "BuildYourStructure", "TOWER_MASSES"
@@ -145,7 +148,7 @@ End Sub
 
 Sub load_TOWER_META()
     Dim db_path As Variant
-    db_path = Range("TextBox_TOWER_db_path2").Value
+    db_path = Range("TextBox_TOWER_db_path").Value
     RunPythonWrapper "db_handling", "load_TOWER_META", db_path
 End Sub
 
@@ -186,7 +189,7 @@ Sub load_TOWER_Data()
     Dim Structure_names As String, db_path As String
     Dim args As New Collection
     
-    db_path = Range("TextBox_TOWER_db_path2").Value
+    db_path = Range("TextBox_TOWER_db_path").Value
     Structure_names = get_dropdown_value("BuildYourStructure", "Dropdown_TOWER_Structures2")
     
     args.Add Structure_names
