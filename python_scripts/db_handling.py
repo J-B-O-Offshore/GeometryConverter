@@ -701,7 +701,7 @@ def load_MP_from_MPTool(excel_caller, MP_path):
         Section_col = Section_col.iloc[:, 0].dropna()
         row_MP = Section_col[Section_col == "Section"].index.values[1]
 
-        Data = ex.read_static_excel_range(MP_path, "Geometry", f"C{row_MP + 3}:H1000", dtype=float)
+        Data = ex.read_excel_range(MP_path, "Geometry", f"C{row_MP + 3}:H1000", dtype=float)
         Data = Data.dropna(how="all")
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "MP_DATA", Data)
     except Exception as e:
@@ -710,14 +710,14 @@ def load_MP_from_MPTool(excel_caller, MP_path):
         return
 
     try:
-        Parameter_col = ex.read_static_excel_range(MP_path, "Control", "E1:E1000", dtype=str, use_header=False)
+        Parameter_col = ex.read_excel_range(MP_path, "Control", "E1:E1000", dtype=str, use_header=False)
         Parameter_col = Parameter_col.iloc[:, 0].dropna()
 
         row_RL = Parameter_col[Parameter_col.str.strip() == "Reference level"].index[0]
         row_ML = Parameter_col[Parameter_col.str.strip() == "Mudline"].index.values[0]
 
-        Refercene_Level = ex.read_static_excel_range(MP_path, "Control", f"F{row_RL + 1}", dtype=str, use_header=False)
-        Mudline = ex.read_static_excel_range(MP_path, "Control", f"F{row_ML + 1}", dtype=float, use_header=False)
+        Refercene_Level = ex.read_excel_range(MP_path, "Control", f"F{row_RL + 1}", dtype=str, use_header=False)
+        Mudline = ex.read_excel_range(MP_path, "Control", f"F{row_ML + 1}", dtype=float, use_header=False)
 
         META_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META_NEW", dtype=str)
 
