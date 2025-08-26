@@ -8,6 +8,7 @@ import os
 import time
 import tempfile
 import pywintypes
+import xlwings as xw
 
 def setup_logger():
     logger = logging.getLogger()
@@ -52,7 +53,6 @@ def set_dropdown_values(workbook_name, sheet_name, dropdown_name, items):
         True if successful, False otherwise.
     """
 
-
     try:
         for app in xw.apps:
             for wb in app.books:
@@ -72,9 +72,6 @@ def set_dropdown_values(workbook_name, sheet_name, dropdown_name, items):
 
     print(f"Workbook '{workbook_name}' or dropdown '{dropdown_name}' not found.")
     return False
-
-
-import xlwings as xw
 
 
 def resolve_path_relative_to_script(path):
@@ -157,13 +154,12 @@ def write_value(workbook_name, sheet_name, cell_or_named_range, value):
     except Exception as e:
         print(f"Error writing value to Excel: {e}.")
 
-import xlwings as xw
 
 def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     """
     Replace the contents of an existing Excel table with a pandas DataFrame using xlwings.
 
-    If the DataFrame is empty, the table is resized to only contain the header row.
+    If the DataFrame is empty, the table is cleared but not resized or filled with rows.
 
     Parameters:
     - workbook_name: str, name of the open Excel workbook (no path needed if open).
@@ -181,12 +177,19 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     except Exception as e:
         raise ValueError(f"Table '{table_name}' not found in sheet '{sheet_name}'.") from e
 
-    # Get the header range
+    # Get the header range and data body range
     header_range = table.HeaderRowRange
 
-    # If the DataFrame is empty -> shrink table to only headers and exit
+    try:
+        data_body_range = table.DataBodyRange
+        if data_body_range:
+            data_body_range.ClearContents()
+    except Exception as e:
+        print("No DataBodyRange to clear:", e)
+
+
+    # If the DataFrame is empty, return early after clearing
     if dataframe.empty:
-        table.Resize(header_range)
         return
 
     # Clean DataFrame to avoid writing the index
@@ -204,58 +207,6 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
         (last_row, last_col)
     )
     table.Resize(new_range.api)
-
-# def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
-#     """
-#     Replace the contents of an existing Excel table with a pandas DataFrame using xlwings.
-#
-#     If the DataFrame is empty, the table is cleared but not resized or filled with rows.
-#
-#     Parameters:
-#     - workbook_name: str, name of the open Excel workbook (no path needed if open).
-#     - sheet_name: str, name of the sheet containing the table.
-#     - table_name: str, name of the Excel table (ListObject) to manipulate.
-#     - dataframe: pandas DataFrame to replace the table's data (same number of columns).
-#     """
-#     # Connect to the open workbook
-#     wb = xw.books[workbook_name]
-#     ws = wb.sheets[sheet_name]
-#
-#     # Find the table (ListObject)
-#     try:
-#         table = ws.api.ListObjects(table_name)
-#     except Exception as e:
-#         raise ValueError(f"Table '{table_name}' not found in sheet '{sheet_name}'.") from e
-#
-#     # Get the header range and data body range
-#     header_range = table.HeaderRowRange
-#     data_body_range = table.DataBodyRange
-#
-#     # Clear existing table data (keep headers)
-#     if data_body_range is not None:
-#         if data_body_range.Rows.Count > 0:
-#             data_body_range.ClearContents()
-#
-#     # If the DataFrame is empty, return early after clearing
-#     if dataframe.empty:
-#         return
-#
-#     # Clean DataFrame to avoid writing the index
-#     df_clean = dataframe.reset_index(drop=True)
-#
-#     # Write the new DataFrame below the headers
-#     start_cell = ws.range((header_range.Row + 1, header_range.Column))
-#     start_cell.options(index=False, header=False).value = df_clean
-#
-#     # Resize the table to match the new data
-#     last_row = header_range.Row + df_clean.shape[0]
-#     last_col = header_range.Column + df_clean.shape[1] - 1
-#     new_range = ws.range(
-#         (header_range.Row, header_range.Column),
-#         (last_row, last_col)
-#     )
-#     table.Resize(new_range.api)
-
 
 
 def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation",
@@ -318,9 +269,9 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
 
     # --- Prepare message for VBA ---
     message_escaped = (
-        message.replace('"', '""')      # Escape quotes
-               .replace('\t', '" & vbTab & "')  # Replace tabs
-               .replace('\n', '" & vbNewLine & "')  # Replace newlines
+        message.replace('"', '""')  # Escape quotes
+        .replace('\t', '" & vbTab & "')  # Replace tabs
+        .replace('\n', '" & vbNewLine & "')  # Replace newlines
     )
 
     # Split into safe chunks to avoid line overflow in VBA
@@ -408,6 +359,7 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=
     else:
         return df
 
+
 from pathlib import Path
 
 
@@ -451,7 +403,7 @@ def read_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
                 data = pd.DataFrame()
             else:
                 data = pd.DataFrame(values)
-                data.columns = [f"Column{i+1}" for i in range(data.shape[1])]
+                data.columns = [f"Column{i + 1}" for i in range(data.shape[1])]
 
         if dtype is not None and not data.empty:
             data = data.astype(dtype)
@@ -459,6 +411,7 @@ def read_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
         wb.close()
         app.quit()
     return data
+
 
 def read_static_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
     """
@@ -480,7 +433,7 @@ def read_static_excel_range(path, sheet_name, cell_range, dtype=None, use_header
     if re.fullmatch(r"[A-Z]+[0-9]+", cell_range, re.IGNORECASE):
         row, col = coordinate_to_tuple(cell_range)  # (row, col)
         df = pd.read_excel(path, sheet_name=sheet_name, header=None, engine="openpyxl")
-        return df.iat[row-1, col-1]
+        return df.iat[row - 1, col - 1]
 
     # Case 2: Single column like "F"
     elif re.fullmatch(r"[A-Z]+", cell_range, re.IGNORECASE):
@@ -504,16 +457,17 @@ def read_static_excel_range(path, sheet_name, cell_range, dtype=None, use_header
 
         # Slice rows (Excel is 1-based, pandas is 0-based, and header may shift things)
         start_row, end_row = int(start_row), int(end_row)
-        df = df.iloc[start_row-1:end_row]
+        df = df.iloc[start_row - 1:end_row]
 
         if use_header:
             df.columns = df.iloc[0]
             df = df.iloc[1:]
 
         if not use_header:
-            df.columns = [f"Column{i+1}" for i in range(df.shape[1])]
+            df.columns = [f"Column{i + 1}" for i in range(df.shape[1])]
 
         return df if dtype is None else df.astype(dtype)
+
 
 def clear_excel_table_contents(workbook_name, sheet_name, table_name):
     """
@@ -594,7 +548,6 @@ def add_unique_row(df1, df2, exclude_columns=None):
     # Check for rows in df2 that match the row in df1
     matching_rows = df2_comp[df2_comp.eq(df1_comp.values[0]).all(axis=1)]
 
-
     if not matching_rows.empty:
         matching_indices = matching_rows.index.tolist()
     else:
@@ -607,6 +560,7 @@ def add_unique_row(df1, df2, exclude_columns=None):
 def call_vba_dropdown_macro(workbook_name: str, sheet_name: str, dropdown_name: str, new_value: str):
     wb = xw.Book(workbook_name)  # Adjust path or use xw.Book.caller()
     wb.macro('set_dropdown_value')(sheet_name, dropdown_name, new_value)
+
 
 # def insert_plot(fig, workbook_name, sheet_name, named_range):
 #     """
@@ -635,7 +589,6 @@ def call_vba_dropdown_macro(workbook_name: str, sheet_name: str, dropdown_name: 
 #                            left=rng.left)
 #     os.remove(tmpfile.name)
 #
-
 
 
 def insert_plot(fig, workbook_name, sheet_name, named_range, retries=5, delay=0.5):

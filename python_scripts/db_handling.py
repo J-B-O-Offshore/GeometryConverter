@@ -721,8 +721,8 @@ def load_MP_from_MPTool(excel_caller, MP_path):
 
         META_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META_NEW", dtype=str)
 
-        if len(META_NEW) == 0:
-            META_NEW.iloc[0, :] = ""
+        if META_NEW.empty:
+            META_NEW.loc[0] = [""] * len(META_NEW.columns)
 
         META_NEW.loc[0, "Height Reference"] = Refercene_Level
         META_NEW.loc[0, "Water Depth [m]"] = -Mudline
@@ -732,6 +732,7 @@ def load_MP_from_MPTool(excel_caller, MP_path):
 
         # update porject name geneatation
         wb = xw.Book(excel_filename)
+
         wb.macro('UpdateIdentifierColumn')("BuildYourStructure", "MP_META")
 
     except Exception as e:
@@ -975,8 +976,8 @@ def load_TP_from_MPTool(excel_caller, MP_path):
 
         META_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_META_NEW", dtype=str)
 
-        if len(META_NEW) == 0:
-            META_NEW.iloc[0, :] = ""
+        if META_NEW.empty:
+            META_NEW.loc[0] = [""] * len(META_NEW.columns)
 
         META_NEW.loc[0, "Height Reference"] = Refercene_Level
         META_NEW.loc[0, "Water Depth [m]"] = -Mudline
@@ -1078,3 +1079,4 @@ def save_RNA_data(excel_caller, db_path, selected_structure):
     return
 
 
+#load_TP_from_MPTool("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/MPTP_DP-B2_L0_G3_S2.xlsm")

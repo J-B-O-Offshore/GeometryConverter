@@ -361,22 +361,26 @@ Sub import_MP_from_MPTool()
     End If
     
     If Range("USE_MP").Value Then
+        
         ClearTableContents "BuildYourStructure", "MP_DATA_TRUE"
-        ClearTableContents "BuildYourStructure", "MP_DATA"
+        'ClearTableContents "BuildYourStructure", "MP_DATA"
         ClearTableContents "BuildYourStructure", "MP_META_TRUE"
         ClearTableContents "BuildYourStructure", "MP_META"
         ClearTableContents "BuildYourStructure", "MP_META_NEW", 1, 6
         ClearTableContents "BuildYourStructure", "MP_MASSES_TRUE"
-     '  ClearTableContents "BuildYourStructure", "MP_MASSES"
+        'ClearTableContents "BuildYourStructure", "MP_MASSES"
         set_dropdown_value "BuildYourStructure", "Dropdown_MP_Structures2", ""
         
+        'show_MP_section
+        Application.Wait (Now + TimeValue("0:00:01"))
         RunPythonWrapper "db_handling", "load_MP_from_MPTool", path
         
     End If
     
-    If Range("USE_MP").Value Then
+    If Range("USE_TP").Value Then
+        
         ClearTableContents "BuildYourStructure", "TP_DATA_TRUE"
-        ClearTableContents "BuildYourStructure", "TP_DATA"
+        'ClearTableContents "BuildYourStructure", "TP_DATA"
         ClearTableContents "BuildYourStructure", "TP_META_TRUE"
         ClearTableContents "BuildYourStructure", "TP_META"
         ClearTableContents "BuildYourStructure", "TP_META_NEW", 1, 6
@@ -384,12 +388,14 @@ Sub import_MP_from_MPTool()
       '  ClearTableContents "BuildYourStructure", "TP_MASSES"
         set_dropdown_value "BuildYourStructure", "Dropdown_TP_Structures2", ""
         
+        'show_TP_section
+        Application.Wait (Now + TimeValue("0:00:01"))
         RunPythonWrapper "db_handling", "load_TP_from_MPTool", path
         
     End If
     
 
-    If Not Range("USE_TP").Value And Range("USE_TP") Then
+    If Not Range("USE_MP").Value And Not Range("USE_TP") Then
 
         MsgBox "Please check Use MP or Use TP to load data from path", vbInformation, "Response"
         
@@ -408,13 +414,13 @@ Sub import_Masses_from_GConverter()
     End If
     
     If Range("UseMPGeomConv").Value Then
-
+        show_MP_section
         RunPythonWrapper "db_handling", "load_MPMasses_from_GeomConv", path
         
     End If
     
     If Range("UseTPGeomConv").Value Then
-
+        show_TP_section
         RunPythonWrapper "db_handling", "load_TPMasses_from_GeomConv", path
         
     End If
@@ -515,8 +521,8 @@ End Sub
 Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceUpdate As Boolean = False)
 
     On Error GoTo CleanExit
-    Application.EnableEvents = False
-    Application.ScreenUpdating = False
+    'Application.EnableEvents = False
+    'Application.ScreenUpdating = False
 
     Dim section As Variant
     Dim tblName As String
@@ -566,6 +572,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceU
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
             If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+                
                 CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
                 ResizeTableToData tblName
             End If
@@ -576,6 +583,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceU
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
             If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+                
                 CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
                 ResizeTableToData tblName
             End If
@@ -609,7 +617,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceU
     Next section
 
 CleanExit:
-    Application.EnableEvents = True
-    Application.ScreenUpdating = True
+    'Application.EnableEvents = True
+    'Application.ScreenUpdating = True
 
 End Sub
