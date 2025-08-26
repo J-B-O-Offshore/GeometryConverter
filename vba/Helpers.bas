@@ -113,9 +113,9 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     Dim retCode As Long
     
     ' Turn off Excel updates for speed & stability
-    Application.ScreenUpdating = False
-    Application.EnableEvents = False
-    Application.Calculation = xlCalculationManual
+     Application.ScreenUpdating = False
+  '  Application.EnableEvents = False
+     Application.Calculation = xlCalculationManual
     
     On Error GoTo CleanFail
 
@@ -170,16 +170,15 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
         ' Run hidden and wait until finished
         retCode = wsh.Run("cmd /c " & cmd, 0, True)
     End If
-    
-    If ThisWorkbook.ActiveSheet.name = "BuildYourStructure" Then
-        BuildYourStructureChange ThisWorkbook.Sheets("BuildYourStructure").Range("A1"), True
-    End If
-    
-CleanExit:
-    ' Re-enable Excel updates
     Application.Calculation = xlCalculationAutomatic
     Application.EnableEvents = True
     Application.ScreenUpdating = True
+        
+   ' If ThisWorkbook.ActiveSheet.name = "BuildYourStructure" Then
+   '     BuildYourStructureChange ThisWorkbook.Sheets("BuildYourStructure").Range("A1"), True
+   ' End If
+    
+CleanExit:
     Exit Sub
 
 PythonPathError:
@@ -539,7 +538,7 @@ Sub ToggleComparisonGeneric()
     key = table1Name & "|" & table2Name & "|" & sheetName
 
     ' Toggle state
-    If Not comparisonEnabledDict.exists(key) Then
+    If Not comparisonEnabledDict.Exists(key) Then
         comparisonEnabledDict.Add key, False
     End If
     comparisonEnabledDict(key) = Not comparisonEnabledDict(key)
@@ -619,7 +618,7 @@ Sub ShowOnlySelectedColumns(rngAllCols As String, rngVisibleCols As String)
     ' Hide/show columns
     For Each col In ws.Range(rngAllCols).Columns
         colNum = col.Column
-        col.EntireColumn.Hidden = Not visibleDict.exists(colNum)
+        col.EntireColumn.Hidden = Not visibleDict.Exists(colNum)
     Next col
 
     ' Hide dropdowns in hidden columns

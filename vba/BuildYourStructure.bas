@@ -363,15 +363,15 @@ Sub import_MP_from_MPTool()
     If Range("USE_MP").Value Then
         
         ClearTableContents "BuildYourStructure", "MP_DATA_TRUE"
-        'ClearTableContents "BuildYourStructure", "MP_DATA"
+        ClearTableContents "BuildYourStructure", "MP_DATA"
         ClearTableContents "BuildYourStructure", "MP_META_TRUE"
         ClearTableContents "BuildYourStructure", "MP_META"
         ClearTableContents "BuildYourStructure", "MP_META_NEW", 1, 6
         ClearTableContents "BuildYourStructure", "MP_MASSES_TRUE"
-        'ClearTableContents "BuildYourStructure", "MP_MASSES"
+        ClearTableContents "BuildYourStructure", "MP_MASSES"
         set_dropdown_value "BuildYourStructure", "Dropdown_MP_Structures2", ""
         
-        'show_MP_section
+        show_MP_section
         Application.Wait (Now + TimeValue("0:00:01"))
         RunPythonWrapper "db_handling", "load_MP_from_MPTool", path
         
@@ -380,15 +380,15 @@ Sub import_MP_from_MPTool()
     If Range("USE_TP").Value Then
         
         ClearTableContents "BuildYourStructure", "TP_DATA_TRUE"
-        'ClearTableContents "BuildYourStructure", "TP_DATA"
+        ClearTableContents "BuildYourStructure", "TP_DATA"
         ClearTableContents "BuildYourStructure", "TP_META_TRUE"
         ClearTableContents "BuildYourStructure", "TP_META"
         ClearTableContents "BuildYourStructure", "TP_META_NEW", 1, 6
         ClearTableContents "BuildYourStructure", "TP_MASSES_TRUE"
-      '  ClearTableContents "BuildYourStructure", "TP_MASSES"
+        ClearTableContents "BuildYourStructure", "TP_MASSES"
         set_dropdown_value "BuildYourStructure", "Dropdown_TP_Structures2", ""
         
-        'show_TP_section
+        show_TP_section
         Application.Wait (Now + TimeValue("0:00:01"))
         RunPythonWrapper "db_handling", "load_TP_from_MPTool", path
         
@@ -414,20 +414,28 @@ Sub import_Masses_from_GConverter()
     End If
     
     If Range("UseMPGeomConv").Value Then
+        ClearTableContents "BuildYourStructure", "MP_MASSES_TRUE"
+        ClearTableContents "BuildYourStructure", "MP_MASSES"
         show_MP_section
+        Application.Wait (Now + TimeValue("0:00:01"))
         RunPythonWrapper "db_handling", "load_MPMasses_from_GeomConv", path
         
     End If
     
     If Range("UseTPGeomConv").Value Then
+        ClearTableContents "BuildYourStructure", "TP_MASSES_TRUE"
+        ClearTableContents "BuildYourStructure", "TP_MASSES"
         show_TP_section
+        Application.Wait (Now + TimeValue("0:00:01"))
         RunPythonWrapper "db_handling", "load_TPMasses_from_GeomConv", path
         
     End If
     
     If Range("UseTOWERGeomConv").Value Then
-
-
+        ClearTableContents "BuildYourStructure", "TOWER_MASSES_TRUE"
+        ClearTableContents "BuildYourStructure", "TOWER_MASSES"
+        show_TOWER_section
+        Application.Wait (Now + TimeValue("0:00:01"))
         RunPythonWrapper "db_handling", "load_TOWERMasses_from_GeomConv", path
         
     End If
@@ -459,6 +467,9 @@ Sub move_structure_TP()
     
     RunPythonWrapper "misc", "move_structure_TP", args
     ActiveSheet.Range("DISPL_TP").Value = ""
+    
+    
+    
 End Sub
 
 
@@ -518,7 +529,7 @@ End Sub
 
 
 
-Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceUpdate As Boolean = False)
+Public Sub BuildYourStructureChange(ByVal Target As Range)
 
     On Error GoTo CleanExit
     'Application.EnableEvents = False
@@ -545,7 +556,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceU
     ' --- Special case for RNA data ---
     Set watchRng = RangeFromNameOrTable(ws, "RNA_DATA")
     If Not watchRng Is Nothing Then
-        If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+        If Not Intersect(Target, watchRng) Is Nothing Then
             CompareTablesAndHighlightDifferences "BuildYourStructure", "RNA_DATA_TRUE", "BuildYourStructure", "RNA_DATA", , RGB(255, 199, 206)
         End If
     End If
@@ -571,7 +582,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceU
         tblName = section & "_DATA"
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
-            If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+            If Not Intersect(Target, watchRng) Is Nothing Then
                 
                 CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
                 ResizeTableToData tblName
@@ -582,7 +593,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceU
         tblName = section & "_MASSES"
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
-            If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+            If Not Intersect(Target, watchRng) Is Nothing Then
                 
                 CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
                 ResizeTableToData tblName
@@ -593,7 +604,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceU
         tblName = section & "_META"
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
-            If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
+            If Not Intersect(Target, watchRng) Is Nothing Then
                 Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
                 If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
                     UpdateIdentifierColumn "BuildYourStructure", tblName
@@ -603,16 +614,16 @@ Public Sub BuildYourStructureChange(ByVal Target As Range, Optional ByVal ForceU
         End If
 
         ' --- Meta new ---
-        tblName = section & "_META_NEW"
-        Set watchRng = RangeFromNameOrTable(ws, tblName)
-        If Not watchRng Is Nothing Then
-            If ForceUpdate Or Not Intersect(Target, watchRng) Is Nothing Then
-                Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
-                If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
-                    UpdateIdentifierColumn "BuildYourStructure", tblName
-                End If
-            End If
-        End If
+        'tblName = section & "_META_NEW"
+        'Set watchRng = RangeFromNameOrTable(ws, tblName)
+        'If Not watchRng Is Nothing Then
+        '    If Not Intersect(Target, watchRng) Is Nothing Then
+        '        Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
+        '        If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
+        '            UpdateIdentifierColumn "BuildYourStructure", tblName
+        '        End If
+        '    End If
+        'End If
 
     Next section
 

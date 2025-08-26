@@ -677,6 +677,7 @@ def load_MP_DATA(excel_caller, Structure_name, db_path):
     load_DATA(excel_filename, "MP", Structure_name, db_path)
     ex_plt.plot_MP(excel_caller)
 
+
 def save_MP_data(excel_caller, db_path, selected_structure):
     excel_filename = os.path.basename(excel_caller)
 
@@ -747,7 +748,7 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data_temp = ex.read_excel_range(GeomConv_path, "Additional entries", "K11:M1000", use_header=False)
+        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
         Data_temp = Data_temp.dropna(how="all")
         Data = pd.DataFrame({
             "Name": Data_temp.iloc[:, 2],
@@ -776,15 +777,7 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         Data = Data.loc[(Data["Top [m]"] <= heigt_range[0]) & (Data["Top [m]"] >= heigt_range[1]), :]
 
-        EXCEL_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_MASSES", dtype=str)
-        EXCEL_MASSES = EXCEL_MASSES[~(EXCEL_MASSES == "").all(axis=1)]
-
-        if EXCEL_MASSES.shape[0] != 0:
-            ALL_MASSES = pd.concat([EXCEL_MASSES, Data], axis=0)
-        else:
-            ALL_MASSES = Data
-
-        ex.write_df_to_table(excel_filename, "BuildYourStructure", "MP_MASSES", ALL_MASSES)
+        ex.write_df_to_table(excel_filename, "BuildYourStructure", "MP_MASSES", Data)
 
     except Exception as e:
         ex.show_message_box(excel_filename,
@@ -850,7 +843,7 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data_temp = ex.read_excel_range(GeomConv_path, "Additional Entries", "K11:M1000", use_header=False)
+        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
         Data_temp = Data_temp.dropna(how="all")
         Data = pd.DataFrame({
             "Name": Data_temp.iloc[:, 2],
@@ -879,15 +872,7 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         Data = Data.loc[(Data["Top [m]"] <= heigt_range[0]) & (Data["Top [m]"] >= heigt_range[1]), :]
 
-        EXCEL_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_MASSES", dtype=str)
-        EXCEL_MASSES = EXCEL_MASSES[~(EXCEL_MASSES == "").all(axis=1)]
-
-        if EXCEL_MASSES.shape[0] != 0:
-            ALL_MASSES = pd.concat([EXCEL_MASSES, Data], axis=0)
-        else:
-            ALL_MASSES = Data
-
-        ex.write_df_to_table(excel_filename, "BuildYourStructure", "TP_MASSES", ALL_MASSES)
+        ex.write_df_to_table(excel_filename, "BuildYourStructure", "TP_MASSES", Data)
 
     except Exception as e:
         ex.show_message_box(excel_filename,
@@ -1000,7 +985,7 @@ def load_TOWERMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data_temp = ex.read_excel_range(GeomConv_path, "Additional Entries", "K11:M1000", use_header=False)
+        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
         Data_temp = Data_temp.dropna(how="all")
         Data = pd.DataFrame({
             "Name": Data_temp.iloc[:, 2],
@@ -1029,15 +1014,7 @@ def load_TOWERMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         Data = Data.loc[Data["Top [m]"] >= heigt_range[0], :]
 
-        EXCEL_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TOWER_MASSES", dtype=str)
-        EXCEL_MASSES = EXCEL_MASSES[~(EXCEL_MASSES == "").all(axis=1)]
-
-        if EXCEL_MASSES.shape[0] != 0:
-            ALL_MASSES = pd.concat([EXCEL_MASSES, Data], axis=0)
-        else:
-            ALL_MASSES = Data
-
-        ex.write_df_to_table(excel_filename, "BuildYourStructure", "TOWER_MASSES", ALL_MASSES)
+        ex.write_df_to_table(excel_filename, "BuildYourStructure", "TOWER_MASSES", Data)
 
     except Exception as e:
         ex.show_message_box(excel_filename,
@@ -1079,4 +1056,4 @@ def save_RNA_data(excel_caller, db_path, selected_structure):
     return
 
 
-#load_TP_from_MPTool("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/MPTP_DP-B2_L0_G3_S2.xlsm")
+load_MPMasses_from_GeomConv("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeomConv_V1.18_Dreekant-15MW236-N12.1_DP-A2_L0G2S1.xlsm")
