@@ -777,7 +777,13 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         heigt_range = (Structure.loc[0, "Top [m]"], Structure.loc[len(Structure) - 1, "Bottom [m]"])
 
-        Data = Data.loc[(Data["Top [m]"] <= heigt_range[0]) & (Data["Top [m]"] >= heigt_range[1]), :]
+        tol = 0.01  # small margin
+
+        Data = Data.loc[
+               (Data["Top [m]"] <= heigt_range[0] + tol) &
+               (Data["Top [m]"] >= heigt_range[1] - tol),
+               :
+               ]
 
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "MP_MASSES", Data)
 
@@ -870,7 +876,12 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         heigt_range = (Structure.loc[0, "Top [m]"], Structure.loc[len(Structure) - 1, "Bottom [m]"])
 
-        Data = Data.loc[(Data["Top [m]"] < heigt_range[0]) & (Data["Top [m]"] >= heigt_range[1]), :]
+        tol = 0.01  # example margin
+        Data = Data.loc[
+               (Data["Top [m]"] <= heigt_range[0] + tol) &
+               (Data["Top [m]"] >= heigt_range[1] - tol),
+               :
+               ]
 
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "TP_MASSES", Data)
 
