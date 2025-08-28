@@ -1,11 +1,11 @@
 import os.path
 import xlwings as xw
-import xlwings
 import pandas as pd
 import sqlite3
 import excel as ex
-
+import numpy as np
 import plot as ex_plt
+
 
 class ConciveError(Exception):
     """
@@ -60,6 +60,7 @@ def drop_db_table(excel_filename, db_path, Identifier):
 
     return True
 
+
 def create_db_table(excel_filename, db_path, Identifier, df, if_exists='fail'):
     """
     Creates or appends to a table in an SQLite database from a pandas DataFrame.
@@ -106,6 +107,7 @@ def create_db_table(excel_filename, db_path, Identifier, df, if_exists='fail'):
         conn.close()
 
     return True
+
 
 def load_db_table(excel_filename, db_path, Identifier, dtype=None):
     """
@@ -657,7 +659,7 @@ def load_MP_META(excel_caller, db_path):
         None
     """
     excel_filename = os.path.basename(excel_caller)
-    load_META(excel_filename,"MP", db_path)
+    load_META(excel_filename, "MP", db_path)
 
 
 def load_MP_DATA(excel_caller, Structure_name, db_path):
@@ -788,7 +790,6 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
 # %% TP
 def load_TP_META(excel_caller, db_path):
-
     """
     Load the META table from the MP database and update the MP structures dropdown
     in the Excel workbook.
@@ -805,7 +806,6 @@ def load_TP_META(excel_caller, db_path):
 
 
 def load_TP_DATA(excel_caller, Structure_name, db_path):
-
     """
     Load metadata and structure-specific data from the TP database
     and write them to the Excel workbook.
@@ -834,7 +834,7 @@ def save_TP_data(excel_caller, db_path, selected_structure):
 def delete_TP_data(excel_caller, db_path, selected_structure):
     excel_filename = os.path.basename(excel_caller)
 
-    delete_data(excel_filename,"TP", db_path, selected_structure)
+    delete_data(excel_filename, "TP", db_path, selected_structure)
 
     return
 
@@ -870,7 +870,7 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
         heigt_range = (Structure.loc[0, "Top [m]"], Structure.loc[len(Structure) - 1, "Bottom [m]"])
 
-        Data = Data.loc[(Data["Top [m]"] <= heigt_range[0]) & (Data["Top [m]"] >= heigt_range[1]), :]
+        Data = Data.loc[(Data["Top [m]"] < heigt_range[0]) & (Data["Top [m]"] >= heigt_range[1]), :]
 
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "TP_MASSES", Data)
 
@@ -883,7 +883,6 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
 # %% TOWER
 def load_TOWER_META(excel_caller, db_path):
-
     """
     Load the META table from the MP database and update the MP structures dropdown
     in the Excel workbook.
@@ -1039,14 +1038,16 @@ def load_RNA_DATA(excel_caller, db_path):
         f"Dropdown_RNA_Structures",
         list(data.loc[:, "Identifier"].values)
     )
-    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"RNA_DATA", data)
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"RNA_DATA_TRUE", data)
+
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"RNA_DATA", data)
 
 
 def save_RNA_data(excel_caller, db_path, selected_structure):
     excel_filename = os.path.basename(excel_caller)
 
     DATA_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"RNA_DATA", dtype=str)
+    DATA_CURR = DATA_CURR.replace("", np.nan).dropna(how="all")
     is_unique = DATA_CURR['Identifier'].is_unique
     if is_unique:
         create_db_table(excel_filename, db_path, "data", DATA_CURR, if_exists='replace')
@@ -1056,4 +1057,19 @@ def save_RNA_data(excel_caller, db_path, selected_structure):
     return
 
 
-load_MPMasses_from_GeomConv("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeomConv_V1.18_Dreekant-15MW236-N12.1_DP-A2_L0G2S1.xlsm")
+def delete_RNA_data(excel_caller, selected_structure):
+    excel_filename = os.path.basename(excel_caller)
+
+    if len(selected_structure) == 0:
+        ex.show_message_box(excel_filename, "Please select RNA to delete.")
+        return
+
+    RNA_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", f"RNA_DATA", dtype=str)
+
+    RNA_DATA = RNA_DATA.dropna(how="all")
+    RNA_DATA.loc[RNA_DATA['Identifier'] == selected_structure, :] = float("nan")
+    ex.write_df_to_table(excel_filename, "BuildYourStructure", f"RNA_DATA", RNA_DATA)
+
+    return
+
+# load_MPMasses_from_GeomConv("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeomConv_V1.18_Dreekant-15MW236-N12.1_DP-A2_L0G2S1.xlsm")

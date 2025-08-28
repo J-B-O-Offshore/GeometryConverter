@@ -115,7 +115,7 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     ' Turn off Excel updates for speed & stability
      Application.ScreenUpdating = False
   '  Application.EnableEvents = False
-     Application.Calculation = xlCalculationManual
+  '  Application.Calculation = xlCalculationManual
     
     On Error GoTo CleanFail
 

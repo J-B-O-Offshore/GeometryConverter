@@ -23,6 +23,7 @@ End Sub
 Sub load_RNA_dialog()
     OpenFileDialog "TextBox_RNA_db_path", "Select a RNA database file", "sql lite database", "*.db"
     load_RNA_DB
+    save_RNA_Data
 End Sub
 
 Sub load_MP_DB()
@@ -257,7 +258,7 @@ Sub save_RNA_Data()
     args.Add db_path
     args.Add selected_structure
     RunPythonWrapper "db_handling", "save_RNA_data", args
-    
+
 End Sub
 
 
@@ -300,6 +301,16 @@ Sub delete_TOWER_Data()
     RunPythonWrapper "db_handling", "delete_TOWER_data", args
 End Sub
 
+
+Sub delete_RNA_Data()
+    Dim args As New Collection, db_path As String, selected_structure As String
+    
+    db_path = Range("TextBox_RNA_db_path").Value
+    selected_structure = get_dropdown_value("BuildYourStructure", "Dropdown_RNA_Structures")
+    
+    args.Add selected_structure
+    RunPythonWrapper "db_handling", "delete_RNA_data", args
+End Sub
 
 '==============================================================================
 ' Utility Subroutines
@@ -613,17 +624,17 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
             End If
         End If
 
-        ' --- Meta new ---
-        'tblName = section & "_META_NEW"
-        'Set watchRng = RangeFromNameOrTable(ws, tblName)
-        'If Not watchRng Is Nothing Then
-        '    If Not Intersect(Target, watchRng) Is Nothing Then
-        '        Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
-        '        If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
-        '            UpdateIdentifierColumn "BuildYourStructure", tblName
-        '        End If
-        '    End If
-        'End If
+        '--- Meta new ---
+        tblName = section & "_META_NEW"
+        Set watchRng = RangeFromNameOrTable(ws, tblName)
+        If Not watchRng Is Nothing Then
+            If Not Intersect(Target, watchRng) Is Nothing Then
+                Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
+                If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
+                    UpdateIdentifierColumn "BuildYourStructure", tblName
+                End If
+            End If
+        End If
 
     Next section
 
@@ -631,4 +642,39 @@ CleanExit:
     'Application.EnableEvents = True
     'Application.ScreenUpdating = True
 
+End Sub
+
+
+Sub Import_GeomConv_useMP_Klicken()
+    If Range("UseMPGeomConv").Value = True Then
+        Range("UseTPGeomConv").Value = False
+        Range("UseTOWERGeomConv").Value = False
+    End If
+End Sub
+
+Sub Import_GeomConv_useTP_Klicken()
+    If Range("UseTPGeomConv").Value = True Then
+        Range("UseMPGeomConv").Value = False
+        Range("UseTOWERGeomConv").Value = False
+    End If
+End Sub
+
+Sub Import_GeomConv_useTOWER_Klicken()
+    If Range("UseTOWERGeomConv").Value = True Then
+        Range("UseMPGeomConv").Value = False
+        Range("UseTPGeomConv").Value = False
+    End If
+End Sub
+
+
+Sub Import_MPTool_useMP_Klicken()
+    If Range("Use_MP").Value = True Then
+        Range("Use_TP").Value = False
+    End If
+End Sub
+
+Sub Import_MPTool_useTP_Klicken()
+    If Range("Use_TP").Value = True Then
+        Range("Use_MP").Value = False
+    End If
 End Sub
