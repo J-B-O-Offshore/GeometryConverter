@@ -417,30 +417,35 @@ def check_db_integrity():
     return
 
 
+import re
+
+
+def natural_sort_key(s):
+    """Generate a key for natural sorting of strings with numbers."""
+    return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
+
+
 def load_META(excel_filename, Structure, db_path):
     """
-    Load the META table from the  database and update the structures dropdown
-    in the Excel workbook.
-
-    Args:
-        Structure (str): Name of the structure to load (MP, TP,...)
-        db_path (str): Path to the MP SQLite database.
-
-    Returns:
-        None
+    Load the META table from the database and update the structures dropdown
+    in the Excel workbook, sorted naturally by Identifier.
     """
     sheet_name_structure_loading = "BuildYourStructure"
 
     META = load_db_table(excel_filename, db_path, "META")
     if META is None:
         return
+
+    # Sort by Identifier naturally
+    META_sorted = META.sort_values(by="Identifier", key=lambda col: col.map(natural_sort_key), ignore_index=True)
+
     ex.set_dropdown_values(
         excel_filename,
         sheet_name_structure_loading,
         f"Dropdown_{Structure}_Structures2",
-        list(META.loc[:, "Identifier"].values)
+        META_sorted["Identifier"].values.tolist()
     )
-    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_FULL", META)
+    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_FULL", META_sorted)
     return
 
 

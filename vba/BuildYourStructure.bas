@@ -594,9 +594,9 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
             If Not Intersect(Target, watchRng) Is Nothing Then
-                
-                CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
                 ResizeTableToData tblName
+                CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
+
             End If
         End If
 
@@ -605,9 +605,9 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
             If Not Intersect(Target, watchRng) Is Nothing Then
-                
-                CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
                 ResizeTableToData tblName
+                CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
+
             End If
         End If
 
