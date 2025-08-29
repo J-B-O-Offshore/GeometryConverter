@@ -1088,4 +1088,3 @@ def delete_RNA_data(excel_caller, selected_structure):
 
     return
 
-# load_MPMasses_from_GeomConv("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeomConv_V1.18_Dreekant-15MW236-N12.1_DP-A2_L0G2S1.xlsm")

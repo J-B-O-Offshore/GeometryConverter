@@ -10,6 +10,7 @@ import tempfile
 import pywintypes
 import xlwings as xw
 
+
 def setup_logger():
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)

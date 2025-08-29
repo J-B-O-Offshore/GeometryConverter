@@ -4,6 +4,10 @@ Attribute VB_Name = "BuildYourStructure"
 ' Database Path Selection Subroutines
 '==============================================================================
 
+' Module-level variable to track pending execution
+Public runPending As Boolean
+Public lastTarget As Range  ' Make sure it is explicitly a Range
+
 Sub load_MP_dialog()
     OpenFileDialog "TextBox_MP_db_path", "Select a MP database file", "sql lite database", "*.db"
     load_MP_DB
@@ -542,24 +546,21 @@ End Sub
 
 Public Sub BuildYourStructureChange(ByVal Target As Range)
 
-    On Error GoTo CleanExit
-    'Application.EnableEvents = False
-    'Application.ScreenUpdating = False
-
+    Dim ws As Worksheet
     Dim section As Variant
     Dim tblName As String
     Dim watchRng As Range
     Dim idCol As Range
     Dim sections As Variant
-    Dim ws As Worksheet
     
+
     Set ws = ThisWorkbook.Sheets("BuildYourStructure")
+
     
     ' --- Special case for RNA path ---
     Set watchRng = RangeFromNameOrTable(ws, "TextBox_RNA_db_path")
     If Not watchRng Is Nothing Then
         If Not Intersect(Target, watchRng) Is Nothing Then
-            ' Add code to handle RNA path changes (similar to MP/TP/TOWER)
             load_RNA_DB
         End If
     End If
@@ -572,7 +573,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         End If
     End If
     
-    sections = Array("MP", "TP", "TOWER")
+    sections = Array("MP", "TP")
     
     ' Loop through all sections
     For Each section In sections
@@ -596,7 +597,6 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
             If Not Intersect(Target, watchRng) Is Nothing Then
                 ResizeTableToData tblName
                 CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
-
             End If
         End If
 
@@ -607,7 +607,6 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
             If Not Intersect(Target, watchRng) Is Nothing Then
                 ResizeTableToData tblName
                 CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
-
             End If
         End If
 
@@ -615,32 +614,27 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         tblName = section & "_META"
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
-            If Not Intersect(Target, watchRng) Is Nothing Then
-                Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
-                If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
-                    UpdateIdentifierColumn "BuildYourStructure", tblName
-                End If
-                CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
+            Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
+            If Intersect(Target, idCol) Is Nothing Then
+                UpdateIdentifierColumn "BuildYourStructure", tblName
             End If
+            CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
         End If
 
         '--- Meta new ---
         tblName = section & "_META_NEW"
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
-            If Not Intersect(Target, watchRng) Is Nothing Then
-                Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
-                If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
-                    UpdateIdentifierColumn "BuildYourStructure", tblName
-                End If
+            Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
+            If Intersect(Target, idCol) Is Nothing Then
+                UpdateIdentifierColumn "BuildYourStructure", tblName
             End If
         End If
 
     Next section
 
-CleanExit:
-    'Application.EnableEvents = True
-    'Application.ScreenUpdating = True
+
+
 
 End Sub
 
@@ -677,4 +671,43 @@ Sub Import_MPTool_useTP_Klicken()
     If Range("Use_TP").Value = True Then
         Range("Use_MP").Value = False
     End If
+End Sub
+
+
+
+Public Sub ScheduleBuildYourStructure(Target As Range)
+    Set lastTarget = Target
+    
+    If Not runPending Then
+        runPending = True
+        ' Schedule to run in 1 second
+        Application.OnTime Now + TimeValue("00:00:01"), "RunBuildYourStructure"
+    End If
+End Sub
+
+Public Sub RunBuildYourStructure()
+    Dim ws As Worksheet
+    
+    runPending = False
+    Set ws = ThisWorkbook.Sheets("BuildYourStructure")
+    
+    ' Temporarily unprotect
+    ws.Unprotect
+    
+    Application.EnableEvents = False
+    Application.ScreenUpdating = False
+    
+    ' Run the main logic only if lastTarget is a valid Range
+    If TypeName(lastTarget) = "Range" Then
+        BuildYourStructureChange lastTarget
+    End If
+    
+    Application.EnableEvents = True
+    Application.ScreenUpdating = True
+    
+    ' Re-protect sheet
+    ws.Protect UserInterfaceOnly:=True, AllowSorting:=True, AllowFiltering:=True
+    
+    ' Clear lastTarget to avoid running on old data
+    Set lastTarget = Nothing
 End Sub

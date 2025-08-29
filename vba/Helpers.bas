@@ -85,23 +85,7 @@ Sub PickFolderDialog(Target_cell As String)
 NoCell:
     MsgBox "Target cell not found: " & Target_cell, vbExclamation
 End Sub
-'*******************************************************************************
-' RunPythonWrapper (Shell version, no xlwings)
-'
-' Description:
-'   Runs a Python function from a script in the "python_scripts" folder
-'   by launching Python via the Shell.
-'
-' Parameters:
-'   module_name (String)     - Python module name (without .py)
-'   Optional function_name   - Function to run inside module (default = "main")
-'   Optional args            - Either a string (path) or a Range/Collection of strings
-'
-' Example Usage:
-'   RunPythonWrapper "load_MP_META", "main", "C:\my\path\file.db"
-'   RunPythonWrapper "my_script", "main", Range("A1:A5")
-'*******************************************************************************
-Sub RunPythonWrapper(module_name As String, Optional function_name As String = "main", Optional args As Variant)
+Sub RunPythonWrapper(module_name As String, Optional function_name As String = "main", Optional args As Variant, Optional manageSheetProtection As Boolean = True)
     Dim scriptPath As String
     Dim pythonExe As String
     Dim argsString As String
@@ -111,13 +95,29 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     Dim showShell As Boolean
     Dim wsh As Object
     Dim retCode As Long
+    Dim ws As Worksheet
+    Dim protStates() As Boolean
+    Dim i As Long
     
     ' Turn off Excel updates for speed & stability
-     Application.ScreenUpdating = False
-  '  Application.EnableEvents = False
-  '  Application.Calculation = xlCalculationManual
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+    Application.Calculation = xlCalculationManual
     
     On Error GoTo CleanFail
+
+    ' --- Optionally unprotect all sheets with UserInterfaceOnly ---
+    If manageSheetProtection Then
+        ReDim protStates(1 To ThisWorkbook.Worksheets.Count)
+        i = 1
+        For Each ws In ThisWorkbook.Worksheets
+            protStates(i) = ws.ProtectContents ' remember if it was protected
+            On Error Resume Next
+            ws.Unprotect
+            On Error GoTo 0
+            i = i + 1
+        Next ws
+    End If
 
     ' Check debug mode
     On Error Resume Next
@@ -164,21 +164,23 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     ' Run Python synchronously
     Set wsh = CreateObject("WScript.Shell")
     If showShell Then
-        ' Keep shell open in debug mode
-        retCode = wsh.Run("cmd /k " & cmd, 1, True)
+        retCode = wsh.Run("cmd /k " & cmd, 1, True) ' Debug mode
     Else
-        ' Run hidden and wait until finished
-        retCode = wsh.Run("cmd /c " & cmd, 0, True)
+        retCode = wsh.Run("cmd /c " & cmd, 0, True) ' Hidden mode
     End If
+
+    ' --- Give Excel a moment to register changes ---
+    DoEvents
+    Application.Calculate
+    
+    ' --- Optional: call your comparison/highlight function here ---
+    ' Example: CompareTablesAndHighlightDifferences "BuildYourStructure", "MP_DATA_TRUE", "BuildYourStructure", "MP_DATA"
+
+CleanExit:
+    ' Restore normal Excel state
     Application.Calculation = xlCalculationAutomatic
     Application.EnableEvents = True
     Application.ScreenUpdating = True
-        
-   ' If ThisWorkbook.ActiveSheet.name = "BuildYourStructure" Then
-   '     BuildYourStructureChange ThisWorkbook.Sheets("BuildYourStructure").Range("A1"), True
-   ' End If
-    
-CleanExit:
     Exit Sub
 
 PythonPathError:
@@ -840,3 +842,22 @@ Sub InstallPythonRequirements()
     ' Run command
     Shell cmd, vbNormalFocus
 End Sub
+Sub ToggleFoldRows()
+    ' Define the rows you want to toggle
+    Dim startRow As Long, endRow As Long
+    startRow = 27   ' change to your start row
+    endRow = 108    ' change to your end row
+    
+    Dim ws As Worksheet
+    Set ws = ActiveSheet
+    
+    ' Check if the first row in the range is hidden
+    If ws.Rows(startRow).Hidden = True Then
+        ' If hidden, unhide all rows in the range
+        ws.Rows(startRow & ":" & endRow).EntireRow.Hidden = False
+    Else
+        ' If visible, hide all rows in the range
+        ws.Rows(startRow & ":" & endRow).EntireRow.Hidden = True
+    End If
+End Sub
+

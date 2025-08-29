@@ -10,7 +10,6 @@ import misc as mc
 
 def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", waterlevel=0, show_section_numbers=True):
 
-
     fig, ax = plt.subplots(1, 3, figsize=[22, 6])
 
     # Check if Structure is empty
