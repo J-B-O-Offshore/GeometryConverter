@@ -562,36 +562,7 @@ def call_vba_dropdown_macro(workbook_name: str, sheet_name: str, dropdown_name: 
     wb.macro('set_dropdown_value')(sheet_name, dropdown_name, new_value)
 
 
-# def insert_plot(fig, workbook_name, sheet_name, named_range):
-#     """
-#     Insert a Matplotlib Figure into an already open Excel workbook at the named range.
-#
-#     Parameters:
-#     - fig: matplotlib.figure.Figure object
-#     - workbook_name: str, name of the open Excel workbook (e.g., 'file.xlsx')
-#     - sheet_name: str, name of the sheet in the workbook
-#     - named_range: str, named range in the sheet to place the image at
-#     """
-#
-#     app = xw.apps.active
-#     wb = app.books[workbook_name]
-#     sheet = wb.sheets[sheet_name]
-#     rng = sheet.range(named_range)
-#
-#     with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmpfile:
-#         fig.savefig(tmpfile.name, bbox_inches='tight')
-#         tmpfile.flush()
-#
-#         sheet.pictures.add(tmpfile.name,
-#                            name=f"Fig_{named_range}",
-#                            update=True,
-#                            top=rng.top,
-#                            left=rng.left)
-#     os.remove(tmpfile.name)
-#
-
-
-def insert_plot(fig, workbook_name, sheet_name, named_range, retries=5, delay=0.5):
+def insert_plot(fig, workbook_name, sheet_name, named_range):
     """
     Insert a Matplotlib Figure into an already open Excel workbook at the named range.
 
@@ -600,8 +571,6 @@ def insert_plot(fig, workbook_name, sheet_name, named_range, retries=5, delay=0.
     - workbook_name: str, name of the open Excel workbook (e.g., 'file.xlsx')
     - sheet_name: str, name of the sheet in the workbook
     - named_range: str, named range in the sheet to place the image at
-    - retries: int, number of retries if Excel is busy
-    - delay: float, seconds to wait between retries
     """
 
     app = xw.apps.active
@@ -610,34 +579,13 @@ def insert_plot(fig, workbook_name, sheet_name, named_range, retries=5, delay=0.
     rng = sheet.range(named_range)
 
     with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmpfile:
-        fig.savefig(tmpfile.name, bbox_inches='tight', dpi=300)
+        fig.savefig(tmpfile.name, bbox_inches='tight')
         tmpfile.flush()
 
-        for attempt in range(retries):
-            try:
-                # remove old picture with same name if it exists
-                pic_name = f"Fig_{named_range}"
-                try:
-                    sheet.pictures[pic_name].delete()
-                except Exception:
-                    pass
-
-                # insert picture
-                pic = sheet.pictures.add(
-                    tmpfile.name,
-                    name=pic_name,
-                    update=True,
-                    top=rng.top,
-                    left=rng.left
-                )
-                return pic  # success
-            except Exception as e:
-                if isinstance(e, pywintypes.com_error) and e.hresult == -2146777998:
-                    time.sleep(delay)  # Excel is busy → wait and retry
-                else:
-                    raise
-        raise RuntimeError(
-            f"Failed to insert plot at named range '{named_range}' "
-            f"in sheet '{sheet_name}' after {retries} retries."
-        )
+        sheet.pictures.add(tmpfile.name,
+                           name=f"Fig_{named_range}",
+                           update=True,
+                           top=rng.top,
+                           left=rng.left)
     os.remove(tmpfile.name)
+

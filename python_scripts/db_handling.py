@@ -109,22 +109,8 @@ def create_db_table(excel_filename, db_path, Identifier, df, if_exists='fail'):
     return True
 
 
+
 def load_db_table(excel_filename, db_path, Identifier, dtype=None):
-    """
-    Load a specific table from an SQLite database into a pandas DataFrame.
-
-    Args:
-        excel_filename (str): Path to the Excel file (used for message box context).
-        db_path (str): Path to the SQLite database file.
-        Identifier (str): Name of the table to load.
-        dtype (dict): Optional dictionary specifying column data types.
-
-    Returns:
-        pd.DataFrame or None: The table content as a pandas DataFrame if successful, otherwise None.
-
-    Notes:
-        Shows Excel warning boxes via `ex.show_message_box()` on failure.
-    """
     if not isinstance(Identifier, str):
         ex.show_message_box(
             excel_filename,
@@ -133,11 +119,12 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
         return None
 
     try:
-        conn = sqlite3.connect(db_path)
+        # Prevent sqlite from creating a new DB by using URI with mode=rw
+        conn = sqlite3.connect(f"file:{db_path}?mode=rw", uri=True)
     except sqlite3.Error as e:
         ex.show_message_box(
             excel_filename,
-            f"Failed to connect to the database '{db_path}'.\nPython Error: {e}"
+            f"The path {db_path} does not lead to a valid SQLite database. Try reloading the database."
         )
         return None
 
@@ -153,11 +140,22 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
         )
         return None
 
+    if len(table_names) == 0:
+        conn.close()
+        ex.show_message_box(
+            excel_filename,
+            f"The path {db_path} does not lead to a valid SQLite database. Try reloading the database."
+        )
+        return None
+
     if Identifier not in table_names:
         conn.close()
         ex.show_message_box(
             excel_filename,
-            f"Table '{Identifier}' does not exist in the database.\nAvailable tables: {table_names}"
+            f"Table '{Identifier}' does not exist in the database. "
+            f"Check if the database path is correct for the table you want to load. "
+            f"Maybe the selection is still from an old save, try reloading the database.\n"
+            f"Available tables: {table_names}"
         )
         return None
 
@@ -174,11 +172,9 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
     finally:
         conn.close()
 
-    # Optional: Remove 'index' column if it exists
     if 'index' in df.columns:
         df = df.drop(columns=['index'])
 
-    # Optional: Apply dtype conversion
     if dtype is not None:
         try:
             df = df.astype(dtype)
@@ -190,7 +186,6 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
             return None
 
     return df
-
 
 def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, Meta_values):
     """

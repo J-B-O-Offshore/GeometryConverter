@@ -10,7 +10,6 @@ import misc as mc
 
 def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", waterlevel=0, show_section_numbers=True):
 
-
     fig, ax = plt.subplots(1, 3, figsize=[22, 6])
 
     # Check if Structure is empty
@@ -441,7 +440,8 @@ def plot_MP(excel_caller):
     Added_Masses = Added_Masses.dropna(how="all")
     Structure = Structure.dropna(how="all")
 
-    META = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META")
+    META = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META", dropnan=True)
+
     if len(META) != 0:
         value = META.loc[0, "Water Depth [m]"]
         waterdepth = -value if np.isreal(value) else None
@@ -467,7 +467,7 @@ def plot_TP(excel_caller):
     Added_Masses = Added_Masses.dropna(how="all")
     Structure = Structure.dropna(how="all")
 
-    META = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_META")
+    META = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_META", dropnan=True)
     if len(META) != 0:
         value = META.loc[0, "Height Reference"]
         height_ref = value if value else None
@@ -488,7 +488,7 @@ def plot_TOWER(excel_caller):
     Added_Masses = Added_Masses.dropna(how="all")
     Structure = Structure.dropna(how="all")
 
-    META = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TOWER_META")
+    META = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TOWER_META", dropnan=True)
     if len(META) != 0:
         value = META.loc[0, "Height Reference"]
         height_ref = value if value else None
@@ -501,5 +501,3 @@ def plot_TOWER(excel_caller):
 
     return
 
-# plot_Assambly_Build("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm")
-#plot_Assambly_Overview("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometrieConverter/GeometrieConverter.xlsm")
