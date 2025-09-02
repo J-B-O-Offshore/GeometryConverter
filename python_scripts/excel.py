@@ -363,54 +363,30 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=
 from pathlib import Path
 
 
-def read_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
-    """
-    Read a specific Excel range or cell from an Excel file.
+def read_excel_range(workbook_name, sheet_name, cell_range):
+    import os, xlwings as xw
+    app = xw.apps.active if xw.apps.count else xw.App(visible=False)
 
-    Parameters:
-        path (str or Path): Full path to the Excel workbook.
-        sheet_name (str): The name of the sheet containing the range.
-        cell_range (str): Excel reference (e.g., "B14:L30", "F", "F10").
-        dtype (dict or type, optional): Data type(s) to apply to the DataFrame.
-        use_header (bool): If True, use the first row of the range as column headers.
-
-    Returns:
-        pd.DataFrame or single value: Depending on input range.
-    """
-    path = Path(path)
-    app = xw.App(visible=False)
+    wb = None
+    opened_here = False
     try:
-        wb = app.books.open(str(path))
-        sheet = wb.sheets[sheet_name]
-
-        # Case 1: Single cell like "F10"
-        if re.fullmatch(r"[A-Z]+[0-9]+", cell_range, re.IGNORECASE):
-            value = sheet.range(cell_range).value
-            return value
-
-        # Case 2: Single column like "F"
-        elif re.fullmatch(r"[A-Z]+", cell_range, re.IGNORECASE):
-            col = cell_range.upper()
-            last_row = sheet.range(f"{col}1048576").end("up").row  # Find last used row in column
-            cell_range = f"{col}1:{col}{last_row}"
-
-        # Case 3: Range like "B14:L30"
-        if use_header:
-            data = sheet.range(cell_range).options(pd.DataFrame, header=1, index=False).value
-        else:
-            values = sheet.range(cell_range).value
-            if values is None:
-                data = pd.DataFrame()
+        # try attach to an already open book (by name)
+        try:
+            wb = app.books[os.path.basename(workbook_name)]
+        except Exception:
+            # open from full path (required when running standalone)
+            if os.path.isabs(workbook_name) and os.path.exists(workbook_name):
+                wb = app.books.open(workbook_name)
+                opened_here = True
             else:
-                data = pd.DataFrame(values)
-                data.columns = [f"Column{i + 1}" for i in range(data.shape[1])]
+                raise FileNotFoundError(f"No such file: '{workbook_name}'")
 
-        if dtype is not None and not data.empty:
-            data = data.astype(dtype)
+        sht = wb.sheets[sheet_name]
+        vals = sht.range(cell_range).value  # 2-D list if multi-cell
+        return vals
     finally:
-        wb.close()
-        app.quit()
-    return data
+        if opened_here and wb is not None:
+            wb.close()
 
 
 def read_static_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):

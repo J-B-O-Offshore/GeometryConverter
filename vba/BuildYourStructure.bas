@@ -32,7 +32,8 @@ Sub load_MP_DB()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("BuildYourStructure")
     db_path = ws.Range("TextBox_MP_db_path").Value
-
+    
+    plot_MP
     
     ClearTableContents "BuildYourStructure", "MP_DATA_TRUE"
     ClearTableContents "BuildYourStructure", "MP_DATA"
@@ -59,7 +60,8 @@ Sub load_TP_DB()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("BuildYourStructure")
     db_path = ws.Range("TextBox_TP_db_path").Value
-
+    
+    plot_TP
         
     ClearTableContents "BuildYourStructure", "TP_DATA_TRUE"
     ClearTableContents "BuildYourStructure", "TP_DATA"
@@ -95,7 +97,7 @@ Sub load_RNA_DB()
     End If
 
     load_RNA_DATA
-
+    
 End Sub
 
 
@@ -105,7 +107,8 @@ Sub load_TOWER_DB()
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Sheets("BuildYourStructure")
     db_path = ws.Range("TextBox_TOWER_db_path").Value
-
+    
+    plot_TOWER
         
     ClearTableContents "BuildYourStructure", "TOWER_DATA_TRUE"
     ClearTableContents "BuildYourStructure", "TOWER_DATA"

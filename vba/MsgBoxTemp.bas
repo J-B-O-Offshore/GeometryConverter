@@ -1,6 +1,6 @@
 Attribute VB_Name = "MsgBoxTemp"
 
     Function ShowMessageBox() As Integer
-        ShowMessageBox = MsgBox("Data for 'XXXX_DUMMY_XXXX' successfully replaced with new entry 'XXXX_DUMMY_YYYY'.", 64, "Message")
+        ShowMessageBox = MsgBox("Sesam file created:" & vbNewLine & "C:\temp\tutorial\output\Heike_.js" & vbNewLine & "" & vbNewLine & "Rows (tbl_Export_Sesam): 117 " & vbNewLine & "Rows (tbl_Export_Sesam_Mass): 73" & vbNewLine & "Preface lines (tbl_Export_Text): 7", 64, "Message")
     End Function
     

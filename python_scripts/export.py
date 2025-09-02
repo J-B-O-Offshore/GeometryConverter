@@ -1,28 +1,25 @@
-import os.path
-
-import pandas as pd
-import excel as ex
-from typing import Tuple, Optional
-
-import misc as mc
-import numpy as np
-import math
-import re
-from pandas.api.types import CategoricalDtype
-
-from math import isnan, isfinite
-
-
 # %% helpers
 import os
+import os.path
+import re
+
+import numpy as np
+import pandas as pd
+from pandas.api.types import CategoricalDtype
+
+import excel as ex
+import misc as mc
+
 os.environ["MPLBACKEND"] = "Agg"  # kein GUI nötig
 
 # optional zusätzlich:
 try:
     import matplotlib
+
     matplotlib.use("Agg", force=True)
 except Exception:
     pass
+
 
 def add_node(df, z_new, defaults=None, add_outside_bound=False):
     """
@@ -485,8 +482,10 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE
     NODES.loc[NODES["Elevation [m]"] == z_RNA, "pMassNames"] = None
 
     NODES.loc[NODES["Elevation [m]"] == z_RNA, "pInertia"] = (
-                                                                     RNA.loc[0, 'Inertia of RNA fore-aft @COG [kg m^2]'] +
-                                                                     RNA.loc[0, 'Inertia of RNA side-side @COG [kg m^2]']
+                                                                     RNA.loc[
+                                                                         0, 'Inertia of RNA fore-aft @COG [kg m^2]'] +
+                                                                     RNA.loc[
+                                                                         0, 'Inertia of RNA side-side @COG [kg m^2]']
                                                              ) / 2
 
     # Interpolate deflections for added nodes and reverse node order
@@ -581,7 +580,8 @@ def create_JBOOST_struct(GEOMETRY, RNA, defl_MP, delf_TOWER, MASSES=None, MARINE
     return text
 
 
-def create_JBOOST_proj(Parameters, marine_growth=None, modelname="struct.lua", runFEModul=True, runFrequencyModul=False, runHindcastValidation=False, wavefile="wave.lua",
+def create_JBOOST_proj(Parameters, marine_growth=None, modelname="struct.lua", runFEModul=True, runFrequencyModul=False,
+                       runHindcastValidation=False, wavefile="wave.lua",
                        windfile="wind."):
     """
        Generates a Lua-based project file text for JBOOST simulations based on input parameters and configuration flags.
@@ -827,7 +827,8 @@ def create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, ski
         if pd.isna(axis_to_axis) and pd.isna(gap_between):
             err_list.append(f"Row {row_num}: Define either 'Distance Axis to Axis [m]' or 'Gap between surfaces [m]'.")
         elif not pd.isna(axis_to_axis) and not pd.isna(gap_between):
-            err_list.append(f"Row {row_num}: Define only one of 'Distance Axis to Axis [m]' or 'Gap between surfaces [m]', not both.")
+            err_list.append(
+                f"Row {row_num}: Define only one of 'Distance Axis to Axis [m]' or 'Gap between surfaces [m]', not both.")
 
     if err_list:
         return False, "Geometry specification issues in APPURTANCES:\n" + "\n".join(err_list)
@@ -965,9 +966,9 @@ def export_JBOOST(excel_caller, jboost_path):
     PROJECT = PROJECT.set_index("Project Settings")
 
     default = PROJECT.loc[:, "default"]
-    proj_configs = PROJECT.iloc[:, 3:]
+    proj_configs = PROJECT.iloc[:, 2:]
 
-    # itterate trought configs
+    # iterate trough configs
     for config_name, config_data in proj_configs.items():
 
         # Fill missing values in config_data with defaults
@@ -1025,23 +1026,35 @@ def export_JBOOST(excel_caller, jboost_path):
 
         struct_text = create_JBOOST_struct(GEOMETRY,
                                            RNA,
-                                           (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Value"].values[0],
-                                            PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Unit"].values[0]),
-                                           (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Value"].values[0],
-                                            PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Unit"].values[0]),
+                                           (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Value"].values[
+                                                0],
+                                            PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Unit"].values[
+                                                0]),
+                                           (PARAMETERS.loc[
+                                                PARAMETERS["Parameter"] == "deflection TOWER", "Value"].values[0],
+                                            PARAMETERS.loc[
+                                                PARAMETERS["Parameter"] == "deflection TOWER", "Unit"].values[0]),
                                            MASSES=MASSES,
                                            MARINE_GROWTH=MARINE_GROWTH,
-                                           defl_TP=(PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Value"].values[0],
-                                                    PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Unit"].values[0]),
+                                           defl_TP=(PARAMETERS.loc[
+                                                        PARAMETERS["Parameter"] == "deflection TP", "Value"].values[0],
+                                                    PARAMETERS.loc[
+                                                        PARAMETERS["Parameter"] == "deflection TP", "Unit"].values[0]),
                                            ModelName=Model_name,
-                                           EModul=PARAMETERS.loc[PARAMETERS["Parameter"] == "EModul", "Value"].values[0],
+                                           EModul=PARAMETERS.loc[PARAMETERS["Parameter"] == "EModul", "Value"].values[
+                                               0],
                                            fyk="355",
                                            poisson="0.3",
-                                           dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "Steel Density", "Value"].values[0],
+                                           dens=
+                                           PARAMETERS.loc[PARAMETERS["Parameter"] == "Steel Density", "Value"].values[
+                                               0],
                                            addMass=0,
                                            member_id=1,
-                                           create_node_tolerance=PARAMETERS.loc[PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[0],
-                                           seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
+                                           create_node_tolerance=PARAMETERS.loc[PARAMETERS[
+                                                                                    "Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[
+                                               0],
+                                           seabed_level=STRUCTURE_META.loc[
+                                               STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
                                            waterlevel=config_struct["water_level"]
                                            )
 
@@ -1099,7 +1112,8 @@ def export_WLGen(excel_caller, WLGen_path):
         model_name = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
         if model_name is None:
             model_name = "WLGen_input.lua"
-            ex.show_message_box(excel_filename, f"No model name defined in Structure Overview. File named {model_name}.")
+            ex.show_message_box(excel_filename,
+                                f"No model name defined in Structure Overview. File named {model_name}.")
         else:
             model_name = model_name + ".lua"
 
@@ -1172,10 +1186,13 @@ def fill_Bladed_table(excel_caller):
     MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
 
-    Bladed_Elements = pd.DataFrame(columns=["Affiliation [-]", "Member [-]", "Node [-]", "Diameter [m]", "Wall thickness [mm]", "cd [-]", "cm [-]", "Marine growth [mm]", "Density [kg*m^-3]", "Material [-]", "Elevation [m]"])
+    Bladed_Elements = pd.DataFrame(
+        columns=["Affiliation [-]", "Member [-]", "Node [-]", "Diameter [m]", "Wall thickness [mm]", "cd [-]", "cm [-]",
+                 "Marine growth [mm]", "Density [kg*m^-3]", "Material [-]", "Elevation [m]"])
     Bladed_Nodes = pd.DataFrame(columns=["Node [-]", "Elevation [m]", "Local x [m]", "Local y [m]", "Point mass [kg]"])
 
-    create_node_tolerance = Bladed_Settings.loc[Bladed_Settings["Parameter"] == "Dimensional Tolerance for Node generating [m]", "Value"].values[0]
+    create_node_tolerance = Bladed_Settings.loc[
+        Bladed_Settings["Parameter"] == "Dimensional Tolerance for Node generating [m]", "Value"].values[0]
     seabed_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0]
     material = Bladed_Material.loc[0, "Material"]
     density = Bladed_Material.loc[0, "Density"]
@@ -1238,10 +1255,13 @@ def fill_Bladed_table(excel_caller):
 
     # Geometry
     GEOMETRY.loc[:, "Section"] = np.linspace(1, len(GEOMETRY), len(GEOMETRY))
-    Bladed_Elements.loc[:, "Affiliation [-]"] = np.array([[aff_elem, aff_elem] for aff_elem in GEOMETRY["Affiliation"].values]).flatten()
-    Bladed_Elements.loc[:, "Member [-]"] = np.array([[f"{int(sec_elem)} (End 1)", f"{int(sec_elem)} (End 2)"] for sec_elem in GEOMETRY["Section"].values]).flatten()
+    Bladed_Elements.loc[:, "Affiliation [-]"] = np.array(
+        [[aff_elem, aff_elem] for aff_elem in GEOMETRY["Affiliation"].values]).flatten()
+    Bladed_Elements.loc[:, "Member [-]"] = np.array(
+        [[f"{int(sec_elem)} (End 1)", f"{int(sec_elem)} (End 2)"] for sec_elem in GEOMETRY["Section"].values]).flatten()
 
-    Bladed_Elements.loc[:, "Elevation [m]"] = np.array([[row["Top [m]"], row["Bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
+    Bladed_Elements.loc[:, "Elevation [m]"] = np.array(
+        [[row["Top [m]"], row["Bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
 
     for i, row in Bladed_Elements.iterrows():
 
@@ -1252,7 +1272,8 @@ def fill_Bladed_table(excel_caller):
         if not node.empty:
             Bladed_Elements.at[i, "Node [-]"] = int(node.values[0])
 
-        marineGrowth = MARINE_GROWTH.loc[(MARINE_GROWTH["Bottom [m]"] < elevation) & (MARINE_GROWTH["Top [m]"] >= elevation), "Marine Growth [mm]"]
+        marineGrowth = MARINE_GROWTH.loc[
+            (MARINE_GROWTH["Bottom [m]"] < elevation) & (MARINE_GROWTH["Top [m]"] >= elevation), "Marine Growth [mm]"]
 
         if not marineGrowth.empty:
             Bladed_Elements.at[i, "Marine growth [mm]"] = marineGrowth.values[0]
@@ -1261,8 +1282,10 @@ def fill_Bladed_table(excel_caller):
 
     Bladed_Elements.drop(columns=["Elevation [m]"], inplace=True)
 
-    Bladed_Elements.loc[:, "Diameter [m]"] = np.array([[row["D, top [m]"], row["D, bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
-    Bladed_Elements.loc[:, "Wall thickness [mm]"] = np.array([[row["t [mm]"], row["t [mm]"]] for i, row in GEOMETRY.iterrows()]).flatten()
+    Bladed_Elements.loc[:, "Diameter [m]"] = np.array(
+        [[row["D, top [m]"], row["D, bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
+    Bladed_Elements.loc[:, "Wall thickness [mm]"] = np.array(
+        [[row["t [mm]"], row["t [mm]"]] for i, row in GEOMETRY.iterrows()]).flatten()
 
     Bladed_Elements.loc[:, "cd [-]"] = 0.9
     Bladed_Elements.loc[:, "cm [-]"] = 2.0
@@ -1272,121 +1295,342 @@ def fill_Bladed_table(excel_caller):
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
 
-
-
     return
+
 
 def fill_Sesam_table(excel_caller):
     excel_filename = os.path.basename(excel_caller)
-    Sesam_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Sesam_Settings", dropnan=True)
-    Sesam_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Sesam_Material", dropnan=True)
-
-    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
-    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
     MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
 
-    Sesam_Elements = pd.DataFrame(columns=["Affiliation [-]", "Member [-]", "Node [-]", "Diameter [m]", "Wall thickness [mm]", "cd [-]", "cm [-]", "Marine growth [mm]", "Density [kg*m^-3]", "Material [-]", "Elevation [m]"])
-    Sesam_Nodes = pd.DataFrame(columns=["Node [-]", "Elevation [m]", "Local x [m]", "Local y [m]", "Point mass [kg]"])
+    GEOMETRY_formatted = build_GEOMETRY_formatted(GEOMETRY, STRUCTURE_META)
+    ex.write_df_to_table(excel_filename, "ExportStructure", "tbl_ExportStructure_Structure",
+                         GEOMETRY_formatted)
 
-    create_node_tolerance = Sesam_Settings.loc[Sesam_Settings["Parameter"] == "Dimensional Tolerance for Node generating [m]", "Value"].values[0]
-    seabed_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0]
-    material = Sesam_Material.loc[0, "Material"]
-    density = Sesam_Material.loc[0, "Density"]
-
-    # Filter geometry below seabed
-    if seabed_level is not None:
-        GEOMETRY = mc.add_element(GEOMETRY, seabed_level)
-    GEOMETRY = GEOMETRY.loc[GEOMETRY["Bottom [m]"] >= seabed_level]
-
-    NODES = mc.extract_nodes_from_elements(GEOMETRY)
-
-    # Add masses
-    NODES["pMass"] = 0.0
-    NODES["pMassNames"] = None
-    NODES["added"] = False
-    NODES["comment"] = None
-
-    if MASSES is not None:
-        for idx in MASSES.index:
-            z_bot = MASSES.loc[idx, "Bottom [m]"]
-            z_Mass = (z_bot + MASSES.loc[idx, "Top [m]"]) / 2 if pd.notna(z_bot) else MASSES.loc[idx, "Top [m]"]
-
-            differences = np.abs(NODES["Elevation [m]"].values - z_Mass)
-            within_tol = np.where(differences <= create_node_tolerance)[0]
-
-            # if node is (nearly) on Node
-            if len(within_tol) > 0:
-                closest_index = within_tol[np.argmin(differences[within_tol])]
-                NODES.loc[closest_index, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
-
-                if NODES.loc[closest_index, "comment"] is None:
-                    NODES.loc[closest_index, "comment"] = MASSES.loc[idx, "Name"] + " "
-                else:
-                    NODES.loc[closest_index, "comment"] += MASSES.loc[idx, "Name"] + " "
-
-            # if node mass is over bottom
-            elif z_Mass >= GEOMETRY["Bottom [m]"].values[-1]:
-
-                # add Node
-                NODES = add_node(NODES, z_Mass, defaults={"float": 0})
-                GEOMETRY = mc.add_element(GEOMETRY, z_Mass)
-
-                NODES.loc[NODES["Elevation [m]"] == z_Mass, "added"] = True
-
-                NODES.loc[NODES["Elevation [m]"] == z_Mass, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
-
-                NODES.loc[NODES["Elevation [m]"] == z_Mass, "comment"] = MASSES.loc[idx, "Name"] + " "
-
-            else:
-                print(f"Warning! Mass '{MASSES.loc[idx, 'Name']}' not added, it is below the seabed level!")
-
-    # Nodes
-    Sesam_Nodes.loc[:, "Node [-]"] = np.linspace(1, len(NODES), len(NODES))
-    Sesam_Nodes.loc[:, "Elevation [m]"] = NODES.loc[:, "Elevation [m]"]
-    Sesam_Nodes.loc[:, "Local x [m]"] = 0.0
-    Sesam_Nodes.loc[:, "Local y [m]"] = 0.0
-    Sesam_Nodes.loc[:, "Point mass [kg]"] = NODES.loc[:, "pMass"]
-    Sesam_Nodes.loc[:, "Added"] = NODES.loc[:, "added"]
-    Sesam_Nodes.loc[:, "Comment"] = NODES.loc[:, "comment"]
-
-    # Geometry
-    GEOMETRY.loc[:, "Section"] = np.linspace(1, len(GEOMETRY), len(GEOMETRY))
-    Sesam_Elements.loc[:, "Affiliation [-]"] = np.array([[aff_elem, aff_elem] for aff_elem in GEOMETRY["Affiliation"].values]).flatten()
-    Sesam_Elements.loc[:, "Member [-]"] = np.array([[f"{int(sec_elem)} (End 1)", f"{int(sec_elem)} (End 2)"] for sec_elem in GEOMETRY["Section"].values]).flatten()
-
-    Sesam_Elements.loc[:, "Elevation [m]"] = np.array([[row["Top [m]"], row["Bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
-
-    for i, row in Sesam_Elements.iterrows():
-
-        # node
-        elevation = row["Elevation [m]"]
-        # Find matching node based on elevation
-        node = Sesam_Nodes.loc[Sesam_Nodes["Elevation [m]"] == elevation, "Node [-]"]
-        if not node.empty:
-            Sesam_Elements.at[i, "Node [-]"] = int(node.values[0])
-
-        marineGrowth = MARINE_GROWTH.loc[(MARINE_GROWTH["Bottom [m]"] < elevation) & (MARINE_GROWTH["Top [m]"] >= elevation), "Marine Growth [mm]"]
-
-        if not marineGrowth.empty:
-            Sesam_Elements.at[i, "Marine growth [mm]"] = marineGrowth.values[0]
-        else:
-            Sesam_Elements.at[i, "Marine growth [mm]"] = 0
-
-    Sesam_Elements.drop(columns=["Elevation [m]"], inplace=True)
-
-    Sesam_Elements.loc[:, "Diameter [m]"] = np.array([[row["D, top [m]"], row["D, bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
-    Sesam_Elements.loc[:, "Wall thickness [mm]"] = np.array([[row["t [mm]"], row["t [mm]"]] for i, row in GEOMETRY.iterrows()]).flatten()
-
-    Sesam_Elements.loc[:, "cd [-]"] = 0.9
-    Sesam_Elements.loc[:, "cm [-]"] = 2.0
-    Sesam_Elements.loc[:, "Density [kg*m^-3]"] = density
-    Sesam_Elements.loc[:, "Material [-]"] = material
-
-    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Sesam_Elements)
-    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Sesam_Nodes)
-
-
+    MASSES_formatted = build_MASSES_formatted(MASSES, STRUCTURE_META)
+    ex.write_df_to_table(excel_filename, "ExportStructure", "tbl_ExportStructure_Mass", MASSES_formatted)
 
     return
 
+
+def build_GEOMETRY_formatted(GEOMETRY: pd.DataFrame,
+                             STRUCTURE_META: pd.DataFrame,
+                             density_kg_per_m3: float = 7850.0) -> pd.DataFrame:
+    """
+    Create the GEOMETRY_formatted dataframe used for export.
+    Requires columns in GEOMETRY: 'Affiliation','Top [m]','Bottom [m]','D, top [m]','D, bottom [m]','t [mm]'.
+    Requires STRUCTURE_META with row Parameter == 'Height Reference'.
+    """
+    # 1) height reference (no silent fallback)
+    mask = STRUCTURE_META["Parameter"].str.strip().str.lower() == "height reference"
+    if not mask.any():
+        raise ValueError("Height Reference not found in STRUCTURE_META dataframe!")
+    height_ref = STRUCTURE_META.loc[mask, "Value"].astype(str).iloc[0].strip()
+
+    # 2) global running section number
+    GEOMETRY = GEOMETRY.copy()
+    GEOMETRY["section"] = range(1, len(GEOMETRY) + 1)
+
+    # 3) label "TP / MP \nTower / Grout"
+    prefix_map = {"TOWER": "TW", "TP": "TP", "TRANSITION PIECE": "TP", "MP": "MP", "MONOPILE": "MP"}
+    prefix = GEOMETRY["Affiliation"].astype(str).str.strip().str.upper().map(prefix_map).fillna("XX")
+    local_idx = (prefix.groupby(prefix).cumcount() + 1).astype(int).astype(str).str.zfill(2)
+    label_header = "TP / MP \nTower / Grout"
+    GEOMETRY[label_header] = prefix + local_idx
+
+    # 4) rename to target headers
+    rename_map = {
+        "Top [m]": f"top [m {height_ref}]",
+        "Bottom [m]": f"bottom [m {height_ref}]",
+        "D, top [m]": "Diameter \ntop [m]",
+        "D, bottom [m]": "Diameter bottom [m]",
+    }
+    G = GEOMETRY.rename(columns=rename_map)
+
+    # 5) select/export order
+    col_top = f"top [m {height_ref}]"
+    col_bottom = f"bottom [m {height_ref}]"
+    col_dt = "Diameter \ntop [m]"
+    col_db = "Diameter bottom [m]"
+    col_tmm = "t [mm]"
+    cols_base = [label_header, "section", col_top, col_bottom, col_dt, col_db, col_tmm]
+    GEOMETRY_formatted = G[cols_base].copy()
+
+    # 6) numeric types + rounding for base cols
+    round_spec = {col_top: 3, col_bottom: 3, col_dt: 3, col_db: 3, col_tmm: 0}
+    for c, nd in round_spec.items():
+        GEOMETRY_formatted[c] = pd.to_numeric(GEOMETRY_formatted[c], errors="coerce").round(nd)
+    GEOMETRY_formatted["section"] = GEOMETRY_formatted["section"].astype(int)
+
+    # 7) derived columns
+    # l [m]
+    GEOMETRY_formatted["l [m]"] = (pd.to_numeric(GEOMETRY_formatted[col_top], errors="coerce")
+                                   - pd.to_numeric(GEOMETRY_formatted[col_bottom], errors="coerce"))
+    # slope [°]
+    num = pd.to_numeric(GEOMETRY_formatted[col_db], errors="coerce") - pd.to_numeric(GEOMETRY_formatted[col_dt],
+                                                                                     errors="coerce")
+    den = 2 * pd.to_numeric(GEOMETRY_formatted["l [m]"], errors="coerce")
+    slope_deg = np.degrees(np.arctan(np.divide(num, den, out=np.zeros_like(num, dtype=float), where=den != 0)))
+    slope_deg = np.where(den == 0, 0.0, slope_deg)
+    GEOMETRY_formatted["slope [°]"] = slope_deg
+
+    # weight [t]
+    t_m = pd.to_numeric(GEOMETRY_formatted[col_tmm], errors="coerce") / 1000.0
+    Dt = pd.to_numeric(GEOMETRY_formatted[col_dt], errors="coerce")
+    Db = pd.to_numeric(GEOMETRY_formatted[col_db], errors="coerce")
+    l = pd.to_numeric(GEOMETRY_formatted["l [m]"], errors="coerce")
+    rho = float(density_kg_per_m3)
+
+    vol_cyl_shell = (np.pi / 4.0) * (Dt ** 2 - (Dt - 2 * t_m) ** 2) * l
+    outer = (Db ** 2 + Db * Dt + Dt ** 2)
+    inner = ((Db - 2 * t_m) ** 2 + (Db - 2 * t_m) * (Dt - 2 * t_m) + (Dt - 2 * t_m) ** 2)
+    vol_cone_shell = (l * np.pi / 12.0) * (outer - inner)
+
+    w_cyl_t = vol_cyl_shell * rho / 1000.0
+    w_cone_t = vol_cone_shell * rho / 1000.0
+    GEOMETRY_formatted["weight [t]"] = np.where(np.isclose(GEOMETRY_formatted["slope [°]"], 0.0, atol=1e-12),
+                                                w_cyl_t, w_cone_t)
+
+    # SCF [-]
+    t_curr = pd.to_numeric(GEOMETRY_formatted[col_tmm], errors="coerce")
+    t_next = t_curr.shift(-1)
+    t_min = np.minimum(t_curr, t_next)
+    t_max = np.maximum(t_curr, t_next)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        term = (np.abs(t_next - t_curr) / 2.0) / t_min
+        blend = (t_min ** 1.5) / (t_min ** 1.5 + t_max ** 1.5)
+        scf = 1.0 + 6.0 * term * blend
+    scf = np.where(t_next.isna(), 1.0, scf)
+    GEOMETRY_formatted["SCF [-]"] = scf
+
+    # 8) final rounding
+    GEOMETRY_formatted[col_top] = GEOMETRY_formatted[col_top].round(3)
+    GEOMETRY_formatted[col_bottom] = GEOMETRY_formatted[col_bottom].round(3)
+    GEOMETRY_formatted[col_dt] = GEOMETRY_formatted[col_dt].round(3)
+    GEOMETRY_formatted[col_db] = GEOMETRY_formatted[col_db].round(3)
+    GEOMETRY_formatted[col_tmm] = GEOMETRY_formatted[col_tmm].round(0)
+    GEOMETRY_formatted["l [m]"] = GEOMETRY_formatted["l [m]"].round(3)
+    GEOMETRY_formatted["slope [°]"] = GEOMETRY_formatted["slope [°]"].round(2)
+    GEOMETRY_formatted["weight [t]"] = GEOMETRY_formatted["weight [t]"].round(2)
+    GEOMETRY_formatted["SCF [-]"] = GEOMETRY_formatted["SCF [-]"].round(2)
+
+    # 9) final column order
+    GEOMETRY_formatted = GEOMETRY_formatted[[
+        label_header, "section", col_top, col_bottom, col_dt, col_db, col_tmm,
+        "l [m]", "slope [°]", "weight [t]", "SCF [-]"
+    ]]
+
+    return GEOMETRY_formatted
+
+
+def build_MASSES_formatted(MASSES: pd.DataFrame, STRUCTURE_META: pd.DataFrame) -> pd.DataFrame:
+    """Create MASSES_formatted with columns:
+       Name | Height for Point mass [m <ref>] | Point mass [kg]
+    """
+    # --- height reference (no silent fallback)
+    mask = STRUCTURE_META["Parameter"].str.strip().str.lower() == "height reference"
+    if not mask.any():
+        raise ValueError("Height Reference not found in STRUCTURE_META dataframe!")
+    height_ref = STRUCTURE_META.loc[mask, "Value"].astype(str).iloc[0].strip()
+
+    # --- normalize numeric inputs
+    top = pd.to_numeric(MASSES.get("Top [m]"), errors="coerce")
+    bottom = pd.to_numeric(MASSES.get("Bottom [m]"), errors="coerce")
+    masskg = pd.to_numeric(MASSES.get("Mass [kg]"), errors="coerce")
+
+    # height: if both present -> midpoint, else whichever exists
+    height = np.where(~top.isna() & ~bottom.isna(), (top + bottom) / 2.0,
+                      np.where(top.isna(), bottom, top))
+
+    # keep only valid rows
+    keep = (~pd.isna(height)) & (~pd.isna(masskg)) & (masskg != 0)
+    df = MASSES.loc[keep].copy()
+    height = pd.Series(height, index=MASSES.index).loc[keep]
+    masskg = masskg.loc[keep]
+
+    # --- name prefix by affiliation, counter per prefix
+    prefix_map = {"TOWER": "TW", "TP": "TP", "TRANSITION PIECE": "TP", "MP": "MP", "MONOPILE": "MP"}
+    prefix = df["Affiliation"].astype(str).str.strip().str.upper().map(prefix_map).fillna("XX")
+    idx = (prefix.groupby(prefix).cumcount() + 1).astype(int).astype(str).str.zfill(2)
+    name = prefix + "Mass" + idx
+
+    # --- build formatted df
+    col_height = f"Height for Point mass [m {height_ref}]"
+    df_out = pd.DataFrame({
+        "Name": name,
+        col_height: height.round(3),
+        "Point mass [kg]": masskg.round(0).astype("Int64")
+    })
+
+    # optional: sort by height descending (like your sheet)
+    df_out = df_out.sort_values(by=col_height, ascending=False, kind="stable").reset_index(drop=True)
+
+    return df_out
+
+
+
+import os, re
+import pandas as pd  # only used for the mass fallback
+
+def export_Sesam(excel_caller, Sesam_path):
+    excel_path = excel_caller
+    excel_filename = os.path.basename(excel_caller)
+
+    # --- model_name with safe default ---
+    try:
+        df_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+        mask = df_META["Parameter"].astype(str).str.strip().str.casefold().eq("model name")
+        raw = None if df_META.loc[mask, "Value"].empty else df_META.loc[mask, "Value"].iloc[0]
+        model_name = ("" if raw is None else str(raw)).strip()
+    except Exception:
+        model_name = ""
+
+    if not model_name or model_name.lower() in {"nan", "none"}:
+        model_name = "Sesam_input.js"
+    else:
+        if not model_name.lower().endswith(".js"):
+            model_name += ".js"
+        model_name = re.sub(r'[<>:"/\\|?*\x00-\x1F]', "_", model_name).strip() or "Sesam_input.js"
+
+    # --- preface from tbl_Export_Text (first column), fallback to BJ5:BJ11 ---
+    preface_lines = []
+    try:
+        df_pref = ex.read_excel_table(excel_filename, "ExportStructure", "tbl_Export_Text", dropnan=False)
+    except Exception:
+        df_pref = None
+
+    if df_pref is not None and df_pref.shape[0] > 0:
+        col0 = df_pref.columns[0]
+        preface_lines = [s for s in (("" if v is None else str(v).strip()) for v in df_pref[col0]) if s]
+    else:
+        vals = ex.read_excel_range(excel_path, "ExportStructure", "BJ5:BJ11")  # can be scalar/1D/2D
+        # normalize to flat list of strings
+        if vals is None:
+            preface_lines = []
+        elif isinstance(vals, (list, tuple)) and vals and isinstance(vals[0], (list, tuple)):
+            preface_lines = [str(v).strip() for row in vals for v in row if v not in (None, "")]
+        elif isinstance(vals, (list, tuple)):  # 1D
+            preface_lines = [str(v).strip() for v in vals if v not in (None, "")]
+        else:  # scalar
+            s = str(vals).strip()
+            preface_lines = [s] if s else []
+
+    # --- main table ---
+    try:
+        df_Sesam = ex.read_excel_table(
+            excel_filename, sheet_name="ExportStructure", table_name="tbl_Export_Sesam", dropnan=True
+        )
+    except Exception as e:
+        ex.show_message_box(excel_filename, f"Failed to read 'tbl_Export_Sesam': {e}")
+        return False
+    if df_Sesam is None or len(df_Sesam) == 0:
+        ex.show_message_box(excel_filename, "Table 'tbl_Export_Sesam' is empty.")
+        return False
+
+    # --- mass table with robust fallback ---
+    df_Sesam_Mass = None
+    try:
+        df_Sesam_Mass = ex.read_excel_table(
+            excel_filename, sheet_name="ExportStructure", table_name="tbl_Export_Sesam_Mass", dropnan=True
+        )
+    except Exception as e:
+        try:
+            from openpyxl import load_workbook
+            wb = load_workbook(excel_path, data_only=True, read_only=True)
+            ws = wb["ExportStructure"]
+
+            target = "point mass data"
+            header_cell = None
+            for r in ws.iter_rows(min_row=1, max_row=300, min_col=1, max_col=1000):
+                for c in r:
+                    if ("" if c.value is None else str(c.value)).strip().casefold() == target:
+                        header_cell = c; break
+                if header_cell: break
+            if not header_cell:
+                wb.close()
+                ex.show_message_box(excel_filename,
+                    "Failed to read 'tbl_Export_Sesam_Mass' and fallback could not find header 'Point Mass data'.")
+                return False
+
+            vals, empty_streak, row = [], 0, header_cell.row + 1
+            while row <= ws.max_row and empty_streak < 50:
+                v = ws.cell(row=row, column=header_cell.column).value
+                if v is None or str(v).strip() == "":
+                    empty_streak += 1
+                else:
+                    vals.append(str(v)); empty_streak = 0
+                row += 1
+            wb.close()
+
+            df_Sesam_Mass = pd.DataFrame({"Point Mass data": vals})
+        except Exception as e2:
+            ex.show_message_box(excel_filename,
+                f"Failed to read 'tbl_Export_Sesam_Mass' and fallback failed as well:\n{e}\n{e2}")
+            return False
+
+    # --- clean rows ---
+    df_Sesam = df_Sesam.dropna(how="all")
+    df_Sesam = df_Sesam[~(df_Sesam.astype(str).apply(lambda r: "".join(r), axis=1).str.strip() == "")].reset_index(drop=True)
+    if df_Sesam_Mass is not None and len(df_Sesam_Mass) > 0:
+        df_Sesam_Mass = df_Sesam_Mass.dropna(how="all")
+        df_Sesam_Mass = df_Sesam_Mass[~(df_Sesam_Mass.astype(str).apply(lambda r: "".join(r), axis=1).str.strip() == "")].reset_index(drop=True)
+
+    # --- output path ---
+    try:
+        out_path = os.path.abspath(os.path.join(Sesam_path, model_name))
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    except Exception as e:
+        ex.show_message_box(excel_filename, f"Output path error: {e}")
+        return False
+
+    # --- build & write file (ensure only strings go into 'lines') ---
+    try:
+        lines = []
+
+        if preface_lines:
+            lines.extend(preface_lines)   # list of strings
+            lines.append("")
+
+        lines.append("// ===== tbl_Export_Sesam =====")
+        for col in df_Sesam.columns:
+            lines.append(f"// {col}")
+            for v in df_Sesam[col]:
+                s = "" if v is None else str(v).strip()
+                if s: lines.append(s)
+            lines.append("")
+
+        if df_Sesam_Mass is not None and len(df_Sesam_Mass) > 0:
+            lines.append("// ===== tbl_Export_Sesam_Mass =====")
+            for col in df_Sesam_Mass.columns:
+                lines.append(f"// {col}")
+                for v in df_Sesam_Mass[col]:
+                    s = "" if v is None else str(v).strip()
+                    if s: lines.append(s)
+                lines.append("")
+
+        # safety: stringify everything
+        lines = ["" if x is None else str(x) for x in lines]
+
+        with open(out_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write("\n".join(lines))
+
+        ex.show_message_box(
+            excel_filename,
+            f"Sesam file created:\n{out_path}\n\n"
+            f"Rows (tbl_Export_Sesam): {len(df_Sesam)} \n"
+            f"Rows (tbl_Export_Sesam_Mass): {0 if df_Sesam_Mass is None else len(df_Sesam_Mass)}\n"
+            f"Preface lines (tbl_Export_Text): {len(preface_lines)}"
+        )
+        return True
+    except Exception as e:
+        ex.show_message_box(excel_filename, f"Sesam file could not be created: {e}")
+        return False
+
+
+
+
+if __name__ == "__main__":
+    export_Sesam(
+        r"C:\temp\tutorial\v1.0\GeometryConverter.xlsm", r"C:/temp/tutorial/output/"
+    )
