@@ -965,7 +965,7 @@ def export_JBOOST(excel_caller, jboost_path):
     PROJECT = PROJECT.set_index("Project Settings")
 
     default = PROJECT.loc[:, "default"]
-    proj_configs = PROJECT.iloc[:, 2:]
+    proj_configs = PROJECT.iloc[:, 3:]
 
     # itterate trought configs
     for config_name, config_data in proj_configs.items():
