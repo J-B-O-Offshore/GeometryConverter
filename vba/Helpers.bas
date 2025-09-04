@@ -47,9 +47,9 @@ Sub OpenFileDialog(TargetCellAddress As String, _
         
         filePath = .SelectedItems(1)
     End With
-
     TargetCell.Value = filePath
 End Sub
+
 '------------------------------------------------------------------------------
 ' PickFolderDialog
 '
@@ -85,6 +85,7 @@ Sub PickFolderDialog(Target_cell As String)
 NoCell:
     MsgBox "Target cell not found: " & Target_cell, vbExclamation
 End Sub
+
 '*******************************************************************************
 ' RunPythonWrapper (Shell version, no xlwings)
 '
@@ -220,6 +221,7 @@ Function ProcessArgument(item As Variant) As String
     
     ProcessArgument = result
 End Function
+
 '------------------------------------------------------------------------------
 ' Function: get_dropdown_value
 '
@@ -254,7 +256,6 @@ Function get_dropdown_value(sheet_name As String, dropdown_name As String) As St
     ' Return the value
     get_dropdown_value = dropdown_value
 End Function
-
 
 Sub ClearTableContents(worksheetName As String, TableName As String, Optional fromCol As Long = -1, Optional toCol As Long = -1)
     ' Clears the contents of the specified table, keeping its structure.
@@ -299,7 +300,6 @@ Sub ClearTableContents(worksheetName As String, TableName As String, Optional fr
         End If
     End If
 End Sub
-
 
 Function set_dropdown_value(sheet_name As String, dropdown_name As String, new_value As String)
     Dim dropdown_list As Variant
@@ -361,6 +361,7 @@ Function set_dropdown_value(sheet_name As String, dropdown_name As String, new_v
         End If
     End With
 End Function
+
 Sub CompareTablesAndHighlightDifferences(sheet1Name As String, table1Name As String, _
                                          sheet2Name As String, table2Name As String, _
                                          Optional matchColor As Variant, _
@@ -461,9 +462,7 @@ Sub CompareTablesAndHighlightDifferences(sheet1Name As String, table1Name As Str
             Next c
         Next r
     End If
-
 End Sub
-
 
 '===============================================================================
 ' Sub ToggleComparisonGeneric
@@ -497,7 +496,6 @@ End Sub
 '   - Requires `comparisonEnabledDict` defined as `Public` in a standard module.
 '
 '===============================================================================
-
 
 Sub ToggleComparisonGeneric()
     Dim btnName As String
@@ -552,8 +550,6 @@ Sub ToggleComparisonGeneric()
     End If
 End Sub
 
-
-
 Sub ResetNormalColoring(sheetName As String, TableName As String)
     ' Resets the background color (fill) of the data rows in the specified table.
     
@@ -576,7 +572,7 @@ Sub ShowOnlyColumns_old(columnRange As String)
 
     On Error GoTo InvalidRange
     ws.Columns.Hidden = False ' Show all columns
-
+    
     Dim col As Range
     For Each col In ws.UsedRange.Columns
         If Intersect(col, ws.Range(columnRange)) Is Nothing Then
@@ -589,7 +585,6 @@ Sub ShowOnlyColumns_old(columnRange As String)
 InvalidRange:
     MsgBox "Invalid column range: " & columnRange, vbCritical
 End Sub
-
 
 Sub ShowOnlySelectedColumns(rngAllCols As String, rngVisibleCols As String)
     Dim ws As Worksheet
@@ -680,7 +675,6 @@ Sub DeleteNamedRange_AllScopes()
     Next nm
 End Sub
 
-
 Public Sub ResizeTableToData(ByVal TableName As String, _
                              Optional ByVal CountFormulaBlanksAsData As Boolean = False)
     Dim ws As Worksheet, lo As ListObject
@@ -758,14 +752,11 @@ Function CheckPath(filePath As String, Optional extension As String = "") As Boo
     CheckPath = True
 End Function
 
-
 Sub ClearFormDropDown(sheetName As String, dropName As String)
     With Worksheets(sheetName).DropDowns(dropName)
         .RemoveAllItems
     End With
 End Sub
-
-
 
 Public Function TableExists(ws As Worksheet, tblName As String) As Boolean
     Dim lo As ListObject
@@ -793,6 +784,7 @@ Public Function RangeFromNameOrTable(ws As Worksheet, name As String) As Range
     End If
     On Error GoTo 0
 End Function
+
 Sub InstallPythonRequirements()
     Dim ws As Worksheet
     Dim tbl As ListObject

@@ -13,18 +13,22 @@ End Sub
 
 Sub export_JBOOST()
     Dim lua_path As Variant
-    lua_path = Range("JBOOST_Path").Value
-    RunPythonWrapper "export", "export_JBOOST", lua_path
+    jboost_path = Range("JBOOST_Path").Value
+    RunPythonWrapper "export", "export_JBOOST", jboost_path
 End Sub
 
+Sub fill_JBOOST_auto_values()
+    RunPythonWrapper "export", "fill_JBOOST_auto_excel"
+End Sub
+
+Sub run_JBOOST()
+    RunPythonWrapper "export", "run_JBOOST_excel"
+End Sub
 
 Sub select_WLGen_out()
     Dim prevValue As Variant
-    
     PickFolderDialog "WLGen_Path"
-    
 End Sub
-
 
 Sub export_WLGen()
     Dim lua_path As Variant
@@ -32,14 +36,14 @@ Sub export_WLGen()
     RunPythonWrapper "export", "export_WLGen", lua_path
 End Sub
 
-
 Sub fill_WLGenMasses()
+    ClearTableContents "ExportStructure", "APPURTANCES"
     RunPythonWrapper "export", "fill_WLGenMasses"
 End Sub
 
-
-
 Sub fill_Bladed_table()
+    ClearTableContents "ExportStructure", "Bladed_Nodes"
+    ClearTableContents "ExportStructure", "Bladed_Elements"
     RunPythonWrapper "export", "fill_Bladed_table"
 End Sub
 

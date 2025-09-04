@@ -501,3 +501,20 @@ def plot_TOWER(excel_caller):
 
     return
 
+
+def plot_modeshapes(data, order=(1,2)):
+
+    fig, axis = plt.subplots(1, len(order), figsize=[4*len(order), 8])
+
+    for n, ax in zip(order, axis):
+
+        ax.set_title(f"Modeshapes of order {n}")
+        ax.set_ylabel("z in m")
+        ax.set_xticks([])
+        for config, values in data.items():
+
+            shape = values.iloc[:, n+2]
+            shape = shape * np.sign(shape[0])
+            ax.plot(shape, values["z"], label=f'{config} {values.columns[n+2].replace("Mode shape ", "")}')
+        ax.legend(loc="lower right")
+    return fig

@@ -1,0 +1,285 @@
+
+                    ██╗██████╗  ██████╗  ██████╗ ███████╗████████╗  
+                    ██║██╔══██╗██╔═══██╗██╔═══██╗██╔════╝╚══██╔══╝  
+                    ██║██████╔╝██║   ██║██║   ██║███████╗   ██║     
+               ██   ██║██╔══██╗██║   ██║██║   ██║╚════██║   ██║     
+               ╚█████╔╝██████╔╝╚██████╔╝╚██████╔╝███████║   ██║     
+                ╚════╝ ╚═════╝  ╚═════╝  ╚═════╝ ╚══════╝   ╚═╝     
+
+  ╦╔╗ ╔═╗  ╔═╗╔═╗╔═╗╔═╗╦ ╦╔═╗╦═╗╔═╗  ╔═╗╔═╗╔═╗╔═╗╔╦╗╦═╗╔═╗╦    ╔╦╗╔═╗╔═╗╦  ╔═╗╔═╗╔╦╗ 
+  ║╠╩╗║ ║  ║ ║╠╣ ╠╣ ╚═╗╠═╣║ ║╠╦╝║╣   ╚═╗╠═╝║╣ ║   ║ ╠╦╝╠═╣║     ║ ║ ║║ ║║  ╚═╗║╣  ║  
+ ╚╝╚═╝╚═╝  ╚═╝╚  ╚  ╚═╝╩ ╩╚═╝╩╚═╚═╝  ╚═╝╩  ╚═╝╚═╝ ╩ ╩╚═╩ ╩╩═╝   ╩ ╚═╝╚═╝╩═╝╚═╝╚═╝ ╩  
+
+9/4/2025 9:50:06 AM	Application starts...
+9/4/2025 9:50:06 AM	running in Lua scripting modus...
+
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE node data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read FE element data
+9/4/2025 9:50:06 AM	read config data
+9/4/2025 9:50:06 AM	read FE module config data
+9/4/2025 9:50:06 AM	read marine growth data
+9/4/2025 9:50:06 AM	read marine growth data
+9/4/2025 9:50:06 AM	read marine growth data
+9/4/2025 9:50:06 AM	read marine growth data
+9/4/2025 9:50:06 AM	read ocean module config data
+9/4/2025 9:50:06 AM	read FDA module config data
+9/4/2025 9:50:06 AM	running FE Analysis...
+9/4/2025 9:50:07 AM	FE-solution found...
+9/4/2025 9:50:07 AM	FE-solution found...
+9/4/2025 9:50:07 AM	FE-Analysis running...
+9/4/2025 9:50:07 AM	Saving data in text files...
+9/4/2025 9:50:07 AM	... saving results in: C:\Users\aaron.lange\Desktop\Projekte\Geometrie_Converter\GeometryConverter\JBOOST\Results_JBOOST_Text
+9/4/2025 9:50:07 AM	...generate relevant plots...
+9/4/2025 9:50:08 AM	Error during execution of Lua script.
+ - A .NET exception occurred in user-code
