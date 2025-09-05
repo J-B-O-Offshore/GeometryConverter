@@ -84,16 +84,17 @@ def fill_dataframe_with_defaults(df: pd.DataFrame, default: pd.Series) -> pd.Dat
 
 
 def str_to_bool(s):
-    """Convert string 'True'/'False' into bool (safe for bools too)."""
+    """Convert string ('True'/'False', 'WAHR'/'FALSCH') into bool (safe for bools too)."""
     if isinstance(s, bool):
         return s
-    if str(s) == "True":
+
+    s = str(s).strip().lower()
+    if s in ("true", "wahr"):
         return True
-    elif str(s) == "False":
+    elif s in ("false", "falsch"):
         return False
     else:
         raise ValueError(f"Invalid boolean value: {s}")
-
 
 # %% macros
 
@@ -541,6 +542,7 @@ def run_JBOOST_excel(excel_caller):
 
         # iterate through configs
         Modeshapes = {}
+        waterlevels = {}
         for config_name, config_data in proj_configs.items():
             config_struct = {row: data for row, data in config_data.items()}
             config_struct.pop("runFEModul", None)
@@ -579,10 +581,11 @@ def run_JBOOST_excel(excel_caller):
             JBOOST_OUT = pe.run_JBOOST(jboost_path, proj_text, struct_text, set_calculation={"FEModul": True, "FreqDomain": True, "HindValid": False})
 
             Modeshapes[config_name] = JBOOST_OUT["Mode_shapes"]
+            waterlevels[config_name] = config_struct["water_level"]
 
         reversed_dfs = {k: df.iloc[::-1].reset_index(drop=True) for k, df in Modeshapes.items()}
 
-        FIG = plt.plot_modeshapes(reversed_dfs, order=(1,2,3,4,5))
+        FIG = plt.plot_modeshapes(reversed_dfs, order=(1,2,3), waterlevels=waterlevels)
 
         ex.insert_plot(FIG, excel_filename, "ExportStructure", f"FIG_JBOOST_MODESHAPES")
 

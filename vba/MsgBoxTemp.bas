@@ -1,6 +1,6 @@
 Attribute VB_Name = "MsgBoxTemp"
 
     Function ShowMessageBox() As Integer
-        ShowMessageBox = MsgBox("The MP and the TP are fitting together perfectly.", 64, "Message")
+        ShowMessageBox = MsgBox("Please set a water level in the StructureOverview, as you set water_level in 500 to 'auto'. Aborting.", 64, "Message")
     End Function
     

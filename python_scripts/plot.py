@@ -8,6 +8,56 @@ import pandas as pd
 import misc as mc
 
 
+def get_JBO_colors(n, fixed_colors=None):
+    """
+    Generate a list of colors for plotting with JBO corporate colors as default.
+
+    Parameters
+    ----------
+    n : int
+        Number of colors needed.
+    fixed_colors : list of tuple or None
+        List of fixed RGB tuples (0–1 range).
+        If None, defaults to JBO corporate colors:
+
+        - Yellow    : (242, 184, 30)  → #F2B81E
+        - LightBlue : (130, 182, 221) → #82B6DD
+        - DarkBlue  : (34, 76, 130)   → #224C82
+        - Teal      : (0, 143, 133)   → #008F85
+        - Gray      : (142, 135, 120) → #8E8778
+
+    Returns
+    -------
+    list of tuple
+        List of RGB colors (length = n).
+    """
+    if fixed_colors is None:
+        fixed_colors = [
+            (242 / 255, 184 / 255, 30 / 255),  # Yellow
+            (130 / 255, 182 / 255, 221 / 255),  # Light Blue
+            (34 / 255, 76 / 255, 130 / 255),  # Dark Blue
+            (0 / 255, 143 / 255, 133 / 255),  # Teal
+            (142 / 255, 135 / 255, 120 / 255),  # Gray
+        ]
+
+    # Get Matplotlib’s default color cycle
+    default_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+
+    colors = []
+
+    # Add fixed colors first
+    for i in range(min(n, len(fixed_colors))):
+        colors.append(fixed_colors[i])
+
+    # If more colors are needed, continue with Matplotlib cycle
+    if n > len(fixed_colors):
+        cycle_len = len(default_cycle)
+        for i in range(n - len(fixed_colors)):
+            colors.append(default_cycle[i % cycle_len])
+
+    return colors
+
+
 def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", waterlevel=0, show_section_numbers=True):
 
     fig, ax = plt.subplots(1, 3, figsize=[22, 6])
@@ -502,19 +552,39 @@ def plot_TOWER(excel_caller):
     return
 
 
-def plot_modeshapes(data, order=(1,2)):
+def plot_modeshapes(data, order=(1, 2), waterlevels=None):
 
-    fig, axis = plt.subplots(1, len(order), figsize=[4*len(order), 8])
+    fig, axis = plt.subplots(1, len(order), figsize=[6*len(order), 8])
+
+    if waterlevels is not None:
+        if len(waterlevels) != len(data):
+            raise ValueError("Waterlevels must have same length as data")
 
     for n, ax in zip(order, axis):
 
         ax.set_title(f"Modeshapes of order {n}")
         ax.set_ylabel("z in m")
-        ax.set_xticks([])
-        for config, values in data.items():
+        #ax.set_xticks([])
+        ax.grid(True)
 
-            shape = values.iloc[:, n+2]
+        i = 0
+        colors = get_JBO_colors(len(data))
+
+        for config, values in data.items():
+            shape = values.iloc[:, n+1]
             shape = shape * np.sign(shape[0])
-            ax.plot(shape, values["z"], label=f'{config} {values.columns[n+2].replace("Mode shape ", "")}')
+
+            if waterlevels is not None:
+                level = float(waterlevels[config])
+                alpha_value = abs(np.round(shape.loc[values["z"]==level].iloc[0] * 100,2))
+                label = f'{config} {values.columns[n + 1].replace("Mode shape ", "")}, $\\alpha(WL) = {alpha_value}\\%$'
+            else:
+                label = f'{config} {values.columns[n + 1].replace("Mode shape ", "")}'
+
+            ax.plot(shape, values["z"], label=label, color=colors[i])
+            i += 1
+
         ax.legend(loc="lower right")
+
+    fig.tight_layout()
     return fig
