@@ -47,15 +47,16 @@ Sub fill_Bladed_table()
     RunPythonWrapper "export", "fill_Bladed_table"
 End Sub
 
-Sub show_JBOOST_section()
-    ShowOnlySelectedColumns "E:AX", "E:Q"
-End Sub
+
 
 Sub show_WLGen_section()
-    ShowOnlySelectedColumns "E:AX", "R:AE"
+    ShowOnlySelectedColumns "E:BW", "E:O"
 End Sub
 
 Sub show_Bladed_section()
-    ShowOnlySelectedColumns "E:AX", "AF:AX"
+    ShowOnlySelectedColumns "E:BW", "S:AK"
 End Sub
 
+Sub show_JBOOST_section()
+    ShowOnlySelectedColumns "E:BW", "AO:BW"
+End Sub

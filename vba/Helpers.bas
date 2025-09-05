@@ -105,6 +105,8 @@ End Sub
 Sub RunPythonWrapper(module_name As String, Optional function_name As String = "main", Optional args As Variant)
     Dim scriptPath As String
     Dim pythonExe As String
+    Dim checkPythonExe As String
+    Dim checkScriptPath As String
     Dim argsString As String
     Dim excelFileName As String
     Dim item As Variant
@@ -114,9 +116,9 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     Dim retCode As Long
     
     ' Turn off Excel updates for speed & stability
-     Application.ScreenUpdating = False
-  '  Application.EnableEvents = False
-  '  Application.Calculation = xlCalculationManual
+    Application.ScreenUpdating = False
+    'Application.EnableEvents = False
+    'Application.Calculation = xlCalculationManual
     
     On Error GoTo CleanFail
 
@@ -129,6 +131,8 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     On Error GoTo PythonPathError
     pythonExe = Sheets("GlobalConfig").Range("python_path").Value
     On Error GoTo 0
+
+    ' Quote path if it contains spaces
     If InStr(pythonExe, " ") > 0 And Left(pythonExe, 1) <> """" Then
         pythonExe = """" & pythonExe & """"
     End If
@@ -137,10 +141,21 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     On Error GoTo ScriptPathError
     scriptPath = Range("python_script_path").Value
     On Error GoTo 0
+
+    ' Remove trailing slash if present
     If Right(scriptPath, 1) = "\" Or Right(scriptPath, 1) = "/" Then
         scriptPath = Left(scriptPath, Len(scriptPath) - 1)
     End If
 
+    If Not FileExists(pythonExe) Then
+        MsgBox "Python executable not found: " & pythonExe, vbCritical
+        GoTo CleanExit
+    End If
+
+    If Not FolderExists(scriptPath) Then
+        MsgBox "Python script path not found: " & scriptPath, vbCritical
+        GoTo CleanExit
+    End If
     ' Always include Excel filename first
     excelFileName = ThisWorkbook.FullName
     argsString = ProcessArgument(excelFileName)
@@ -171,14 +186,11 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
         ' Run hidden and wait until finished
         retCode = wsh.Run("cmd /c " & cmd, 0, True)
     End If
+
     Application.Calculation = xlCalculationAutomatic
     Application.EnableEvents = True
     Application.ScreenUpdating = True
         
-   ' If ThisWorkbook.ActiveSheet.name = "BuildYourStructure" Then
-   '     BuildYourStructureChange ThisWorkbook.Sheets("BuildYourStructure").Range("A1"), True
-   ' End If
-    
 CleanExit:
     Exit Sub
 
@@ -194,6 +206,54 @@ CleanFail:
     MsgBox "Error in RunPythonWrapper: " & Err.Description, vbCritical
     Resume CleanExit
 End Sub
+
+Private Function FileExists(path As String) As Boolean
+    Dim fso As Object
+    Dim p As String
+    
+    If Len(path) = 0 Then
+        FileExists = False
+        Exit Function
+    End If
+    
+    ' Remove quotes
+    p = path
+    If Left(p, 1) = """" And Right(p, 1) = """" Then
+        p = Mid(p, 2, Len(p) - 2)
+    End If
+    p = Trim(p)
+    
+    ' Use FileSystemObject
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    FileExists = fso.FileExists(p)
+End Function
+
+
+Private Function FolderExists(path As String) As Boolean
+    Dim fso As Object
+    Dim p As String
+    
+    If Len(path) = 0 Then
+        FolderExists = False
+        Exit Function
+    End If
+    
+    ' Remove quotes
+    p = path
+    If Left(p, 1) = """" And Right(p, 1) = """" Then
+        p = Mid(p, 2, Len(p) - 2)
+    End If
+    p = Trim(p)
+    
+    ' Remove trailing slashes
+    Do While Right(p, 1) = "\" Or Right(p, 1) = "/"
+        p = Left(p, Len(p) - 1)
+    Loop
+    
+    ' Use FileSystemObject for reliability
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    FolderExists = fso.FolderExists(p)
+End Function
 
 '------------------------------------------------------------------------------
 ' Helper: turns VBA args into proper Python literal strings

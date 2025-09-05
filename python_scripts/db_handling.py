@@ -16,14 +16,20 @@ class ConciveError(Exception):
     pass
 
 
+import os
+import sqlite3
+import pandas as pd
+
 def drop_db_table(excel_filename, db_path, Identifier):
     """
     Drops (deletes) a table from an SQLite database.
 
     Parameters
     ----------
+    excel_filename : str
+        Excel filename for message boxes.
     db_path : str
-        Path to the SQLite database file.
+        Path to the SQLite database file (supports UNC paths).
     Identifier : str
         Name of the table to drop.
 
@@ -31,12 +37,10 @@ def drop_db_table(excel_filename, db_path, Identifier):
     -------
     bool
         True if table was successfully dropped, False otherwise.
-
-    Notes
-    -----
-    - If the table does not exist, no error is raised.
-    - Errors are shown via message box and do not raise exceptions.
     """
+    db_path = os.path.normpath(db_path)  # Normalize path
+    db_path = db_path.replace("\\", "/")
+
     try:
         conn = sqlite3.connect(db_path)
     except sqlite3.Error as e:
@@ -67,8 +71,10 @@ def create_db_table(excel_filename, db_path, Identifier, df, if_exists='fail'):
 
     Parameters
     ----------
+    excel_filename : str
+        Excel filename for message boxes.
     db_path : str
-        Path to the SQLite database file.
+        Path to the SQLite database file (supports UNC paths).
     Identifier : str
         Name of the table to create or append to.
     df : pd.DataFrame
@@ -80,12 +86,10 @@ def create_db_table(excel_filename, db_path, Identifier, df, if_exists='fail'):
     -------
     bool
         True if table creation/appending was successful, False otherwise.
-
-    Notes
-    -----
-    - Uses pandas `to_sql()` under the hood.
-    - Shows message boxes via `ex.show_message_box()` on failure.
     """
+    db_path = os.path.normpath(db_path)  # Normalize path
+    db_path = db_path.replace("\\", "/")
+
     try:
         conn = sqlite3.connect(db_path)
     except sqlite3.Error as e:
@@ -109,8 +113,26 @@ def create_db_table(excel_filename, db_path, Identifier, df, if_exists='fail'):
     return True
 
 
-
 def load_db_table(excel_filename, db_path, Identifier, dtype=None):
+    """
+    Loads a table from an SQLite database into a pandas DataFrame.
+
+    Parameters
+    ----------
+    excel_filename : str
+        Excel filename for message boxes.
+    db_path : str
+        Path to the SQLite database file (supports UNC paths).
+    Identifier : str
+        Name of the table to load.
+    dtype : dict, optional
+        Column types to enforce.
+
+    Returns
+    -------
+    pd.DataFrame or None
+        The loaded DataFrame, or None if loading failed.
+    """
     if not isinstance(Identifier, str):
         ex.show_message_box(
             excel_filename,
@@ -118,13 +140,15 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
         )
         return None
 
+    db_path = os.path.normpath(db_path)  # Normalize path
+    db_path = db_path.replace("\\", "/")
+
     try:
-        # Prevent sqlite from creating a new DB by using URI with mode=rw
         conn = sqlite3.connect(f"file:{db_path}?mode=rw", uri=True)
     except sqlite3.Error as e:
         ex.show_message_box(
             excel_filename,
-            f"The path {db_path} does not lead to a valid SQLite database. Try reloading the database."
+            f"The path '{db_path}' does not lead to a valid SQLite database. Try reloading the database."
         )
         return None
 
@@ -144,7 +168,7 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
         conn.close()
         ex.show_message_box(
             excel_filename,
-            f"The path {db_path} does not lead to a valid SQLite database. Try reloading the database."
+            f"The path '{db_path}' does not lead to a valid SQLite database. Try reloading the database."
         )
         return None
 
@@ -152,18 +176,14 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
         conn.close()
         ex.show_message_box(
             excel_filename,
-            f"Table '{Identifier}' does not exist in the database. "
-            f"Check if the database path is correct for the table you want to load. "
-            f"Maybe the selection is still from an old save, try reloading the database.\n"
+            f"Table '{Identifier}' does not exist in the database.\n"
             f"Available tables: {table_names}"
         )
         return None
 
     try:
-        query = f'SELECT * FROM "{Identifier}"'
-        df = pd.read_sql_query(query, conn)
+        df = pd.read_sql_query(f'SELECT * FROM "{Identifier}"', conn)
     except Exception as e:
-        conn.close()
         ex.show_message_box(
             excel_filename,
             f"Failed to load table '{Identifier}' from database.\nPython Error: {e}"
@@ -186,6 +206,7 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
             return None
 
     return df
+
 
 def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, Meta_values):
     """
