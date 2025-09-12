@@ -310,7 +310,7 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
     return response_map.get(result, f"Unknown ({result})")
 
 
-def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=False):
+def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=False, strip=True):
     """
     Read an Excel Table into a Pandas DataFrame, using the Table's header as column names.
 
@@ -319,6 +319,8 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=
         sheet_name (str): The name of the sheet containing the table.
         table_name (str): The name of the Excel Table (not the range name).
         dtype (type or dict): Optional dtype to cast columns to.
+        dropnan (bool): Whether to drop rows that are completely NaN.
+        strip (bool): Whether to strip whitespace from string cells.
 
     Returns:
         pd.DataFrame: DataFrame containing the table data with correct headers.
@@ -348,16 +350,21 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=
 
     df = pd.DataFrame(raw_data, columns=headers)
 
+    # Apply dtype conversions
     if dtype is not None and dtype != str:
         df = df.astype(dtype)
     elif isinstance(dtype, dict):
         for col, col_dtype in dtype.items():
             df[col] = df[col].astype(col_dtype)
 
+    # Strip whitespace from string values if enabled
+    if strip:
+        df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
+
     if dropnan:
-        return df.dropna(how='all')
-    else:
-        return df
+        df = df.dropna(how='all')
+
+    return df
 
 
 from pathlib import Path
@@ -589,3 +596,57 @@ def insert_plot(fig, workbook_name, sheet_name, named_range):
                            left=rng.left)
     os.remove(tmpfile.name)
 
+
+
+def read_named_range(path, name, sheet_name=None, dtype=None, use_header=True):
+    """
+    Read a named range from an Excel file (supports workbook-level and sheet-level names).
+    """
+    path = Path(path)
+    app = xw.App(visible=False)
+    try:
+        wb = app.books.open(str(path))
+
+        rng = None
+
+        # 1) Workbook-level names
+        for n in wb.names:
+            if n.name == name or n.name.endswith(f"!{name}"):
+                rng = n.refers_to_range
+                break
+
+        # 2) Sheet-level names
+        if rng is None and sheet_name is not None:
+            for n in wb.sheets[sheet_name].names:
+                if n.name == name or n.name.endswith(f"!{name}"):
+                    rng = n.refers_to_range
+                    break
+
+        if rng is None:
+            raise KeyError(
+                f"Named range '{name}' not found in workbook or sheet '{sheet_name}'."
+            )
+
+        # Single cell → scalar
+        if rng.rows.count == 1 and rng.columns.count == 1:
+            return rng.value
+
+        # Multi-cell → DataFrame
+        if use_header:
+            data = rng.options(pd.DataFrame, header=1, index=False).value
+        else:
+            values = rng.value
+            if values is None:
+                data = pd.DataFrame()
+            else:
+                data = pd.DataFrame(values)
+                data.columns = [f"Column{i + 1}" for i in range(data.shape[1])]
+
+        if dtype is not None and not data.empty:
+            data = data.astype(dtype)
+
+    finally:
+        wb.close()
+        app.quit()
+
+    return data

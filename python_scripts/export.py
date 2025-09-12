@@ -6,17 +6,20 @@ import excel as ex
 import misc as mc
 import numpy as np
 from pandas.api.types import CategoricalDtype
-from ALaPy import periphery as pe
+
+
 from ALaPy import periphery as pe
 
 import plot as plt
 # %% helpers
 import os
+
 os.environ["MPLBACKEND"] = "Agg"  # kein GUI nötig
 
 # optional zusätzlich:
 try:
     import matplotlib
+
     matplotlib.use("Agg", force=True)
 except Exception:
     pass
@@ -96,8 +99,135 @@ def str_to_bool(s):
     else:
         raise ValueError(f"Invalid boolean value: {s}")
 
-# %% macros
 
+# %% checks:
+def check_marine_growth(mg: pd.DataFrame, name: str = "MARINE_GROWTH") -> tuple[bool, str]:
+    required_cols = [
+        "Bottom [m]", "Top [m]", "Marine Growth [mm]",
+        "Density  [kg/m^3]", "Surface Roughness [m]"
+    ]
+
+    missing_cols = [col for col in required_cols if col not in mg.columns]
+    if missing_cols:
+        return False, f"Missing required columns in {name}:\n" + "\n".join(missing_cols)
+
+    missing_vals = [col for col in required_cols if mg[col].isnull().any()]
+    if missing_vals:
+        return False, f"Missing values in {name}:\n" + "\n".join(missing_vals)
+
+    if (mg["Marine Growth [mm]"] < 0).any():
+        return False, f"{name} contains negative marine growth thickness values."
+
+    if (mg["Density  [kg/m^3]"] <= 0).any():
+        return False, f"{name} contains non-positive density values."
+
+    return True, ""
+
+
+def check_appurtenances(apps: pd.DataFrame) -> tuple[bool, str]:
+    """
+    Validate an appurtenances DataFrame, including mutual exclusivity rules.
+
+    Parameters
+    ----------
+    apps : pd.DataFrame
+        Appurtenance data. Required columns:
+        'Top [m]', 'Bottom [m]', 'Mass [kg]', 'Diameter [m]',
+        'Orientation [°]', 'Surface roughness [m]', 'Name',
+        'Distance Axis to Axis [m]', 'Gap between surfaces [m]'.
+
+    Returns
+    -------
+    tuple[bool, str]
+        (True, "") if valid, else (False, error_message).
+    """
+    required_cols = [
+        "Top [m]", "Bottom [m]", "Mass [kg]",
+        "Diameter [m]", "Orientation [°]", "Surface roughness [m]", "Name",
+        "Distance Axis to Axis [m]", "Gap between surfaces [m]"
+    ]
+
+    # Check required columns
+    missing_cols = [col for col in required_cols if col not in apps.columns]
+    if missing_cols:
+        return False, "Missing required columns:\n" + "\n".join(missing_cols)
+
+    # Check for missing values (excluding mutually exclusive pair)
+    check_cols = [c for c in required_cols if c not in ["Distance Axis to Axis [m]", "Gap between surfaces [m]"]]
+    missing_info = []
+    for col in check_cols:
+        mask = apps[col].isnull()
+        if mask.any():
+            names = apps.loc[mask, "Name"].astype(str).tolist()
+            missing_info.append(f"Column '{col}' has missing values for: {names}")
+
+    if missing_info:
+        return False, "Missing values found:\n" + "\n".join(missing_info)
+
+    # Mutual exclusivity check
+    err_list = []
+    for idx, row in apps.iterrows():
+        axis_to_axis = row["Distance Axis to Axis [m]"]
+        gap_between = row["Gap between surfaces [m]"]
+        name = row["Name"]
+
+        if pd.isna(axis_to_axis) and pd.isna(gap_between):
+            err_list.append(
+                f"'{name}': Define either 'Distance Axis to Axis [m]' "
+                f"or 'Gap between surfaces [m]'."
+            )
+        elif pd.notna(axis_to_axis) and pd.notna(gap_between):
+            err_list.append(
+                f"'{name}': Define only one of 'Distance Axis to Axis [m]' "
+                f"or 'Gap between surfaces [m]', not both."
+            )
+
+    if err_list:
+        return False, "Geometry specification issues:\n" + "\n".join(err_list)
+
+    return True, ""
+
+
+def check_added_masses(masses: pd.DataFrame, name: str = "ADDITIONAL_MASSES") -> tuple[bool, str]:
+    """
+    Validate an additional masses DataFrame.
+
+    Parameters
+    ----------
+    masses : pd.DataFrame
+        Table of additional point masses. Required columns:
+        'Top [m]', 'Bottom [m]', 'Mass [kg]', 'Name'.
+    name : str, optional
+        Name of the dataset (used in error messages).
+
+    Returns
+    -------
+    tuple[bool, str]
+        (True, "") if valid, else (False, error_message).
+    """
+    required_cols = ["Top [m]", "Bottom [m]", "Mass [kg]", "Name"]
+
+    # Check required columns
+    missing_cols = [col for col in required_cols if col not in masses.columns]
+    if missing_cols:
+        return False, f"Missing required columns in {name}:\n" + "\n".join(missing_cols)
+
+    # Check for missing values
+    missing_vals = [col for col in required_cols if masses[col].isnull().any()]
+    if missing_vals:
+        return False, f"Missing values in {name}:\n" + "\n".join(missing_vals)
+
+    # Optional sanity checks
+    if (masses["Mass [kg]"] <= 0).any():
+        return False, f"{name} contains non-positive mass values."
+
+    if (masses["Top [m]"] < masses["Bottom [m]"]).any():
+        return False, f"{name} contains rows where Top [m] is below Bottom [m]."
+
+    return True, ""
+
+
+# %% macros
 def export_JBOOST(excel_caller, jboost_path):
     excel_filename = os.path.basename(excel_caller)
     jboost_path = os.path.abspath(jboost_path)
@@ -113,6 +243,14 @@ def export_JBOOST(excel_caller, jboost_path):
 
     if len(RNA) == 0:
         ex.show_message_box(excel_filename, "Please define RNA parameters. Aborting")
+        return
+
+    if PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "fore-aft":
+        RNA["Inertia"] = RNA["Inertia of RNA fore-aft @COG [kg m^2]"]
+    elif PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "side-side":
+        RNA["Inertia"] = RNA["Inertia of RNA side-side @COG [kg m^2]"]
+    else:
+        ex.show_message_box(excel_filename, "Please define 'side-side' or 'fore-aft' for RNA Inertia. Aborting")
         return
 
     # check Geometry
@@ -179,7 +317,7 @@ def export_JBOOST(excel_caller, jboost_path):
         path_config = os.path.join(jboost_path, config_name)
         os.makedirs(path_config, exist_ok=True)
 
-        path_proj = os.path.join(path_config, config_name + ".lua")
+        path_proj = os.path.join(path_config,  "proj.lua")
         path_struct = os.path.join(path_config, Model_name + ".lua")
 
         with open(path_proj, 'w') as file:
@@ -199,10 +337,10 @@ def export_JBOOST(excel_caller, jboost_path):
 def export_WLGen(excel_caller, WLGen_path):
     excel_filename = os.path.basename(excel_caller)
 
-    APPURTANCES_MASSES = ex.read_excel_table(excel_filename, "ExportStructure", "APPURTANCES")
-    STRUCTURE = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE")
+    APPURTANCES_MASSES = ex.read_excel_table(excel_filename, "ExportStructure", "APPURTANCES", dropnan=True)
+    STRUCTURE = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
     STRUCTURE = STRUCTURE.drop(columns=["Section", "local Section"])
-    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH")
+    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
     SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", "SKIRT", dropnan=True)
 
@@ -222,24 +360,42 @@ def export_WLGen(excel_caller, WLGen_path):
 
     if len(SKIRT) == 0:
         SKIRT = None
-    text, msg = pe.create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, skirt=SKIRT)
 
-    # Feedback to user
-    if not text:
-        ex.show_message_box(excel_filename, f"WLGen Structure could not be created: {msg}")
+    # check
+    ok, err = check_added_masses(ADDITIONAL_MASSES, "ADDITIONAL_MASSES")
+    if not ok:
+        ex.show_message_box(excel_filename, f"WLGen Structure creation failed, problem with Added masses: {err}")
+        return
+
+    ok, err = check_appurtenances(APPURTANCES)
+    if not ok:
+        ex.show_message_box(excel_filename, f"WLGen Structure creation failed, problem with Appurtances definition: {err}")
+        return
+
+    ok, err = check_marine_growth(MARINE_GROWTH, "MARINE_GROWTH")
+    if not ok:
+        ex.show_message_box(excel_filename, f"WLGen Structure creation failed, problem with Marine Growth: {err}")
+        return
+
+    # run WGEN creation
+    try:
+        text = pe.create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, skirt=SKIRT)
+    except Exception as e:
+        ex.show_message_box(excel_filename, f"WLGen Structure could not be created: {e}")
+        return
+
+    model_name = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
+    if model_name is None:
+        model_name = "input_WLGen.lua"
+        ex.show_message_box(excel_filename, f"No model name defined in Structure Overview. File named {model_name}.")
     else:
-        model_name = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
-        if model_name is None:
-            model_name = "WLGen_input.lua"
-            ex.show_message_box(excel_filename, f"No model name defined in Structure Overview. File named {model_name}.")
-        else:
-            model_name = model_name + ".lua"
+        model_name = model_name + ".lua"
 
-        WLGen_path = os.path.abspath(os.path.join(WLGen_path, model_name))
+    WLGen_path = os.path.abspath(os.path.join(WLGen_path, model_name))
 
-        with open(WLGen_path, 'w') as file:
-            file.write(text)
-        ex.show_message_box(excel_filename, f"WLGen Structure created successfully and saved at {WLGen_path}.")
+    with open(WLGen_path, 'w') as file:
+        file.write(text)
+    ex.show_message_box(excel_filename, f"WLGen Structure created successfully and saved at {WLGen_path}.")
     return
 
 
@@ -302,8 +458,27 @@ def fill_Bladed_table(excel_caller):
     Bladed_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Material", dropnan=True)
     GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
     MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
-    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
+    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+
+    APPURTANCES = MASSES[MASSES["Top [m]"] != MASSES["Bottom [m]"]]
+    ADDITIONAL_MASSES = MASSES[MASSES["Top [m]"] == MASSES["Bottom [m]"]]
+
+    # check
+    ok, err = check_added_masses(ADDITIONAL_MASSES, "ADDITIONAL_MASSES")
+    if not ok:
+        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Added masses: {err}")
+        return
+
+    ok, err = check_appurtenances(APPURTANCES)
+    if not ok:
+        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Appurtances definition: {err}")
+        return
+
+    ok, err = check_marine_growth(MARINE_GROWTH, "MARINE_GROWTH")
+    if not ok:
+        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Marine Growth: {err}")
+        return
 
     # Build dataframes
     Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
@@ -433,78 +608,82 @@ def fill_JBOOST_auto_excel(excel_caller):
     Fills missing or automatically assigned values in the `JBOOST_PROJECT` Excel table
     based on defaults and metadata from the `StructureOverview` sheet.
 
-    This function reads the `JBOOST_PROJECT` table from the "ExportStructure" sheet
-    and the `STRUCTURE_META` table from the "StructureOverview" sheet of the given
-    Excel file. It then replaces missing or "auto" values in project configurations
-    with either:
-    - default values from the `default` column, or
-    - resolved values from the `STRUCTURE_META` table (e.g., water level, seabed level,
-      hub height).
+    Reads the `JBOOST_PROJECT` table from the "ExportStructure" sheet
+    and the `STRUCTURE_META` table from the "StructureOverview" sheet. Replaces
+    missing or 'auto' values with either:
+      - defaults from the `default` column, or
+      - values from `STRUCTURE_META` (e.g., water level, seabed level, hub height).
 
-    If a required "auto" value cannot be resolved from `STRUCTURE_META`, a message box
-    is shown to the user and the process is aborted.
+    If a required 'auto' value cannot be resolved from `STRUCTURE_META`, a message box
+    is shown and the function aborts.
 
     Parameters
     ----------
     excel_caller : str
         Path or filename of the Excel file containing the required tables.
         Only the basename is used internally.
+
+    Returns
+    -------
+    bool
+        True if all values were successfully filled; False if the process was aborted.
     """
 
     excel_filename = os.path.basename(excel_caller)
 
+    # Load tables
     PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    hubheight = ex.read_named_range(excel_caller, "HubHeight", sheet_name="StructureOverview", dtype=float, use_header=False)
 
-    # Keep original for reference
+    # Use 'Project Settings' as the index
     PROJECT.index = PROJECT["Project Settings"]
 
-    default = PROJECT.loc[:, "default"]
+    default_values = PROJECT["default"]
     proj_configs = PROJECT.iloc[:, 4:]
 
+    def resolve_auto_value(parameter, config_key, description, config_name):
+        """Helper to resolve 'auto' values from STRUCTURE_META."""
+        value = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == parameter, "Value"].values
+        if len(value) > 0 and isinstance(value[0], (int, float)):
+            PROJECT.at[config_key, config_name] = value[0]
+            return True
+        ex.show_message_box(
+            excel_filename,
+            f"Please set {description} in StructureOverview, as you set {config_key} in {config_name} to 'auto'. Aborting."
+        )
+        return False
+
+    # Iterate over project configurations
     for config_name, config_data in proj_configs.items():
+        # Fill empty cells with defaults
+        config_data = config_data.replace("", np.nan).fillna(default_values)
 
-        # Fill missing values in config_data with defaults
-        config_data = config_data.replace("", np.nan).fillna(default)
-
-        # helper: resolve auto values
-        def resolve_auto_value(parameter, config_key, description):
-            var = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == parameter, "Value"].values
-            if len(var) > 0 and isinstance(var[0], (int, float)):
-                PROJECT.at[config_key, config_name] = var[0]
-                return True
-            else:
-                ex.show_message_box(
-                    excel_filename,
-                    f"Please set {description} in the StructureOverview, as you set {config_key} in {config_name} to 'auto'. Aborting."
-                )
-                return False
-
-        # only overwrite if original was "auto"
+        # Fill specific 'auto' values
         if config_data.at["water_level"] == "auto":
-            if not resolve_auto_value("Water level", "water_level", "a water level"):
+            if not resolve_auto_value("Water level", "water_level", "a water level", config_name):
                 return False
         if config_data.at["seabed_level"] == "auto":
-            if not resolve_auto_value("Seabed level", "seabed_level", "a seabed level"):
+            if not resolve_auto_value("Seabed level", "seabed_level", "a seabed level", config_name):
                 return False
         if config_data.at["h_hub"] == "auto":
-            if not resolve_auto_value("Hubheight", "h_hub", "Hubheight"):
-                return False
+            PROJECT.at["h_hub", config_name] = hubheight
         if config_data.at["h_refwindspeed"] == "auto":
-            PROJECT.at["h_refwindspeed", config_name] = config_data["h_hub"]
+            PROJECT.at["h_refwindspeed", config_name] = PROJECT.at["h_hub", config_name]
 
+    # Restore 'Project Settings' column
     PROJECT["Project Settings"] = PROJECT.index
 
-    # write back only the modified table
+    # Write back updated table
     ex.write_df_to_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
 
     return True
 
 
 def run_JBOOST_excel(excel_caller):
+    success = fill_JBOOST_auto_excel(excel_caller)
 
-    if fill_JBOOST_auto_excel(excel_caller):
-
+    if success:
         excel_filename = os.path.basename(excel_caller)
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -521,6 +700,14 @@ def run_JBOOST_excel(excel_caller):
 
         if len(RNA) == 0:
             ex.show_message_box(excel_filename, "Please define RNA parameters. Aborting")
+            return
+
+        if PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "fore-aft":
+            RNA["Inertia"] = RNA["Inertia of RNA fore-aft @COG [kg m^2]"]
+        elif PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "side-side":
+            RNA["Inertia"] = RNA["Inertia of RNA side-side @COG [kg m^2]"]
+        else:
+            ex.show_message_box(excel_filename, "Please define 'side-side' or 'fore-aft' for RNA Inertia. Aborting")
             return
 
         # check Geometry
@@ -585,7 +772,7 @@ def run_JBOOST_excel(excel_caller):
 
         reversed_dfs = {k: df.iloc[::-1].reset_index(drop=True) for k, df in Modeshapes.items()}
 
-        FIG = plt.plot_modeshapes(reversed_dfs, order=(1,2,3), waterlevels=waterlevels)
+        FIG = plt.plot_modeshapes(reversed_dfs, order=(1, 2, 3), waterlevels=waterlevels)
 
         ex.insert_plot(FIG, excel_filename, "ExportStructure", f"FIG_JBOOST_MODESHAPES")
 
@@ -593,5 +780,7 @@ def run_JBOOST_excel(excel_caller):
 
 
 #run_JBOOST_excel("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm")
+#fill_JBOOST_auto_excel("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm")
+#export_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", ".")
 
-#export_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/Validation_Waterekke/JBOOST/new/GeometryConverter_v1.1_L2G1S3.xlsm", ".")
+#fill_Bladed_table("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm")

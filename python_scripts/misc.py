@@ -446,6 +446,13 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
     TP_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_MASSES", dropnan=True)
     TOWER_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_MASSES", dropnan=True)
 
+    if len(MP_DATA) == 0:
+        ex.show_message_box(excel_filename, f"Please provide a MP structure to assamble.")
+        return
+    if len(TP_DATA) == 0:
+        ex.show_message_box(excel_filename, f"Please provide a TP structure to assamble.")
+        return
+
     # Quality Checks/Warings of single datasets, if any fail fataly, abort
     sucess_MP, MP_DATA = check_convert_structure(excel_filename, MP_DATA, "MP")
     sucess_TP, TP_DATA = check_convert_structure(excel_filename, TP_DATA, "TP")
@@ -504,7 +511,7 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
     ex.write_df_to_table(excel_filename, "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
 
     if SKIRT is not None:
-            ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT", SKIRT)
+        ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT", SKIRT)
     if SKIRT_POINTMASS is not None:
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT_POINTMASS", SKIRT_POINTMASS)
 
