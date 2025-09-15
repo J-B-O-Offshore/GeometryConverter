@@ -721,11 +721,11 @@ def load_MP_from_MPTool(excel_caller, MP_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Section_col = ex.read_excel_range(MP_path, "Geometry", "C1:C1000")
+        Section_col = ex.read_static_excel_range(MP_path, "Geometry", "C1:C1000")
         Section_col = Section_col.iloc[:, 0].dropna()
         row_MP = Section_col[Section_col == "Section"].index.values[1]
 
-        Data = ex.read_excel_range(MP_path, "Geometry", f"C{row_MP + 3}:H1000", dtype=float)
+        Data = ex.read_static_excel_range(MP_path, "Geometry", f"C{row_MP + 3}:H1000", dtype=float)
         Data = Data.dropna(how="all")
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "MP_DATA", Data)
     except Exception as e:
@@ -734,14 +734,14 @@ def load_MP_from_MPTool(excel_caller, MP_path):
         return
 
     try:
-        Parameter_col = ex.read_excel_range(MP_path, "Control", "E1:E1000", dtype=str, use_header=False)
+        Parameter_col = ex.read_static_excel_range(MP_path, "Control", "E1:E1000", dtype=str, use_header=False)
         Parameter_col = Parameter_col.iloc[:, 0].dropna()
 
         row_RL = Parameter_col[Parameter_col.str.strip() == "Reference level"].index[0]
         row_ML = Parameter_col[Parameter_col.str.strip() == "Mudline"].index.values[0]
 
-        Refercene_Level = ex.read_excel_range(MP_path, "Control", f"F{row_RL + 1}", dtype=str, use_header=False)
-        Mudline = ex.read_excel_range(MP_path, "Control", f"F{row_ML + 1}", dtype=float, use_header=False)
+        Refercene_Level = ex.read_static_excel_range(MP_path, "Control", f"F{row_RL + 1}", dtype=str, use_header=False)
+        Mudline = ex.read_static_excel_range(MP_path, "Control", f"F{row_ML + 1}", dtype=float, use_header=False)
 
         META_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META_NEW", dtype=str)
 
@@ -771,7 +771,7 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
+        Data_temp = ex.read_static_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
         Data_temp = Data_temp.dropna(how="all")
         Data = pd.DataFrame({
             "Name": Data_temp.iloc[:, 2],
@@ -870,7 +870,7 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
+        Data_temp = ex.read_static_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
         Data_temp = Data_temp.dropna(how="all")
         Data = pd.DataFrame({
             "Name": Data_temp.iloc[:, 2],
@@ -968,12 +968,12 @@ def load_TP_from_MPTool(excel_caller, MP_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Section_col = ex.read_excel_range(MP_path, "Geometry", "C1:C1000")
+        Section_col = ex.read_static_excel_range(MP_path, "Geometry", "C1:C1000")
         Section_col = Section_col.iloc[:, 0].dropna()
         row_TP = Section_col[Section_col == "Section"].index.values[0]
         row_MP = Section_col[Section_col == "Section"].index.values[1]
 
-        Data = ex.read_excel_range(MP_path, "Geometry", f"C{row_TP + 3}:H{row_MP - 2}", dtype=float)
+        Data = ex.read_static_excel_range(MP_path, "Geometry", f"C{row_TP + 3}:H{row_MP - 2}", dtype=float)
         Data = Data.dropna(how="all")
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "TP_DATA", Data)
     except Exception as e:
@@ -981,14 +981,14 @@ def load_TP_from_MPTool(excel_caller, MP_path):
                             f"Error reading {MP_path} TP and MP. Please make sure, the path leads to a valid MP_tool xlsm file and has the TP data on the 'Geometry' sheet 3 rows under the first 'Section' header, empty rows allowed. Error thrown by Python: {e}.")
 
     try:
-        Parameter_col = ex.read_excel_range(MP_path, "Control", "E1:E1000", dtype=str, use_header=False)
+        Parameter_col = ex.read_static_excel_range(MP_path, "Control", "E1:E1000", dtype=str, use_header=False)
         Parameter_col = Parameter_col.iloc[:, 0].dropna()
 
         row_RL = Parameter_col[Parameter_col.str.strip() == "Reference level"].index[0]
         row_ML = Parameter_col[Parameter_col.str.strip() == "Mudline"].index.values[0]
 
-        Refercene_Level = ex.read_excel_range(MP_path, "Control", f"F{row_RL + 1}", dtype=str, use_header=False)
-        Mudline = ex.read_excel_range(MP_path, "Control", f"F{row_ML + 1}", dtype=float, use_header=False)
+        Refercene_Level = ex.read_static_excel_range(MP_path, "Control", f"F{row_RL + 1}", dtype=str, use_header=False)
+        Mudline = ex.read_static_excel_range(MP_path, "Control", f"F{row_ML + 1}", dtype=float, use_header=False)
 
         META_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_META_NEW", dtype=str)
 
@@ -1016,7 +1016,7 @@ def load_TOWERMasses_from_GeomConv(excel_caller, GeomConv_path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        Data_temp = ex.read_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
+        Data_temp = ex.read_static_excel_range(GeomConv_path, "Zusätzliche Eingaben", "K11:M1000", use_header=False)
         Data_temp = Data_temp.dropna(how="all")
         Data = pd.DataFrame({
             "Name": Data_temp.iloc[:, 2],

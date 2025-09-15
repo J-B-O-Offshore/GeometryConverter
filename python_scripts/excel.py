@@ -1,14 +1,15 @@
 import logging
 from datetime import datetime
-import pandas as pd
 import numpy as np
-import re
 import textwrap
 import os
-import time
 import tempfile
-import pywintypes
 import xlwings as xw
+import pandas as pd
+from pathlib import Path
+import re
+from openpyxl import load_workbook
+
 
 def setup_logger():
     logger = logging.getLogger()
@@ -367,9 +368,6 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=
     return df
 
 
-from pathlib import Path
-
-
 def read_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
     """
     Read a specific Excel range or cell from an Excel file.
@@ -422,58 +420,53 @@ def read_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
 
 def read_static_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
     """
-    Read a specific Excel range or cell from an Excel file using pandas.
+    Read a specific Excel range or cell from an Excel file without launching Excel.
 
     Parameters:
-        path (str or Path): Full path to the Excel workbook.
+        path (str or Path): Full path to the Excel workbook (.xlsx).
         sheet_name (str): The name of the sheet containing the range.
         cell_range (str): Excel reference (e.g., "B14:L30", "F", "F10").
         dtype (dict or type, optional): Data type(s) to apply to the DataFrame.
         use_header (bool): If True, use the first row of the range as column headers.
 
     Returns:
-        pd.DataFrame or single value
+        pd.DataFrame, scalar, or None: Depending on input range.
     """
     path = Path(path)
+    wb = load_workbook(path, data_only=True, read_only=True)
+    if sheet_name not in wb.sheetnames:
+        raise ValueError(f"Sheet {sheet_name!r} not found in workbook.")
+    ws = wb[sheet_name]
 
     # Case 1: Single cell like "F10"
     if re.fullmatch(r"[A-Z]+[0-9]+", cell_range, re.IGNORECASE):
-        row, col = coordinate_to_tuple(cell_range)  # (row, col)
-        df = pd.read_excel(path, sheet_name=sheet_name, header=None, engine="openpyxl")
-        return df.iat[row - 1, col - 1]
+        return ws[cell_range].value
 
     # Case 2: Single column like "F"
     elif re.fullmatch(r"[A-Z]+", cell_range, re.IGNORECASE):
-        col = cell_range.upper()
-        df = pd.read_excel(path, sheet_name=sheet_name, usecols=col, header=0 if use_header else None, engine="openpyxl")
-        if not use_header:
-            df.columns = ["Column1"]
-        return df if dtype is None else df.astype(dtype)
+        col_letter = cell_range.upper()
+        values = [cell.value for cell in ws[col_letter] if cell.value is not None]
+        return pd.DataFrame(values, columns=[col_letter])
 
-    # Case 3: Range like "B14:L30"
+    # Case 3: Explicit range like "B14:L30"
     else:
-        # Parse coordinates
-        start_col, start_row = re.match(r"([A-Z]+)(\d+)", cell_range.split(":")[0]).groups()
-        end_col, end_row = re.match(r"([A-Z]+)(\d+)", cell_range.split(":")[1]).groups()
+        data = ws[cell_range]
+        rows = [[cell.value for cell in row] for row in data]
 
-        # Column letters range
-        col_range = f"{start_col}:{end_col}"
-
-        # Read only the necessary columns
-        df = pd.read_excel(path, sheet_name=sheet_name, usecols=col_range, header=None, engine="openpyxl")
-
-        # Slice rows (Excel is 1-based, pandas is 0-based, and header may shift things)
-        start_row, end_row = int(start_row), int(end_row)
-        df = df.iloc[start_row - 1:end_row]
+        if not rows:
+            return pd.DataFrame()
 
         if use_header:
-            df.columns = df.iloc[0]
-            df = df.iloc[1:]
+            header = rows[0]
+            df = pd.DataFrame(rows[1:], columns=header)
+        else:
+            df = pd.DataFrame(rows)
+            df.columns = [f"Column{i+1}" for i in range(df.shape[1])]
 
-        if not use_header:
-            df.columns = [f"Column{i + 1}" for i in range(df.shape[1])]
+        if dtype is not None and not df.empty:
+            df = df.astype(dtype)
 
-        return df if dtype is None else df.astype(dtype)
+        return df
 
 
 def clear_excel_table_contents(workbook_name, sheet_name, table_name):
@@ -595,7 +588,6 @@ def insert_plot(fig, workbook_name, sheet_name, named_range):
                            top=rng.top,
                            left=rng.left)
     os.remove(tmpfile.name)
-
 
 
 def read_named_range(path, name, sheet_name=None, dtype=None, use_header=True):
