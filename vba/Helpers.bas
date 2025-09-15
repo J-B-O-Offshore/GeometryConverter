@@ -1,131 +1,27 @@
 Attribute VB_Name = "Helpers"
-' PRIVATE FUNCTIONS:
 
-' -----------------------------------------------------------------------------
-' Function: FileExists
+'------------------------------------------------------------------------------
+' OpenFileDialog
 '
-' Description:
-'   Checks whether a specified file exists on disk.
-'   Handles paths with optional quotes and trims extra spaces.
+' Opens a file dialog to allow the user to select a file and writes the selected
+' file path into a specified target cell.
+'
+' Features:
+' - Displays a file picker dialog with a customizable title.
+' - Lets you define a file filter (e.g., only .txt or .xlsx files).
+' - Writes the selected file path into the specified target cell.
+' - If the user cancels, the target cell is cleared.
 '
 ' Parameters:
-'   path (String) [Required]
-'       - The full path to the file, optionally quoted.
+'   TargetCellAddress (String) - Address of the cell where the file path should be written.
+'   DialogTitle (String)       - The title shown in the file picker dialog.
+'   FilterName (String)        - Description of the filter (e.g., "Text Files").
+'   FilterPattern (String)     - Pattern for the filter (e.g., "*.txt").
 '
-' Returns:
-'   Boolean
-'       - True if the file exists, False otherwise.
+' Example:
+'   OpenFileDialog "B2", "Select a text file", "Text Files", "*.txt"
+'   -> Opens a file dialog showing only .txt files, writes chosen file path into cell B2.
 '
-' Notes:
-'   - Uses the FileSystemObject for reliable file existence checking.
-'   - Returns False if the input path is empty.
-' -----------------------------------------------------------------------------
-Private Function FileExists(path As String) As Boolean
-    Dim fso As Object
-    Dim p As String
-    
-    If Len(path) = 0 Then
-        FileExists = False
-        Exit Function
-    End If
-    
-    ' Remove quotes
-    p = path
-    If Left(p, 1) = """" And Right(p, 1) = """" Then
-        p = Mid(p, 2, Len(p) - 2)
-    End If
-    p = Trim(p)
-    
-    ' Use FileSystemObject
-    Set fso = CreateObject("Scripting.FileSystemObject")
-    FileExists = fso.FileExists(p)
-End Function
-
-' -----------------------------------------------------------------------------
-' Function: FolderExists
-'
-' Description:
-'   Checks whether a specified folder exists on disk.
-'   Handles paths with optional quotes, trims extra spaces, and removes
-'   trailing slashes.
-'
-' Parameters:
-'   path (String) [Required]
-'       - The full path to the folder, optionally quoted.
-'
-' Returns:
-'   Boolean
-'       - True if the folder exists, False otherwise.
-'
-' Notes:
-'   - Uses the FileSystemObject for reliable folder existence checking.
-'   - Returns False if the input path is empty.
-' -----------------------------------------------------------------------------
-
-Private Function FolderExists(path As String) As Boolean
-    Dim fso As Object
-    Dim p As String
-    
-    If Len(path) = 0 Then
-        FolderExists = False
-        Exit Function
-    End If
-    
-    ' Remove quotes
-    p = path
-    If Left(p, 1) = """" And Right(p, 1) = """" Then
-        p = Mid(p, 2, Len(p) - 2)
-    End If
-    p = Trim(p)
-    
-    ' Remove trailing slashes
-    Do While Right(p, 1) = "\" Or Right(p, 1) = "/"
-        p = Left(p, Len(p) - 1)
-    Loop
-    
-    ' Use FileSystemObject for reliability
-    Set fso = CreateObject("Scripting.FileSystemObject")
-    FolderExists = fso.FolderExists(p)
-End Function
-
-
-' -----------------------------------------------------------------------------
-' Subroutine: OpenFileDialog
-'
-' Description:
-'   Opens a file picker dialog in Excel and writes the selected file path into
-'   a specified target cell. Provides options to customize the dialog title
-'   and file filters.
-'
-' Parameters:
-'   TargetCellAddress (String) [Required]
-'       - The address of the cell (e.g., "B2") where the selected file path
-'         will be written.
-'
-'   DialogTitle (String) [Optional, default: "Select a file"]
-'       - The title displayed on the file dialog window.
-'
-'   FilterName (String) [Optional, default: "All Files"]
-'       - The display name of the file filter (e.g., "Excel Files").
-'
-'   FilterPattern (String) [Optional, default: "*.*"]
-'       - The file pattern for filtering files (e.g., "*.xlsx;*.xls").
-'
-' Behavior:
-'   1. Uses the workbook's folder as the starting location for the dialog.
-'      If the workbook is unsaved, defaults to "C:\".
-'   2. Clears any existing filters and adds the specified filter.
-'   3. Opens the file picker dialog and waits for user selection.
-'   4. Writes the selected file path into the target cell. If the user cancels,
-'      the target cell is cleared.
-'
-' Example Usage:
-'   OpenFileDialog "B2"
-'   OpenFileDialog "C5", "Select an Excel file", "Excel Files", "*.xlsx;*.xls"
-'
-' Notes:
-'   - Only the first selected file is used if multiple selection is allowed.
-' -----------------------------------------------------------------------------
 Sub OpenFileDialog(TargetCellAddress As String, _
                    Optional DialogTitle As String = "Select a file", _
                    Optional FilterName As String = "All Files", _
@@ -134,21 +30,13 @@ Sub OpenFileDialog(TargetCellAddress As String, _
     Dim FileDialog As FileDialog
     Dim filePath As String
     Dim TargetCell As Range
-    Dim startFolder As String
 
     Set TargetCell = ActiveSheet.Range(TargetCellAddress)
     Set FileDialog = Application.FileDialog(msoFileDialogFilePicker)
 
-    ' Use workbook location as starting folder (fallback to C:\ if unsaved)
-    If ThisWorkbook.path <> "" Then
-        startFolder = ThisWorkbook.path & "\"
-    Else
-        startFolder = "C:\"
-    End If
-
     With FileDialog
         .Title = DialogTitle
-        .InitialFileName = startFolder
+        .InitialFileName = "C:\"   ' Starting folder
         .Filters.Clear
         .Filters.Add FilterName, FilterPattern
         
@@ -159,7 +47,6 @@ Sub OpenFileDialog(TargetCellAddress As String, _
         
         filePath = .SelectedItems(1)
     End With
-
     TargetCell.Value = filePath
 End Sub
 
@@ -199,51 +86,22 @@ NoCell:
     MsgBox "Target cell not found: " & Target_cell, vbExclamation
 End Sub
 
-' -----------------------------------------------------------------------------
-' Subroutine: RunPythonWrapper
+'*******************************************************************************
+' RunPythonWrapper (Shell version, no xlwings)
 '
 ' Description:
-'   Executes a specified Python module and function from within Excel using VBA.
-'   This wrapper constructs a command line call to Python, passes the current
-'   workbook filename and any additional arguments, and optionally displays
-'   the command prompt for debugging.
+'   Runs a Python function from a script in the "python_scripts" folder
+'   by launching Python via the Shell.
 '
 ' Parameters:
-'   module_name (String) [Required]
-'       - The name of the Python module to import and execute.
-'
-'   function_name (String) [Optional, default: "main"]
-'       - The function within the module to call.
-'
-'   args (Variant) [Optional]
-'       - Additional arguments to pass to the Python function. Can be a single
-'         value or a Collection of values.
-'
-' Behavior:
-'   1. Reads the Python executable path and script folder from the "GlobalConfig"
-'      sheet's named ranges: 'python_path' and 'python_script_path'.
-'   2. Verifies that the Python executable and script folder exist.
-'   3. Constructs a Python command line that appends the script path to sys.path,
-'      imports the module, and calls the specified function with the workbook
-'      filename and additional arguments.
-'   4. Executes the command synchronously using WScript.Shell.
-'   5. In debug mode (controlled via 'debug_mode' on GlobalConfig), the command
-'      prompt remains open after execution; otherwise, it runs hidden.
-'   6. Temporarily disables Excel screen updating, events, and calculation for
-'      performance and stability, restoring them afterward.
-'
-' Error Handling:
-'   - Displays a message box if the Python executable or script path is missing or invalid.
-'   - Catches other runtime errors and reports them via message box.
+'   module_name (String)     - Python module name (without .py)
+'   Optional function_name   - Function to run inside module (default = "main")
+'   Optional args            - Either a string (path) or a Range/Collection of strings
 '
 ' Example Usage:
-'   RunPythonWrapper "my_module"
-'   RunPythonWrapper "my_module", "my_function", Array("arg1", 123)
-'
-' Notes:
-'   - The workbook filename is always passed as the first argument to the Python function.
-'   - Spaces in paths are automatically quoted.
-' -----------------------------------------------------------------------------
+'   RunPythonWrapper "load_MP_META", "main", "C:\my\path\file.db"
+'   RunPythonWrapper "my_script", "main", Range("A1:A5")
+'*******************************************************************************
 Sub RunPythonWrapper(module_name As String, Optional function_name As String = "main", Optional args As Variant)
     Dim scriptPath As String
     Dim pythonExe As String
@@ -349,35 +207,57 @@ CleanFail:
     Resume CleanExit
 End Sub
 
+Private Function FileExists(path As String) As Boolean
+    Dim fso As Object
+    Dim p As String
+    
+    If Len(path) = 0 Then
+        FileExists = False
+        Exit Function
+    End If
+    
+    ' Remove quotes
+    p = path
+    If Left(p, 1) = """" And Right(p, 1) = """" Then
+        p = Mid(p, 2, Len(p) - 2)
+    End If
+    p = Trim(p)
+    
+    ' Use FileSystemObject
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    FileExists = fso.FileExists(p)
+End Function
 
-' -----------------------------------------------------------------------------
-' Function: ProcessArgument
-'
-' Description:
-'   Converts a VBA variable into a string formatted as a Python literal.
-'   Handles ranges, strings, arrays, and other types appropriately so that
-'   they can be safely passed as arguments to Python functions via a command line.
-'
-' Parameters:
-'   item (Variant) [Required]
-'       - The value to convert. Can be a single value, a Range, or an Array.
-'
-' Returns:
-'   String
-'       - A string representing the Python literal version of the input.
-'
-' Behavior:
-'   - Range: returns the cell value as a single-quoted Python string, escaping
-'     single quotes inside the value.
-'   - String: returns a raw Python string (r'...') and escapes backslashes.
-'   - Array: returns a Python list with each element converted as a raw string.
-'   - Other types (numbers, Boolean, etc.): converted to string using CStr.
-'
-' Example Usage:
-'   ProcessArgument("C:\path\file.txt")  ->  r'C:\\path\\file.txt'
-'   ProcessArgument(Range("A1"))        ->  'cell_value'
-'   ProcessArgument(Array("a", "b"))    ->  [r'a', r'b']
-' -----------------------------------------------------------------------------
+
+Private Function FolderExists(path As String) As Boolean
+    Dim fso As Object
+    Dim p As String
+    
+    If Len(path) = 0 Then
+        FolderExists = False
+        Exit Function
+    End If
+    
+    ' Remove quotes
+    p = path
+    If Left(p, 1) = """" And Right(p, 1) = """" Then
+        p = Mid(p, 2, Len(p) - 2)
+    End If
+    p = Trim(p)
+    
+    ' Remove trailing slashes
+    Do While Right(p, 1) = "\" Or Right(p, 1) = "/"
+        p = Left(p, Len(p) - 1)
+    Loop
+    
+    ' Use FileSystemObject for reliability
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    FolderExists = fso.FolderExists(p)
+End Function
+
+'------------------------------------------------------------------------------
+' Helper: turns VBA args into proper Python literal strings
+'------------------------------------------------------------------------------
 Function ProcessArgument(item As Variant) As String
     Dim result As String
     Dim i As Long
@@ -437,44 +317,50 @@ Function get_dropdown_value(sheet_name As String, dropdown_name As String) As St
     get_dropdown_value = dropdown_value
 End Function
 
+Sub ClearTableContents(worksheetName As String, TableName As String, Optional fromCol As Long = -1, Optional toCol As Long = -1)
+    ' Clears the contents of the specified table, keeping its structure.
+    ' If fromCol and toCol are specified, only those columns within the table are cleared.
+    '
+    ' Arguments:
+    ' worksheetName (String) : The name of the worksheet containing the table.
+    ' tableName (String)     : The name of the table to clear.
+    ' fromCol (Long)         : Optional start column index (1-based, relative to the table).
+    ' toCol (Long)           : Optional end column index (1-based, relative to the table).
+    '
+    ' Example:
+    ' ClearTableContents "Sheet1", "Table1"            ' clears all columns
+    ' ClearTableContents "Sheet1", "Table1", 2, 4      ' clears columns 2 to 4 in the table
 
-' -----------------------------------------------------------------------------
-' Function: set_dropdown_value
-'
-' Description:
-'   Sets the selected value of a Form Control dropdown (ComboBox) on a
-'   specified worksheet. Handles empty values, adds missing items if needed,
-'   and provides optional warnings if the value is not found.
-'
-' Parameters:
-'   sheet_name (String) [Required]
-'       - The name of the worksheet containing the dropdown.
-'
-'   dropdown_name (String) [Required]
-'       - The name of the Form Control dropdown shape.
-'
-'   new_value (String) [Required]
-'       - The value to set in the dropdown. Use "" to clear or set an empty
-'         selection.
-'
-' Returns:
-'   None explicitly (Function used for its side-effect of setting the dropdown).
-'
-' Behavior:
-'   1. If the dropdown is empty and new_value is "", adds an empty item and selects it.
-'   2. If new_value is "", selects an existing empty item or adds one if missing.
-'   3. If new_value exists in the dropdown list, selects it.
-'   4. If new_value is not found in the list, optionally shows a message box.
-'   5. Warns if attempting to set a non-empty value when the dropdown has no items.
-'
-' Example Usage:
-'   set_dropdown_value "Sheet1", "DropDown1", "Option A"
-'   set_dropdown_value "Sheet1", "DropDown1", ""      ' clear selection
-'
-' Notes:
-'   - Works only with Form Control dropdowns (not ActiveX controls).
-'   - Dropdown items are 1-based indexed in VBA.
-' -----------------------------------------------------------------------------
+    Dim ws As Worksheet
+    Dim table As ListObject
+    Dim i As Long
+
+    ' Set the worksheet and table
+    Set ws = ThisWorkbook.Sheets(worksheetName)
+    Set table = ws.ListObjects(TableName)
+
+    If table.DataBodyRange Is Nothing Then Exit Sub ' exit if table is empty
+
+    Dim startCol As Long
+    Dim endCol As Long
+
+    ' Determine column range to clear
+    If fromCol = -1 Or toCol = -1 Then
+        ' Default: clear all columns
+        table.DataBodyRange.ClearContents
+    Else
+        ' Validate and adjust column range
+        startCol = Application.Max(1, fromCol)
+        endCol = Application.Min(table.ListColumns.Count, toCol)
+
+        If startCol <= endCol Then
+            For i = startCol To endCol
+                table.ListColumns(i).DataBodyRange.ClearContents
+            Next i
+        End If
+    End If
+End Sub
+
 Function set_dropdown_value(sheet_name As String, dropdown_name As String, new_value As String)
     Dim dropdown_list As Variant
     Dim i As Integer
@@ -535,6 +421,108 @@ Function set_dropdown_value(sheet_name As String, dropdown_name As String, new_v
         End If
     End With
 End Function
+
+Sub CompareTablesAndHighlightDifferences(sheet1Name As String, table1Name As String, _
+                                         sheet2Name As String, table2Name As String, _
+                                         Optional matchColor As Variant, _
+                                         Optional mismatchColor As Variant)
+
+    Dim ws1 As Worksheet, ws2 As Worksheet
+    Dim table1 As ListObject, table2 As ListObject
+    Dim r As Long, c As Long
+    Dim cell1 As Range, cell2 As Range
+    Dim tolerance As Double
+    tolerance = 0.00001
+
+    ' Apply default colors if not provided
+    If IsMissing(matchColor) Then matchColor = xlNone
+    If IsMissing(mismatchColor) Then mismatchColor = RGB(255, 199, 206)
+
+    Set ws1 = ThisWorkbook.Sheets(sheet1Name)
+    Set ws2 = ThisWorkbook.Sheets(sheet2Name)
+    Set table1 = ws1.ListObjects(table1Name)
+    Set table2 = ws2.ListObjects(table2Name)
+
+    ' Ensure the tables have the same number of columns
+    If table1.ListColumns.Count <> table2.ListColumns.Count Then
+        MsgBox "Tables '" & table1Name & "' and '" & table2Name & "' must have the same number of columns!", vbExclamation
+        Exit Sub
+    End If
+
+    ' Clear previous formatting if DataBodyRange exists
+    If Not table2.DataBodyRange Is Nothing Then
+        table2.DataBodyRange.Interior.ColorIndex = xlNone
+    End If
+    If Not table1.DataBodyRange Is Nothing Then
+        table1.DataBodyRange.Interior.ColorIndex = xlNone
+    End If
+
+    ' If either table is empty, exit or highlight new rows
+    If table1.DataBodyRange Is Nothing And table2.DataBodyRange Is Nothing Then
+        ' Both tables empty, nothing to compare
+        Exit Sub
+    End If
+
+    ' Get number of rows (0 if empty)
+    Dim rows1 As Long, rows2 As Long
+
+    If table1.DataBodyRange Is Nothing Then
+        rows1 = 0
+    Else
+         rows1 = table1.DataBodyRange.Rows.Count
+    End If
+
+    If table2.DataBodyRange Is Nothing Then
+        rows2 = 0
+    Else
+        rows2 = table2.DataBodyRange.Rows.Count
+    End If
+    ' Compare cell by cell for overlapping rows
+    For r = 1 To Application.Min(rows1, rows2)
+        For c = 1 To table1.ListColumns.Count
+            Set cell1 = table1.DataBodyRange.Cells(r, c)
+            Set cell2 = table2.DataBodyRange.Cells(r, c)
+
+            If IsNumeric(cell1.Value) And IsNumeric(cell2.Value) Then
+                If Abs(cell1.Value - cell2.Value) > tolerance Then
+                    cell2.Interior.Color = mismatchColor
+                ElseIf matchColor <> xlNone Then
+                    cell2.Interior.Color = matchColor
+                End If
+            Else
+                If cell1.Value <> cell2.Value Then
+                    cell2.Interior.Color = mismatchColor
+                ElseIf matchColor <> xlNone Then
+                    cell2.Interior.Color = matchColor
+                End If
+            End If
+        Next c
+    Next r
+
+    ' Highlight extra rows in table1 (new rows not in table2)
+    If rows1 > rows2 Then
+        For r = rows2 + 1 To rows1
+            For c = 1 To table1.ListColumns.Count
+                Set cell1 = table1.DataBodyRange.Cells(r, c)
+                If cell1.Value <> "" Then
+                    cell1.Interior.Color = mismatchColor
+                End If
+            Next c
+        Next r
+    End If
+
+    ' Highlight extra rows in table2 (new rows not in table1)
+    If rows2 > rows1 Then
+        For r = rows1 + 1 To rows2
+            For c = 1 To table2.ListColumns.Count
+                Set cell2 = table2.DataBodyRange.Cells(r, c)
+                If cell2.Value <> "" Then
+                    cell2.Interior.Color = mismatchColor
+                End If
+            Next c
+        Next r
+    End If
+End Sub
 
 '===============================================================================
 ' Sub ToggleComparisonGeneric
@@ -622,6 +610,41 @@ Sub ToggleComparisonGeneric()
     End If
 End Sub
 
+Sub ResetNormalColoring(sheetName As String, TableName As String)
+    ' Resets the background color (fill) of the data rows in the specified table.
+    
+    Dim ws As Worksheet
+    Dim table As ListObject
+
+    ' Get the worksheet and table
+    Set ws = ThisWorkbook.Sheets(sheetName)
+    Set table = ws.ListObjects(TableName)
+
+    On Error Resume Next
+    ' Clear manual fill color from the table's data range
+    table.DataBodyRange.Interior.ColorIndex = xlColorIndexNone
+    On Error GoTo 0
+End Sub
+
+Sub ShowOnlyColumns_old(columnRange As String)
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Sheets("BuildYourStructure") ' Adjust sheet name if needed
+
+    On Error GoTo InvalidRange
+    ws.Columns.Hidden = False ' Show all columns
+    
+    Dim col As Range
+    For Each col In ws.UsedRange.Columns
+        If Intersect(col, ws.Range(columnRange)) Is Nothing Then
+            col.EntireColumn.Hidden = True
+        End If
+    Next col
+
+    Exit Sub
+
+InvalidRange:
+    MsgBox "Invalid column range: " & columnRange, vbCritical
+End Sub
 
 Sub ShowOnlySelectedColumns(rngAllCols As String, rngVisibleCols As String)
     Dim ws As Worksheet
