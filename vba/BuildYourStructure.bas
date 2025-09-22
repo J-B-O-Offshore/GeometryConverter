@@ -482,10 +482,18 @@ Sub move_structure_TP()
     RunPythonWrapper "misc", "move_structure_TP", args
     ActiveSheet.Range("DISPL_TP").Value = ""
     
-    
-    
 End Sub
 
+Sub move_structure_TOWER()
+    Dim displacement As String
+    Dim args As New Collection
+    displacement = ActiveSheet.Range("DISPL_TOWER").Value
+    args.Add displacement
+    
+    RunPythonWrapper "misc", "move_structure_TOWER", args
+    ActiveSheet.Range("DISPL_TOWER").Value = ""
+    
+End Sub
 
 Sub assamble_structure()
     Dim args As New Collection

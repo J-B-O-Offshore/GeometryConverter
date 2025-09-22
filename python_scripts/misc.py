@@ -484,16 +484,14 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
     WL_ref_MT = TP_META.loc[0, "Height Reference"]
     WL_ref_TOWER = TOWER_META.loc[0, "Height Reference"]
 
-    if not all_same_ignoring_none(WL_ref_MP, WL_ref_MT, WL_ref_TOWER):
+    if not all_same_ignoring_none(WL_ref_MP, WL_ref_MT):
         answer = ex.show_message_box(excel_filename,
-                                     f"Warning, not all height references are the same (MP: {WL_ref_MP}, TP: {WL_ref_MT}, TOWER: {WL_ref_TOWER}). Assemble anyway?",
+                                     f"Warning, MP and TP height reference are not the same (MP: {WL_ref_MP}, TP: {WL_ref_MT}). Assemble anyway?",
                                      buttons="vbYesNo", icon="warning")
         if answer == "No":
             return
     else:
         STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"] = [v for v in [WL_ref_MP, WL_ref_MT, WL_ref_TOWER] if v is not None][0]
-        ex.show_message_box(excel_filename,
-                            f"Height references are the same or not defined. (MP: {WL_ref_MP}, TP: {WL_ref_MT}, TOWER: {WL_ref_TOWER}).")
 
     # waterdepth handling
     if MP_META.loc[0, "Water Depth [m]"] is not None:
@@ -554,6 +552,14 @@ def move_structure_TP(excel_caller, displ):
     excel_filename = os.path.basename(excel_caller)
 
     move_structure(excel_filename, displ, "TP")
+
+    return
+
+
+def move_structure_TOWER(excel_caller, displ):
+    excel_filename = os.path.basename(excel_caller)
+
+    move_structure(excel_filename, displ, "TOWER")
 
     return
 

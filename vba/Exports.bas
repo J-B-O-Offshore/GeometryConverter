@@ -13,17 +13,42 @@ End Sub
 
 Sub export_JBOOST()
     Dim lua_path As Variant
+    Dim run As Boolean
+    Dim args As New Collection
+    
     jboost_path = Range("JBOOST_Path").Value
-    RunPythonWrapper "export", "export_JBOOST", jboost_path
+    
+    args.Add jboost_path
+
+    RunPythonWrapper "export", "export_JBOOST", args
 End Sub
+
+Sub export_run_JBOOST()
+    Dim jboost_path As Variant
+    Dim args As New Collection
+    
+    jboost_path = Range("JBOOST_Path").Value
+    
+    
+    RunPythonWrapper "export", "run_JBOOST_excel", jboost_path
+End Sub
+
 
 Sub fill_JBOOST_auto_values()
     RunPythonWrapper "export", "fill_JBOOST_auto_excel"
 End Sub
 
+
 Sub run_JBOOST()
-    RunPythonWrapper "export", "run_JBOOST_excel"
+    Dim lua_path As Variant
+    Dim run As Boolean
+    Dim args As New Collection
+    
+    jboost_path = ""
+    
+    RunPythonWrapper "export", "run_JBOOST_excel", jboost_path
 End Sub
+
 
 Sub select_WLGen_out()
     Dim prevValue As Variant

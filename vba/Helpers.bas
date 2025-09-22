@@ -181,10 +181,10 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
     Set wsh = CreateObject("WScript.Shell")
     If showShell Then
         ' Keep shell open in debug mode
-        retCode = wsh.Run("cmd /k " & cmd, 1, True)
+        retCode = wsh.run("cmd /k " & cmd, 1, True)
     Else
         ' Run hidden and wait until finished
-        retCode = wsh.Run("cmd /c " & cmd, 0, True)
+        retCode = wsh.run("cmd /c " & cmd, 0, True)
     End If
 
     Application.Calculation = xlCalculationAutomatic

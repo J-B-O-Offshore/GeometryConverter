@@ -229,8 +229,16 @@ def check_added_masses(masses: pd.DataFrame, name: str = "ADDITIONAL_MASSES") ->
 
 # %% macros
 def export_JBOOST(excel_caller, jboost_path):
+    success = fill_JBOOST_auto_excel(excel_caller)
+
+    if not success:
+        return
+
     excel_filename = os.path.basename(excel_caller)
     jboost_path = os.path.abspath(jboost_path)
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    jboost_exe_path = os.path.join(os.path.dirname(script_dir), "JBOOST\\JBOOST.exe")
 
     GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
     GEOMETRY = GEOMETRY.drop(columns=["Section", "local Section"])
@@ -680,11 +688,14 @@ def fill_JBOOST_auto_excel(excel_caller):
     return True
 
 
-def run_JBOOST_excel(excel_caller):
+def run_JBOOST_excel(excel_caller, export_path=""):
     success = fill_JBOOST_auto_excel(excel_caller)
 
     if success:
         excel_filename = os.path.basename(excel_caller)
+
+        if len(export_path) > 0:
+            export_path = os.path.abspath(export_path)
 
         script_dir = os.path.dirname(os.path.abspath(__file__))
         jboost_path = os.path.join(os.path.dirname(script_dir), "JBOOST\\JBOOST.exe")
@@ -767,6 +778,33 @@ def run_JBOOST_excel(excel_caller):
 
             JBOOST_OUT = pe.run_JBOOST(jboost_path, proj_text, struct_text, set_calculation={"FEModul": True, "FreqDomain": True, "HindValid": False})
 
+            sheet_names = []
+            sheets = []
+
+            if len(export_path) > 0:
+
+                path_config = os.path.join(export_path, config_name)
+                path_struct = os.path.join(path_config, Model_name + ".lua")
+                path_proj = os.path.join(path_config, "proj.lua")
+                path_out = os.path.join(path_config, "JBOOST_OUT.xlsx")
+
+                os.makedirs(path_config, exist_ok=True)
+
+                with open(path_proj, 'w') as file:
+                    file.write(proj_text)
+                with open(path_struct, 'w') as file:
+                    file.write(struct_text)
+
+                for key, value in JBOOST_OUT.items():
+                    if value is not None:
+                        sheet_names.append(key)
+                        sheets.append(value)
+                        pe.save_df_list_to_excel(path_out, sheets, sheet_names=sheet_names)
+
+
+
+
+
             Modeshapes[config_name] = JBOOST_OUT["Mode_shapes"]
             waterlevels[config_name] = config_struct["water_level"]
 
@@ -779,7 +817,7 @@ def run_JBOOST_excel(excel_caller):
     return
 
 
-#run_JBOOST_excel("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm")
+run_JBOOST_excel("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", ".")
 #fill_JBOOST_auto_excel("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm")
 #export_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", ".")
 
