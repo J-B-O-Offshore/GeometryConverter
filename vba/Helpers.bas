@@ -207,7 +207,7 @@ CleanFail:
     Resume CleanExit
 End Sub
 
-Private Function FileExists(path As String) As Boolean
+Public Function FileExists(path As String) As Boolean
     Dim fso As Object
     Dim p As String
     
@@ -229,7 +229,7 @@ Private Function FileExists(path As String) As Boolean
 End Function
 
 
-Private Function FolderExists(path As String) As Boolean
+Public Function FolderExists(path As String) As Boolean
     Dim fso As Object
     Dim p As String
     

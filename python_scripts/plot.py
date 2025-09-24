@@ -1,7 +1,6 @@
 import os
 import excel as ex
 import numpy as np
-
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -588,3 +587,52 @@ def plot_modeshapes(data, order=(1, 2), waterlevels=None):
 
     fig.tight_layout()
     return fig
+
+
+def plot_py_curves(data, max_lines=10, crop_symetric=False, loadcase=None):
+
+    Springs = list(np.unique(data["Spring [-]"].values))
+    heights = list(np.unique(data["z [m]"].values))
+
+    NPlot = int(np.ceil(len(Springs) / max_lines))
+
+    fig, axis = plt.subplots(1, NPlot, figsize=[5*NPlot, 6], dpi=800)
+
+    if len(axis) == 0:
+        axis = [axis]
+
+    Springs_group = [Springs[i:i + max_lines] for i in range(0, len(Springs), max_lines)]
+    heights_group = [heights[i:i + max_lines] for i in range(0, len(heights), max_lines)]
+
+    for Spring_group, height_group, ax in zip(Springs_group, heights_group, axis):
+
+        ax.set_title(f"py-curves for springs: {Spring_group[0]} ({round(height_group[0],2)}m) to {Spring_group[-1]} ({round(height_group[-1],2)}m)")
+
+        ax.set_xlabel("y [m]")
+        ax.set_ylabel("p [KN/m]")
+        ax.grid(True)
+        colors = get_JBO_colors(len(Spring_group))
+
+        for Spring, height, color in zip(Spring_group, height_group, colors):
+            p = data.loc[data["Spring [-]"] == Spring, "p [kN/m]"].values
+            y = data.loc[data["Spring [-]"] == Spring, "y [m]"].values
+
+            if crop_symetric:
+                p = p[p>=0]
+                y = y[y>=0]
+
+            ax.plot(y, p, color=color, label=f"Spring {str(Spring).zfill(2)} at {round(height,2):.2f}m b. SB")
+
+        ax.legend(loc="lower right")
+
+    fig.suptitle(
+        (f"py-curves for {loadcase}" if loadcase is not None else "") +
+        (" cropped to positive axis" if crop_symetric else ""),
+        fontsize=13,
+        fontweight="bold",
+        x=0.1,  # left edge of the figure
+        ha="left"  # align text to the left
+    )
+    fig.tight_layout()
+    return fig
+

@@ -562,7 +562,7 @@ def call_vba_dropdown_macro(workbook_name: str, sheet_name: str, dropdown_name: 
     wb.macro('set_dropdown_value')(sheet_name, dropdown_name, new_value)
 
 
-def insert_plot(fig, workbook_name, sheet_name, named_range):
+def insert_plot(fig, workbook_name, sheet_name, named_range, replace=False):
     """
     Insert a Matplotlib Figure into an already open Excel workbook at the named range.
 
@@ -571,6 +571,7 @@ def insert_plot(fig, workbook_name, sheet_name, named_range):
     - workbook_name: str, name of the open Excel workbook (e.g., 'file.xlsx')
     - sheet_name: str, name of the sheet in the workbook
     - named_range: str, named range in the sheet to place the image at
+    - replace: bool, if True, try to delete an existing picture with the same name first
     """
 
     app = xw.apps.active
@@ -578,16 +579,44 @@ def insert_plot(fig, workbook_name, sheet_name, named_range):
     sheet = wb.sheets[sheet_name]
     rng = sheet.range(named_range)
 
-    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmpfile:
-        fig.savefig(tmpfile.name, bbox_inches='tight')
-        tmpfile.flush()
+    pic_name = f"Fig_{named_range}"
 
-        sheet.pictures.add(tmpfile.name,
-                           name=f"Fig_{named_range}",
-                           update=True,
-                           top=rng.top,
-                           left=rng.left)
-    os.remove(tmpfile.name)
+    # Optionally try to delete the old picture
+    if replace:
+        try:
+            old_pic = sheet.pictures[pic_name]
+            old_pic.delete()
+        except KeyError:
+            # No picture with this name exists, ignore
+            pass
+        except Exception as e:
+            print(f"⚠️ Could not delete old picture {pic_name}: {e}")
+
+    # Try inserting as SVG first
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.svg', delete=False) as tmpfile:
+            fig.savefig(tmpfile.name, bbox_inches='tight', format='svg')
+            sheet.pictures.add(
+                tmpfile.name,
+                name=pic_name,
+                update=True,
+                top=rng.top,
+                left=rng.left
+            )
+        os.remove(tmpfile.name)
+
+    except Exception as e:
+        print(f"⚠️ SVG export failed ({e}), falling back to PNG.")
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmpfile:
+            fig.savefig(tmpfile.name, bbox_inches='tight', dpi=fig.dpi)
+            sheet.pictures.add(
+                tmpfile.name,
+                name=pic_name,
+                update=True,
+                top=rng.top,
+                left=rng.left
+            )
+        os.remove(tmpfile.name)
 
 
 def read_named_range(path, name, sheet_name=None, dtype=None, use_header=True):

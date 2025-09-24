@@ -1,12 +1,9 @@
 import os.path
-
 import pandas as pd
 import excel as ex
-
 import misc as mc
 import numpy as np
 from pandas.api.types import CategoricalDtype
-
 
 from ALaPy import periphery as pe
 
@@ -325,7 +322,7 @@ def export_JBOOST(excel_caller, jboost_path):
         path_config = os.path.join(jboost_path, config_name)
         os.makedirs(path_config, exist_ok=True)
 
-        path_proj = os.path.join(path_config,  "proj.lua")
+        path_proj = os.path.join(path_config, "proj.lua")
         path_struct = os.path.join(path_config, Model_name + ".lua")
 
         with open(path_proj, 'w') as file:
@@ -497,119 +494,6 @@ def fill_Bladed_table(excel_caller):
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
 
-
-# def fill_Sesam_table(excel_caller):
-#     excel_filename = os.path.basename(excel_caller)
-#     Sesam_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Sesam_Settings", dropnan=True)
-#     Sesam_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Sesam_Material", dropnan=True)
-#
-#     GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
-#     MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
-#     MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
-#     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
-#
-#     Sesam_Elements = pd.DataFrame(columns=["Affiliation [-]", "Member [-]", "Node [-]", "Diameter [m]", "Wall thickness [mm]", "cd [-]", "cm [-]", "Marine growth [mm]", "Density [kg*m^-3]", "Material [-]", "Elevation [m]"])
-#     Sesam_Nodes = pd.DataFrame(columns=["Node [-]", "Elevation [m]", "Local x [m]", "Local y [m]", "Point mass [kg]"])
-#
-#     create_node_tolerance = Sesam_Settings.loc[Sesam_Settings["Parameter"] == "Dimensional Tolerance for Node generating [m]", "Value"].values[0]
-#     seabed_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0]
-#     material = Sesam_Material.loc[0, "Material"]
-#     density = Sesam_Material.loc[0, "Density"]
-#
-#     # Filter geometry below seabed
-#     if seabed_level is not None:
-#         GEOMETRY = mc.add_element(GEOMETRY, seabed_level)
-#     GEOMETRY = GEOMETRY.loc[GEOMETRY["Bottom [m]"] >= seabed_level]
-#
-#     NODES = mc.extract_nodes_from_elements(GEOMETRY)
-#
-#     # Add masses
-#     NODES["pMass"] = 0.0
-#     NODES["pMassNames"] = None
-#     NODES["added"] = False
-#     NODES["comment"] = None
-#
-#     if MASSES is not None:
-#         for idx in MASSES.index:
-#             z_bot = MASSES.loc[idx, "Bottom [m]"]
-#             z_Mass = (z_bot + MASSES.loc[idx, "Top [m]"]) / 2 if pd.notna(z_bot) else MASSES.loc[idx, "Top [m]"]
-#
-#             differences = np.abs(NODES["Elevation [m]"].values - z_Mass)
-#             within_tol = np.where(differences <= create_node_tolerance)[0]
-#
-#             # if node is (nearly) on Node
-#             if len(within_tol) > 0:
-#                 closest_index = within_tol[np.argmin(differences[within_tol])]
-#                 NODES.loc[closest_index, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
-#
-#                 if NODES.loc[closest_index, "comment"] is None:
-#                     NODES.loc[closest_index, "comment"] = MASSES.loc[idx, "Name"] + " "
-#                 else:
-#                     NODES.loc[closest_index, "comment"] += MASSES.loc[idx, "Name"] + " "
-#
-#             # if node mass is over bottom
-#             elif z_Mass >= GEOMETRY["Bottom [m]"].values[-1]:
-#
-#                 # add Node
-#                 NODES = add_node(NODES, z_Mass, defaults={"float": 0})
-#                 GEOMETRY = mc.add_element(GEOMETRY, z_Mass)
-#
-#                 NODES.loc[NODES["Elevation [m]"] == z_Mass, "added"] = True
-#
-#                 NODES.loc[NODES["Elevation [m]"] == z_Mass, "pMass"] += MASSES.loc[idx, "Mass [kg]"]
-#
-#                 NODES.loc[NODES["Elevation [m]"] == z_Mass, "comment"] = MASSES.loc[idx, "Name"] + " "
-#
-#             else:
-#                 print(f"Warning! Mass '{MASSES.loc[idx, 'Name']}' not added, it is below the seabed level!")
-#
-#     # Nodes
-#     Sesam_Nodes.loc[:, "Node [-]"] = np.linspace(1, len(NODES), len(NODES))
-#     Sesam_Nodes.loc[:, "Elevation [m]"] = NODES.loc[:, "Elevation [m]"]
-#     Sesam_Nodes.loc[:, "Local x [m]"] = 0.0
-#     Sesam_Nodes.loc[:, "Local y [m]"] = 0.0
-#     Sesam_Nodes.loc[:, "Point mass [kg]"] = NODES.loc[:, "pMass"]
-#     Sesam_Nodes.loc[:, "Added"] = NODES.loc[:, "added"]
-#     Sesam_Nodes.loc[:, "Comment"] = NODES.loc[:, "comment"]
-#
-#     # Geometry
-#     GEOMETRY.loc[:, "Section"] = np.linspace(1, len(GEOMETRY), len(GEOMETRY))
-#     Sesam_Elements.loc[:, "Affiliation [-]"] = np.array([[aff_elem, aff_elem] for aff_elem in GEOMETRY["Affiliation"].values]).flatten()
-#     Sesam_Elements.loc[:, "Member [-]"] = np.array([[f"{int(sec_elem)} (End 1)", f"{int(sec_elem)} (End 2)"] for sec_elem in GEOMETRY["Section"].values]).flatten()
-#
-#     Sesam_Elements.loc[:, "Elevation [m]"] = np.array([[row["Top [m]"], row["Bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
-#
-#     for i, row in Sesam_Elements.iterrows():
-#
-#         # node
-#         elevation = row["Elevation [m]"]
-#         # Find matching node based on elevation
-#         node = Sesam_Nodes.loc[Sesam_Nodes["Elevation [m]"] == elevation, "Node [-]"]
-#         if not node.empty:
-#             Sesam_Elements.at[i, "Node [-]"] = int(node.values[0])
-#
-#         marineGrowth = MARINE_GROWTH.loc[(MARINE_GROWTH["Bottom [m]"] < elevation) & (MARINE_GROWTH["Top [m]"] >= elevation), "Marine Growth [mm]"]
-#
-#         if not marineGrowth.empty:
-#             Sesam_Elements.at[i, "Marine growth [mm]"] = marineGrowth.values[0]
-#         else:
-#             Sesam_Elements.at[i, "Marine growth [mm]"] = 0
-#
-#     Sesam_Elements.drop(columns=["Elevation [m]"], inplace=True)
-#
-#     Sesam_Elements.loc[:, "Diameter [m]"] = np.array([[row["D, top [m]"], row["D, bottom [m]"]] for i, row in GEOMETRY.iterrows()]).flatten()
-#     Sesam_Elements.loc[:, "Wall thickness [mm]"] = np.array([[row["t [mm]"], row["t [mm]"]] for i, row in GEOMETRY.iterrows()]).flatten()
-#
-#     Sesam_Elements.loc[:, "cd [-]"] = 0.9
-#     Sesam_Elements.loc[:, "cm [-]"] = 2.0
-#     Sesam_Elements.loc[:, "Density [kg*m^-3]"] = density
-#     Sesam_Elements.loc[:, "Material [-]"] = material
-#
-#     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Sesam_Elements)
-#     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Sesam_Nodes)
-#
-#     return
-#
 
 def fill_JBOOST_auto_excel(excel_caller):
     """
@@ -801,10 +685,6 @@ def run_JBOOST_excel(excel_caller, export_path=""):
                         sheets.append(value)
                         pe.save_df_list_to_excel(path_out, sheets, sheet_names=sheet_names)
 
-
-
-
-
             Modeshapes[config_name] = JBOOST_OUT["Mode_shapes"]
             waterlevels[config_name] = config_struct["water_level"]
 
@@ -817,8 +697,117 @@ def run_JBOOST_excel(excel_caller, export_path=""):
     return
 
 
-run_JBOOST_excel("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", ".")
-#fill_JBOOST_auto_excel("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm")
-#export_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", ".")
+def fill_bladed_py_dropdown(excel_caller, py_path):
+    py_path = os.path.abspath(py_path)
+    excel_filename = os.path.basename(excel_caller)
 
-#fill_Bladed_table("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm")
+    try:
+        PY_data = pe.read_geo_py_curves(py_path)
+    except ValueError as err:
+        ex.show_message_box(excel_filename, "PY data file could not be read, make shure it is the right format.")
+        ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
+        return
+
+    ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", list(PY_data.keys()))
+
+    return
+
+
+def plot_bladed_py(excel_caller, py_path, selected_loadcase):
+    py_path = os.path.abspath(py_path)
+    excel_filename = os.path.basename(excel_caller)
+    Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
+    max_lines = Bladed_Settings.loc[
+        Bladed_Settings["Parameter"] == "py lines per axis", "Value"
+    ].values[0]
+
+    try:
+        PY_data = pe.read_geo_py_curves(py_path)
+        PY_loadcase = PY_data[selected_loadcase]
+
+        FIG = plt.plot_py_curves(PY_loadcase, loadcase=selected_loadcase, max_lines=int(max_lines))
+
+        ex.insert_plot(FIG, excel_filename, "ExportStructure", f"FIG_PY_CURVES", replace=True)
+
+    except ValueError as err:
+        ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make shure it is the right format and it is reachable.")
+        ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
+        return
+
+    return
+
+
+def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadcase):
+    py_path = os.path.abspath(py_path)
+    pj_export_path = os.path.abspath(pj_export_path)
+    excel_filename = os.path.basename(excel_caller)
+    Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
+    PJ_file_name = Bladed_Settings.loc[
+        Bladed_Settings["Parameter"] == "PJ file name", "Value"
+    ].values[0]
+    PJ_file_name += ".$PJ"
+
+    try:
+        PY_data = pe.read_geo_py_curves(py_path)
+        PY_loadcase = PY_data[selected_loadcase]
+
+        PJ_txt = pe.create_bladed_PJ_py_file(PY_loadcase)
+
+        path_PJ_file = os.path.join(pj_export_path, PJ_file_name)
+        with open(path_PJ_file, 'w') as file:
+            file.write(PJ_txt)
+
+    except ValueError as err:
+        ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make shure it is the right format and it is reachable.")
+        ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
+        return
+
+    np.unique(PY_loadcase["z [m]"])
+
+    PY_loadcase_spring_heigths = pd.Series(np.unique(PY_loadcase["z [m]"]), index=np.unique(PY_loadcase["Spring [-]"]))
+
+    # insert springs
+    Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
+    Bladed_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Material", dropnan=True)
+    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
+    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
+    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+
+    APPURTANCES = MASSES[MASSES["Top [m]"] != MASSES["Bottom [m]"]]
+    ADDITIONAL_MASSES = MASSES[MASSES["Top [m]"] == MASSES["Bottom [m]"]]
+
+    seabed_level = STRUCTURE_META.loc[
+        STRUCTURE_META["Parameter"] == "Seabed level", "Value"
+    ].values[0]
+
+    # check
+    ok, err = check_added_masses(ADDITIONAL_MASSES, "ADDITIONAL_MASSES")
+    if not ok:
+        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Added masses: {err}")
+        return
+
+    ok, err = check_appurtenances(APPURTANCES)
+    if not ok:
+        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Appurtances definition: {err}")
+        return
+
+    ok, err = check_marine_growth(MARINE_GROWTH, "MARINE_GROWTH")
+    if not ok:
+        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Marine Growth: {err}")
+        return
+
+    if seabed_level is None:
+        ex.show_message_box(excel_filename, f"Seabed level has to be proided (StrucutreOverview) when py curves are applied! Aborting.")
+        return
+
+    # Build dataframes
+    Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
+        Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META, cut_embedded=False, PY_springs=PY_loadcase_spring_heigths
+    )
+
+    # Write outputs
+    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
+    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
+
+    return
