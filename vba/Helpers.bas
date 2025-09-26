@@ -692,18 +692,19 @@ Sub ShowOnlySelectedColumns(rngAllCols As String, rngVisibleCols As String)
         End If
     Next shp
 
-    ' Hide pictures in hidden columns
+    ' Hide pictures in hidden columns (PNG, SVG, etc.)
     For Each shp In ws.Shapes
-        If shp.Type = msoPicture Then
-            On Error Resume Next ' Prevents crash if TopLeftCell is off-sheet
-            topLeftCol = shp.TopLeftCell.Column
-            On Error GoTo 0
-            If ws.Columns(topLeftCol).Hidden = True And topLeftCol <> 1 Then
-                shp.Visible = msoFalse
-            Else
-                shp.Visible = msoTrue
-            End If
-        End If
+        Select Case shp.Type
+            Case msoPicture, msoLinkedPicture, msoLinkedGraphic, msoGraphic
+                On Error Resume Next ' Prevents crash if TopLeftCell is off-sheet
+                topLeftCol = shp.TopLeftCell.Column
+                On Error GoTo 0
+                If ws.Columns(topLeftCol).Hidden = True And topLeftCol <> 1 Then
+                    shp.Visible = msoFalse
+                Else
+                    shp.Visible = msoTrue
+                End If
+        End Select
     Next shp
 
     ' -- Restore application settings

@@ -292,7 +292,8 @@ def export_JBOOST(excel_caller, jboost_path):
             runFrequencyModul=runFrequencyModul,
             runHindcastValidation=False,
             wavefile="wave.lua",
-            windfile="wind.lua"
+            windfile="wind.lua",
+            write_JBOOST_graph=True
         )
 
         struct_text = pe.create_JBOOST_struct(
@@ -747,24 +748,6 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
     ].values[0]
     PJ_file_name += ".$PJ"
 
-    try:
-        PY_data = pe.read_geo_py_curves(py_path)
-        PY_loadcase = PY_data[selected_loadcase]
-
-        PJ_txt = pe.create_bladed_PJ_py_file(PY_loadcase)
-
-        path_PJ_file = os.path.join(pj_export_path, PJ_file_name)
-        with open(path_PJ_file, 'w') as file:
-            file.write(PJ_txt)
-
-    except ValueError as err:
-        ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make shure it is the right format and it is reachable.")
-        ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
-        return
-
-    np.unique(PY_loadcase["z [m]"])
-
-    PY_loadcase_spring_heigths = pd.Series(np.unique(PY_loadcase["z [m]"]), index=np.unique(PY_loadcase["Spring [-]"]))
 
     # insert springs
     Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
@@ -780,6 +763,40 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
     seabed_level = STRUCTURE_META.loc[
         STRUCTURE_META["Parameter"] == "Seabed level", "Value"
     ].values[0]
+
+    pile_end = GEOMETRY.iloc[-1].loc["Bottom [m]"]
+
+    try:
+        PY_data = pe.read_geo_py_curves(py_path)
+        PY_loadcase = PY_data[selected_loadcase]
+
+        PJ_txt, Interpol_control_FIGs = pe.create_bladed_PJ_py_file(PY_loadcase, pile_end=pile_end)
+
+        # Save PJ file
+        path_PJ_file = os.path.join(pj_export_path, PJ_file_name)
+        with open(path_PJ_file, 'w') as file:
+            file.write(PJ_txt)
+
+        # Create subfolder for figs
+        figs_folder = os.path.join(pj_export_path, "interpol_control_figs")
+        os.makedirs(figs_folder, exist_ok=True)
+
+        # Save figures
+        for i, fig in enumerate(Interpol_control_FIGs, start=1):
+            fig_path = os.path.join(figs_folder, f"interpol_control_fig_{i}.png")
+            fig.savefig(fig_path, dpi=300, bbox_inches="tight")
+
+
+    except ValueError as err:
+        ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make shure it is the right format and it is reachable.")
+        ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
+        return
+
+    np.unique(PY_loadcase["z [m]"])
+
+    PY_loadcase_spring_heigths = pd.Series(np.unique(PY_loadcase["z [m]"]), index=np.unique(PY_loadcase["Spring [-]"]))
+
+
 
     # check
     ok, err = check_added_masses(ADDITIONAL_MASSES, "ADDITIONAL_MASSES")
@@ -811,3 +828,7 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
 
     return
+
+#apply_bladed_py_curves("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", ".", "FLS_(Reloading_BE)")
+
+#plot_bladed_py("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", selected_loadcase)

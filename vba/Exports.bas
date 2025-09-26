@@ -155,18 +155,16 @@ Sub fill_Bladed_table()
     RunPythonWrapper "export", "fill_Bladed_table"
 End Sub
 
-
-
 Sub show_WLGen_section()
     ShowOnlySelectedColumns "E:BW", "E:O"
 End Sub
 
 Sub show_Bladed_section()
-    ShowOnlySelectedColumns "E:BW", "S:AK"
+    ShowOnlySelectedColumns "E:BW", "S:AP"
 End Sub
 
 Sub show_JBOOST_section()
-    ShowOnlySelectedColumns "E:BW", "AO:BW"
+    ShowOnlySelectedColumns "E:BW", "AQ:BW"
 End Sub
 
 Sub open_PY_csv()
