@@ -26,7 +26,7 @@ End Sub
 
 
 Sub load_Bladed_dropdown()
-    Dim lua_path As Variant
+    Dim path As String
     Dim run As Boolean
     Dim args As New Collection
     
@@ -63,6 +63,26 @@ Sub plot_Bladed_py_curves()
     
     RunPythonWrapper "export", "plot_bladed_py", args
 End Sub
+
+
+Sub load_JBOOST_soil_stiffness()
+    Dim path As String
+    Dim run As Boolean
+    Dim args As New Collection
+    
+    path = Range("JBOOST_soil_path").Value
+    success = FileExists(path)
+
+    If Not success Then
+        MsgBox "The soil stiffness matrix csv file does not exist or is not reachable: " & path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    
+    args.Add path
+
+    RunPythonWrapper "export", "fill_bladed_py_dropdown", path
+End Sub
+
 
 Sub apply_py_curves()
     Dim Bladed_py_path As String
@@ -121,6 +141,10 @@ Sub fill_JBOOST_auto_values()
     RunPythonWrapper "export", "fill_JBOOST_auto_excel"
 End Sub
 
+Sub fill_JBOOST_soil_configs()
+    RunPythonWrapper "export", "create_JBOOST_soil_configs"
+End Sub
+
 
 Sub run_JBOOST()
     Dim lua_path As Variant
@@ -156,19 +180,22 @@ Sub fill_Bladed_table()
 End Sub
 
 Sub show_WLGen_section()
-    ShowOnlySelectedColumns "E:BW", "E:O"
+    ShowOnlySelectedColumns "E:BW", "E:S"
 End Sub
 
 Sub show_Bladed_section()
-    ShowOnlySelectedColumns "E:BW", "S:AP"
+    ShowOnlySelectedColumns "E:BW", "U:AQ"
 End Sub
 
 Sub show_JBOOST_section()
-    ShowOnlySelectedColumns "E:BW", "AQ:BW"
+    ShowOnlySelectedColumns "E:BW", "AS:BW"
 End Sub
 
 Sub open_PY_csv()
-    OpenFileDialog "Bladed_py_path", "select PY cureve csv file", "csv files", "*.csv"
+    OpenFileDialog "Bladed_py_path", "select PY curve csv file", "csv files", "*.csv"
 End Sub
 
 
+Sub open_JBOOST_soil_csv()
+    OpenFileDialog "JBOOST_soil_path", "select so csv file", "csv files", "*.csv"
+End Sub

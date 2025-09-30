@@ -705,7 +705,7 @@ def fill_bladed_py_dropdown(excel_caller, py_path):
     try:
         PY_data = pe.read_geo_py_curves(py_path)
     except ValueError as err:
-        ex.show_message_box(excel_filename, "PY data file could not be read, make shure it is the right format.")
+        ex.show_message_box(excel_filename, "PY data file could not be read, make sure it is the right format.")
         ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
         return
 
@@ -731,7 +731,7 @@ def plot_bladed_py(excel_caller, py_path, selected_loadcase):
         ex.insert_plot(FIG, excel_filename, "ExportStructure", f"FIG_PY_CURVES", replace=True)
 
     except ValueError as err:
-        ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make shure it is the right format and it is reachable.")
+        ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make sure it is the right format and it is reachable.")
         ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
         return
 
@@ -788,15 +788,13 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
 
 
     except ValueError as err:
-        ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make shure it is the right format and it is reachable.")
+        ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make sure it is the right format and it is reachable.")
         ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
         return
 
     np.unique(PY_loadcase["z [m]"])
 
     PY_loadcase_spring_heigths = pd.Series(np.unique(PY_loadcase["z [m]"]), index=np.unique(PY_loadcase["Spring [-]"]))
-
-
 
     # check
     ok, err = check_added_masses(ADDITIONAL_MASSES, "ADDITIONAL_MASSES")
@@ -829,6 +827,85 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
 
     return
 
-#apply_bladed_py_curves("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", ".", "FLS_(Reloading_BE)")
+def load_JBOOST_soil_file(excel_caller, path):
+    excel_filename = os.path.basename(excel_caller)
+    try:
+        _, sparse = pe.read_soil_stiffness_matrix_csv(path)
+        sparse = sparse.T
 
+        # Set default value for all columns
+        sparse.loc["Use for JBOOST config? (Y/N)", :] = "N"
+        sparse.loc["Short name", :] = sparse.columns
+
+        # Boolean masks for columns
+        reloading_init_col = sparse.columns.str.contains("reloading") & sparse.columns.str.contains("init")
+        reloading_loaded_col = sparse.columns.str.contains("reloading") & sparse.columns.str.contains("loaded")
+        static_red_init_col = (
+                sparse.columns.str.contains("static")
+                & sparse.columns.str.contains("init")
+                & sparse.columns.str.contains("red")
+        )
+        static_red_loaded_col = (
+                sparse.columns.str.contains("static")
+                & sparse.columns.str.contains("loaded")
+                & sparse.columns.str.contains("red")
+        )
+
+        # Apply changes if there are matches
+        if reloading_init_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", reloading_init_col] = "Y"
+            sparse.loc["Short name", reloading_init_col] = "reloading_init"
+        if reloading_loaded_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", reloading_loaded_col] = "Y"
+            sparse.loc["Short name", reloading_loaded_col] = "reloading_loaded"
+        if static_red_init_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", static_red_init_col] = "Y"
+            sparse.loc["Short name", static_red_init_col] = "static_red_init"
+        if static_red_loaded_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", static_red_loaded_col] = "Y"
+            sparse.loc["Short name", static_red_loaded_col] = "static_red_loaded"
+
+        sparse.insert(0, "Stiffness", sparse.index)
+
+        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_soil_stiffness")
+        ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_soil_stiffness", sparse)
+
+    except:
+        ex.show_message_box(excel_filename, f"PY data file could not be read, make sure it is the right format and it is reachable.")
+        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_soil_stiffness")
+    return
+
+
+def create_JBOOST_soil_configs(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
+    PROJECT = PROJECT.iloc[:, 0:4]
+
+    JBOOST_soil_stiffness = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_soil_stiffness", dtype=str, dropnan=True)
+    JBOOST_soil_stiffness.set_index("Stiffness", inplace=True)
+
+    mask = JBOOST_soil_stiffness.loc["Use for JBOOST config? (Y/N)"] == "Y"
+    JBOOST_soil_stiffness = JBOOST_soil_stiffness.loc[:, mask]
+
+    if len(JBOOST_soil_stiffness) == 0:
+        ex.show_message_box(excel_filename, "Please fill Soil Stiffness table or toggle some configs, aborting.")
+        return
+
+    for col_name, values in JBOOST_soil_stiffness.items():
+        Short_name = values["Short name"]
+        PROJECT.loc[:, Short_name] = ""
+        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_trans", Short_name] = values["found_stiff_trans [N/m]"]
+        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_rotat", Short_name] = values["found_stiff_rotat [Nm/rad]"]
+        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_coupl", Short_name] = values["found_stiff_coupl [Nm/m]"]
+
+    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_PROJECT")
+    ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
+
+
+excel_caller = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm"
+#apply_bladed_py_curves("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", ".", "FLS_(Reloading_BE)")
+#fill_bladed_py_dropdown("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "I:/2024/A/24A525_EnBW_Dreekant_FEED/02_Statik/01_Geotechnik/2025-09-24_-_Design_Positions_(15MW)/B1/24A525-JBO-TNSPDP-EN-XXXX-01 - Preliminary Concept Design - Monopile - Appendix B01-G-0 - Springs_(L).csv")
+#create_JBOOST_soil_configs(excel_caller)
+#load_JBOOST_soil_file(excel_caller, "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Lateral_Stiffness.csv")
+#export_JBOOST(excel_caller, ".")
 #plot_bladed_py("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", selected_loadcase)
