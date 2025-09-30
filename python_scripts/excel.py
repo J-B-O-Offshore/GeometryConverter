@@ -210,6 +210,67 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     table.Resize(new_range.api)
 
 
+def write_df_to_table_flexible(workbook_name, sheet_name, table_name, dataframe, headers=None):
+    """
+    Replace the contents of an existing Excel table with a pandas DataFrame using xlwings,
+    allowing for variable number of columns and custom headers.
+
+    Parameters:
+    - workbook_name: str, name of the open Excel workbook (no path needed if open).
+    - sheet_name: str, name of the sheet containing the table.
+    - table_name: str, name of the Excel table (ListObject) to manipulate.
+    - dataframe: pandas DataFrame to replace the table's data.
+    - headers: list of str, optional custom header names. If None, dataframe.columns are used.
+    """
+    # Connect to the open workbook
+    wb = xw.books[workbook_name]
+    ws = wb.sheets[sheet_name]
+
+    # Find the table (ListObject)
+    try:
+        table = ws.api.ListObjects(table_name)
+    except Exception as e:
+        raise ValueError(f"Table '{table_name}' not found in sheet '{sheet_name}'.") from e
+
+    # Use provided headers or DataFrame headers
+    if headers is not None:
+        if len(headers) != dataframe.shape[1]:
+            raise ValueError("Length of custom headers must match number of DataFrame columns")
+        df_clean = dataframe.copy()
+        df_clean.columns = headers
+    else:
+        df_clean = dataframe.copy()
+
+    # Clear existing data
+    try:
+        data_body_range = table.DataBodyRange
+        if data_body_range:
+            data_body_range.ClearContents()
+    except Exception as e:
+        print("No DataBodyRange to clear:", e)
+
+    # If the DataFrame is empty, clear table data and return
+    if df_clean.empty:
+        return
+
+    # Write headers explicitly
+    header_range = table.HeaderRowRange
+    ws.range((header_range.Row, header_range.Column)).value = df_clean.columns.tolist()
+
+    # Write the new DataFrame values (without headers)
+    start_cell = ws.range((header_range.Row + 1, header_range.Column))
+    start_cell.options(index=False, header=False).value = df_clean
+
+    # Resize the table to match the new shape
+    last_row = header_range.Row + df_clean.shape[0]
+    last_col = header_range.Column + df_clean.shape[1] - 1
+    new_range = ws.range(
+        (header_range.Row, header_range.Column),
+        (last_row, last_col)
+    )
+    table.Resize(new_range.api)
+
+
 def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation",
                      default="vbDefaultButton1", title="Message"):
     """
