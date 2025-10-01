@@ -224,7 +224,7 @@ def check_added_masses(masses: pd.DataFrame, name: str = "ADDITIONAL_MASSES") ->
     return True, ""
 
 
-# %% macros
+# %% JBOOST
 def export_JBOOST(excel_caller, jboost_path):
     success = fill_JBOOST_auto_excel(excel_caller)
 
@@ -339,6 +339,300 @@ def export_JBOOST(excel_caller, jboost_path):
 
     return
 
+
+def fill_JBOOST_auto_excel(excel_caller):
+    """
+    Fills missing or automatically assigned values in the `JBOOST_PROJECT` Excel table
+    based on defaults and metadata from the `StructureOverview` sheet.
+
+    Reads the `JBOOST_PROJECT` table from the "ExportStructure" sheet
+    and the `STRUCTURE_META` table from the "StructureOverview" sheet. Replaces
+    missing or 'auto' values with either:
+      - defaults from the `default` column, or
+      - values from `STRUCTURE_META` (e.g., water level, seabed level, hub height).
+
+    If a required 'auto' value cannot be resolved from `STRUCTURE_META`, a message box
+    is shown and the function aborts.
+
+    Parameters
+    ----------
+    excel_caller : str
+        Path or filename of the Excel file containing the required tables.
+        Only the basename is used internally.
+
+    Returns
+    -------
+    bool
+        True if all values were successfully filled; False if the process was aborted.
+    """
+
+    excel_filename = os.path.basename(excel_caller)
+
+    # Load tables
+    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    hubheight = ex.read_named_range(excel_caller, "HubHeight", sheet_name="StructureOverview", dtype=float, use_header=False)
+
+    # Use 'Project Settings' as the index
+    PROJECT.index = PROJECT["Project Settings"]
+
+    default_values = PROJECT["default"]
+    proj_configs = PROJECT.iloc[:, 4:]
+
+    def resolve_auto_value(parameter, config_key, description, config_name):
+        """Helper to resolve 'auto' values from STRUCTURE_META."""
+        value = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == parameter, "Value"].values
+
+        if len(value) > 0:
+            if isinstance(value[0], (int, float)):
+                PROJECT.at[config_key, config_name] = value[0]
+                return True
+            else:
+                # Wrong type in Excel
+                ex.show_message_box(
+                    excel_filename,
+                    f"Invalid type for {description} in StructureOverview.\n"
+                    f"You set {config_key} in {config_name} to 'auto', but the corresponding value "
+                    f"is not a number (found: {value[0]!r}). Aborting."
+                )
+                return False
+
+        # Missing entry in Excel
+        ex.show_message_box(
+            excel_filename,
+            f"Please set {description} in StructureOverview, as you set {config_key} "
+            f"in {config_name} to 'auto'. Aborting."
+        )
+        return False
+
+    # Iterate over project configurations
+    for config_name, config_data in proj_configs.items():
+        # Fill empty cells with defaults
+        config_data = config_data.replace("", np.nan).fillna(default_values)
+
+        # Fill specific 'auto' values
+        if config_data.at["water_level"] == "auto":
+            if not resolve_auto_value("Water level", "water_level", "a water level", config_name):
+                return False
+        if config_data.at["seabed_level"] == "auto":
+            if not resolve_auto_value("Seabed level", "seabed_level", "a seabed level", config_name):
+                return False
+        if config_data.at["h_hub"] == "auto":
+            PROJECT.at["h_hub", config_name] = hubheight
+        if config_data.at["h_refwindspeed"] == "auto":
+            PROJECT.at["h_refwindspeed", config_name] = PROJECT.at["h_hub", config_name]
+
+    # Restore 'Project Settings' column
+    PROJECT["Project Settings"] = PROJECT.index
+
+    # Write back updated table
+    ex.write_df_to_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
+
+    return True
+
+
+def run_JBOOST_excel(excel_caller, export_path=""):
+    success = fill_JBOOST_auto_excel(excel_caller)
+
+    if success:
+        excel_filename = os.path.basename(excel_caller)
+
+        if len(export_path) > 0:
+            export_path = os.path.abspath(export_path)
+
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        jboost_path = os.path.join(os.path.dirname(script_dir), "JBOOST\\JBOOST.exe")
+
+        GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
+        GEOMETRY = GEOMETRY.drop(columns=["Section", "local Section"])
+        MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
+        MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
+        PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PARAMETER", dropnan=True)
+        STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+        PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
+        RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA", dropnan=True)
+
+        if len(RNA) == 0:
+            ex.show_message_box(excel_filename, "Please define RNA parameters. Aborting")
+            return
+
+        if PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "fore-aft":
+            RNA["Inertia"] = RNA["Inertia of RNA fore-aft @COG [kg m^2]"]
+        elif PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "side-side":
+            RNA["Inertia"] = RNA["Inertia of RNA side-side @COG [kg m^2]"]
+        else:
+            ex.show_message_box(excel_filename, "Please define 'side-side' or 'fore-aft' for RNA Inertia. Aborting")
+            return
+
+        # check Geometry
+        sucess_GEOMETRY = mc.sanity_check_structure(excel_filename, GEOMETRY)
+        if not sucess_GEOMETRY:
+            ex.show_message_box(excel_filename, "Geometry is messed up. Aborting.")
+            return
+
+        Model_name = PARAMETERS.loc[PARAMETERS["Parameter"] == "ModelName", "Value"].values[0]
+
+        # proj file
+        PROJECT = PROJECT.set_index("Project Settings")
+        default = PROJECT.loc[:, "default"]
+        proj_configs = PROJECT.iloc[:, 3:]
+
+        # --- fill defaults ---
+        proj_configs = fill_dataframe_with_defaults(proj_configs, default)
+        # -------------------------------------
+
+        # iterate through configs
+        Modeshapes = {}
+        waterlevels = {}
+        for config_name, config_data in proj_configs.items():
+            config_struct = {row: data for row, data in config_data.items()}
+            config_struct.pop("runFEModul", None)
+            config_struct.pop("runFrequencyModul", None)
+
+            proj_text = pe.create_JBOOST_proj(
+                config_struct,
+                MARINE_GROWTH,
+                modelname=Model_name,
+                write_JBOOST_graph=True
+            )
+
+            struct_text = pe.create_JBOOST_struct(
+                GEOMETRY,
+                RNA,
+                (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Value"].values[0],
+                 PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Unit"].values[0]),
+                (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Value"].values[0],
+                 PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Unit"].values[0]),
+                MASSES=MASSES,
+                MARINE_GROWTH=MARINE_GROWTH,
+                defl_TP=(PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Value"].values[0],
+                         PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Unit"].values[0]),
+                ModelName=Model_name,
+                EModul=PARAMETERS.loc[PARAMETERS["Parameter"] == "EModul", "Value"].values[0],
+                fyk="355",
+                poisson="0.3",
+                dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "Steel Density", "Value"].values[0],
+                addMass=0,
+                member_id=1,
+                create_node_tolerance=PARAMETERS.loc[
+                    PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[0],
+                seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
+                waterlevel=config_struct["water_level"]
+            )
+
+            JBOOST_OUT = pe.run_JBOOST(jboost_path, proj_text, struct_text, set_calculation={"FEModul": True, "FreqDomain": True, "HindValid": False})
+
+            sheet_names = []
+            sheets = []
+
+            if len(export_path) > 0:
+
+                path_config = os.path.join(export_path, config_name)
+                path_struct = os.path.join(path_config, Model_name + ".lua")
+                path_proj = os.path.join(path_config, "proj.lua")
+                path_out = os.path.join(path_config, "JBOOST_OUT.xlsx")
+
+                os.makedirs(path_config, exist_ok=True)
+
+                with open(path_proj, 'w') as file:
+                    file.write(proj_text)
+                with open(path_struct, 'w') as file:
+                    file.write(struct_text)
+
+                for key, value in JBOOST_OUT.items():
+                    if value is not None:
+                        sheet_names.append(key)
+                        sheets.append(value)
+                        pe.save_df_list_to_excel(path_out, sheets, sheet_names=sheet_names)
+
+            Modeshapes[config_name] = JBOOST_OUT["Mode_shapes"]
+            waterlevels[config_name] = config_struct["water_level"]
+
+        reversed_dfs = {k: df.iloc[::-1].reset_index(drop=True) for k, df in Modeshapes.items()}
+
+        FIG = plt.plot_modeshapes(reversed_dfs, order=(1, 2, 3), waterlevels=waterlevels)
+
+        ex.insert_plot(FIG, excel_filename, "ExportStructure", f"FIG_JBOOST_MODESHAPES")
+
+    return
+
+
+def load_JBOOST_soil_file(excel_caller, path):
+    excel_filename = os.path.basename(excel_caller)
+    try:
+        _, sparse = pe.read_soil_stiffness_matrix_csv(path)
+        sparse = sparse.T
+
+        # Set default value for all columns
+        sparse.loc["Use for JBOOST config? (Y/N)", :] = "N"
+        sparse.loc["Short name", :] = sparse.columns
+
+        # Boolean masks for columns
+        reloading_init_col = sparse.columns.str.contains("reloading") & sparse.columns.str.contains("init")
+        reloading_loaded_col = sparse.columns.str.contains("reloading") & sparse.columns.str.contains("loaded")
+        static_red_init_col = (
+                sparse.columns.str.contains("static")
+                & sparse.columns.str.contains("init")
+                & sparse.columns.str.contains("red")
+        )
+        static_red_loaded_col = (
+                sparse.columns.str.contains("static")
+                & sparse.columns.str.contains("loaded")
+                & sparse.columns.str.contains("red")
+        )
+
+        # Apply changes if there are matches
+        if reloading_init_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", reloading_init_col] = "Y"
+            sparse.loc["Short name", reloading_init_col] = "reloading_init"
+        if reloading_loaded_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", reloading_loaded_col] = "Y"
+            sparse.loc["Short name", reloading_loaded_col] = "reloading_loaded"
+        if static_red_init_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", static_red_init_col] = "Y"
+            sparse.loc["Short name", static_red_init_col] = "static_red_init"
+        if static_red_loaded_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", static_red_loaded_col] = "Y"
+            sparse.loc["Short name", static_red_loaded_col] = "static_red_loaded"
+
+        sparse.insert(0, "Stiffness", sparse.index)
+
+        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_soil_stiffness")
+        ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_soil_stiffness", sparse)
+
+    except:
+        ex.show_message_box(excel_filename, f"PY data file could not be read, make sure it is the right format and it is reachable.")
+        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_soil_stiffness")
+    return
+
+
+def create_JBOOST_soil_configs(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
+    PROJECT = PROJECT.iloc[:, 0:4]
+
+    JBOOST_soil_stiffness = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_soil_stiffness", dtype=str, dropnan=True)
+    JBOOST_soil_stiffness.set_index("Stiffness", inplace=True)
+
+    mask = JBOOST_soil_stiffness.loc["Use for JBOOST config? (Y/N)"] == "Y"
+    JBOOST_soil_stiffness = JBOOST_soil_stiffness.loc[:, mask]
+
+    if len(JBOOST_soil_stiffness) == 0:
+        ex.show_message_box(excel_filename, "Please fill Soil Stiffness table or toggle some configs, aborting.")
+        return
+
+    for col_name, values in JBOOST_soil_stiffness.items():
+        Short_name = values["Short name"]
+        PROJECT.loc[:, Short_name] = ""
+        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_trans", Short_name] = values["found_stiff_trans [N/m]"]
+        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_rotat", Short_name] = values["found_stiff_rotat [Nm/rad]"]
+        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_coupl", Short_name] = values["found_stiff_coupl [Nm/m]"]
+
+    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_PROJECT")
+    ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
+
+
+# %% WLGEN
 
 def export_WLGen(excel_caller, WLGen_path):
     excel_filename = os.path.basename(excel_caller)
@@ -456,6 +750,8 @@ def fill_WLGenMasses(excel_caller):
     ex.write_df_to_table(excel_filename, "ExportStructure", "APPURTANCES", MASSES_WL)
 
 
+# %% BLADED
+
 def fill_Bladed_table(excel_caller):
     excel_filename = os.path.basename(excel_caller)
 
@@ -494,208 +790,6 @@ def fill_Bladed_table(excel_caller):
     # Write outputs
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
-
-
-def fill_JBOOST_auto_excel(excel_caller):
-    """
-    Fills missing or automatically assigned values in the `JBOOST_PROJECT` Excel table
-    based on defaults and metadata from the `StructureOverview` sheet.
-
-    Reads the `JBOOST_PROJECT` table from the "ExportStructure" sheet
-    and the `STRUCTURE_META` table from the "StructureOverview" sheet. Replaces
-    missing or 'auto' values with either:
-      - defaults from the `default` column, or
-      - values from `STRUCTURE_META` (e.g., water level, seabed level, hub height).
-
-    If a required 'auto' value cannot be resolved from `STRUCTURE_META`, a message box
-    is shown and the function aborts.
-
-    Parameters
-    ----------
-    excel_caller : str
-        Path or filename of the Excel file containing the required tables.
-        Only the basename is used internally.
-
-    Returns
-    -------
-    bool
-        True if all values were successfully filled; False if the process was aborted.
-    """
-
-    excel_filename = os.path.basename(excel_caller)
-
-    # Load tables
-    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
-    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
-    hubheight = ex.read_named_range(excel_caller, "HubHeight", sheet_name="StructureOverview", dtype=float, use_header=False)
-
-    # Use 'Project Settings' as the index
-    PROJECT.index = PROJECT["Project Settings"]
-
-    default_values = PROJECT["default"]
-    proj_configs = PROJECT.iloc[:, 4:]
-
-    def resolve_auto_value(parameter, config_key, description, config_name):
-        """Helper to resolve 'auto' values from STRUCTURE_META."""
-        value = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == parameter, "Value"].values
-        if len(value) > 0 and isinstance(value[0], (int, float)):
-            PROJECT.at[config_key, config_name] = value[0]
-            return True
-        ex.show_message_box(
-            excel_filename,
-            f"Please set {description} in StructureOverview, as you set {config_key} in {config_name} to 'auto'. Aborting."
-        )
-        return False
-
-    # Iterate over project configurations
-    for config_name, config_data in proj_configs.items():
-        # Fill empty cells with defaults
-        config_data = config_data.replace("", np.nan).fillna(default_values)
-
-        # Fill specific 'auto' values
-        if config_data.at["water_level"] == "auto":
-            if not resolve_auto_value("Water level", "water_level", "a water level", config_name):
-                return False
-        if config_data.at["seabed_level"] == "auto":
-            if not resolve_auto_value("Seabed level", "seabed_level", "a seabed level", config_name):
-                return False
-        if config_data.at["h_hub"] == "auto":
-            PROJECT.at["h_hub", config_name] = hubheight
-        if config_data.at["h_refwindspeed"] == "auto":
-            PROJECT.at["h_refwindspeed", config_name] = PROJECT.at["h_hub", config_name]
-
-    # Restore 'Project Settings' column
-    PROJECT["Project Settings"] = PROJECT.index
-
-    # Write back updated table
-    ex.write_df_to_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
-
-    return True
-
-
-def run_JBOOST_excel(excel_caller, export_path=""):
-    success = fill_JBOOST_auto_excel(excel_caller)
-
-    if success:
-        excel_filename = os.path.basename(excel_caller)
-
-        if len(export_path) > 0:
-            export_path = os.path.abspath(export_path)
-
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        jboost_path = os.path.join(os.path.dirname(script_dir), "JBOOST\\JBOOST.exe")
-
-        GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
-        GEOMETRY = GEOMETRY.drop(columns=["Section", "local Section"])
-        MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
-        MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
-        PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PARAMETER", dropnan=True)
-        STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
-        PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
-        RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA", dropnan=True)
-
-        if len(RNA) == 0:
-            ex.show_message_box(excel_filename, "Please define RNA parameters. Aborting")
-            return
-
-        if PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "fore-aft":
-            RNA["Inertia"] = RNA["Inertia of RNA fore-aft @COG [kg m^2]"]
-        elif PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "side-side":
-            RNA["Inertia"] = RNA["Inertia of RNA side-side @COG [kg m^2]"]
-        else:
-            ex.show_message_box(excel_filename, "Please define 'side-side' or 'fore-aft' for RNA Inertia. Aborting")
-            return
-
-        # check Geometry
-        sucess_GEOMETRY = mc.sanity_check_structure(excel_filename, GEOMETRY)
-        if not sucess_GEOMETRY:
-            ex.show_message_box(excel_filename, "Geometry is messed up. Aborting.")
-            return
-
-        Model_name = PARAMETERS.loc[PARAMETERS["Parameter"] == "ModelName", "Value"].values[0]
-
-        # proj file
-        PROJECT = PROJECT.set_index("Project Settings")
-        default = PROJECT.loc[:, "default"]
-        proj_configs = PROJECT.iloc[:, 3:]
-
-        # --- fill defaults ---
-        proj_configs = fill_dataframe_with_defaults(proj_configs, default)
-        # -------------------------------------
-
-        # iterate through configs
-        Modeshapes = {}
-        waterlevels = {}
-        for config_name, config_data in proj_configs.items():
-            config_struct = {row: data for row, data in config_data.items()}
-            config_struct.pop("runFEModul", None)
-            config_struct.pop("runFrequencyModul", None)
-
-            proj_text = pe.create_JBOOST_proj(
-                config_struct,
-                MARINE_GROWTH,
-                modelname=Model_name,
-            )
-
-            struct_text = pe.create_JBOOST_struct(
-                GEOMETRY,
-                RNA,
-                (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Value"].values[0],
-                 PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Unit"].values[0]),
-                (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Value"].values[0],
-                 PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Unit"].values[0]),
-                MASSES=MASSES,
-                MARINE_GROWTH=MARINE_GROWTH,
-                defl_TP=(PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Value"].values[0],
-                         PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Unit"].values[0]),
-                ModelName=Model_name,
-                EModul=PARAMETERS.loc[PARAMETERS["Parameter"] == "EModul", "Value"].values[0],
-                fyk="355",
-                poisson="0.3",
-                dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "Steel Density", "Value"].values[0],
-                addMass=0,
-                member_id=1,
-                create_node_tolerance=PARAMETERS.loc[
-                    PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[0],
-                seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
-                waterlevel=config_struct["water_level"]
-            )
-
-            JBOOST_OUT = pe.run_JBOOST(jboost_path, proj_text, struct_text, set_calculation={"FEModul": True, "FreqDomain": True, "HindValid": False})
-
-            sheet_names = []
-            sheets = []
-
-            if len(export_path) > 0:
-
-                path_config = os.path.join(export_path, config_name)
-                path_struct = os.path.join(path_config, Model_name + ".lua")
-                path_proj = os.path.join(path_config, "proj.lua")
-                path_out = os.path.join(path_config, "JBOOST_OUT.xlsx")
-
-                os.makedirs(path_config, exist_ok=True)
-
-                with open(path_proj, 'w') as file:
-                    file.write(proj_text)
-                with open(path_struct, 'w') as file:
-                    file.write(struct_text)
-
-                for key, value in JBOOST_OUT.items():
-                    if value is not None:
-                        sheet_names.append(key)
-                        sheets.append(value)
-                        pe.save_df_list_to_excel(path_out, sheets, sheet_names=sheet_names)
-
-            Modeshapes[config_name] = JBOOST_OUT["Mode_shapes"]
-            waterlevels[config_name] = config_struct["water_level"]
-
-        reversed_dfs = {k: df.iloc[::-1].reset_index(drop=True) for k, df in Modeshapes.items()}
-
-        FIG = plt.plot_modeshapes(reversed_dfs, order=(1, 2, 3), waterlevels=waterlevels)
-
-        ex.insert_plot(FIG, excel_filename, "ExportStructure", f"FIG_JBOOST_MODESHAPES")
-
-    return
 
 
 def fill_bladed_py_dropdown(excel_caller, py_path):
@@ -747,7 +841,6 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
         Bladed_Settings["Parameter"] == "PJ file name", "Value"
     ].values[0]
     PJ_file_name += ".$PJ"
-
 
     # insert springs
     Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
@@ -827,85 +920,11 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
 
     return
 
-def load_JBOOST_soil_file(excel_caller, path):
-    excel_filename = os.path.basename(excel_caller)
-    try:
-        _, sparse = pe.read_soil_stiffness_matrix_csv(path)
-        sparse = sparse.T
-
-        # Set default value for all columns
-        sparse.loc["Use for JBOOST config? (Y/N)", :] = "N"
-        sparse.loc["Short name", :] = sparse.columns
-
-        # Boolean masks for columns
-        reloading_init_col = sparse.columns.str.contains("reloading") & sparse.columns.str.contains("init")
-        reloading_loaded_col = sparse.columns.str.contains("reloading") & sparse.columns.str.contains("loaded")
-        static_red_init_col = (
-                sparse.columns.str.contains("static")
-                & sparse.columns.str.contains("init")
-                & sparse.columns.str.contains("red")
-        )
-        static_red_loaded_col = (
-                sparse.columns.str.contains("static")
-                & sparse.columns.str.contains("loaded")
-                & sparse.columns.str.contains("red")
-        )
-
-        # Apply changes if there are matches
-        if reloading_init_col.any():
-            sparse.loc["Use for JBOOST config? (Y/N)", reloading_init_col] = "Y"
-            sparse.loc["Short name", reloading_init_col] = "reloading_init"
-        if reloading_loaded_col.any():
-            sparse.loc["Use for JBOOST config? (Y/N)", reloading_loaded_col] = "Y"
-            sparse.loc["Short name", reloading_loaded_col] = "reloading_loaded"
-        if static_red_init_col.any():
-            sparse.loc["Use for JBOOST config? (Y/N)", static_red_init_col] = "Y"
-            sparse.loc["Short name", static_red_init_col] = "static_red_init"
-        if static_red_loaded_col.any():
-            sparse.loc["Use for JBOOST config? (Y/N)", static_red_loaded_col] = "Y"
-            sparse.loc["Short name", static_red_loaded_col] = "static_red_loaded"
-
-        sparse.insert(0, "Stiffness", sparse.index)
-
-        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_soil_stiffness")
-        ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_soil_stiffness", sparse)
-
-    except:
-        ex.show_message_box(excel_filename, f"PY data file could not be read, make sure it is the right format and it is reachable.")
-        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_soil_stiffness")
-    return
-
-
-def create_JBOOST_soil_configs(excel_caller):
-    excel_filename = os.path.basename(excel_caller)
-    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
-    PROJECT = PROJECT.iloc[:, 0:4]
-
-    JBOOST_soil_stiffness = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_soil_stiffness", dtype=str, dropnan=True)
-    JBOOST_soil_stiffness.set_index("Stiffness", inplace=True)
-
-    mask = JBOOST_soil_stiffness.loc["Use for JBOOST config? (Y/N)"] == "Y"
-    JBOOST_soil_stiffness = JBOOST_soil_stiffness.loc[:, mask]
-
-    if len(JBOOST_soil_stiffness) == 0:
-        ex.show_message_box(excel_filename, "Please fill Soil Stiffness table or toggle some configs, aborting.")
-        return
-
-    for col_name, values in JBOOST_soil_stiffness.items():
-        Short_name = values["Short name"]
-        PROJECT.loc[:, Short_name] = ""
-        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_trans", Short_name] = values["found_stiff_trans [N/m]"]
-        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_rotat", Short_name] = values["found_stiff_rotat [Nm/rad]"]
-        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_coupl", Short_name] = values["found_stiff_coupl [Nm/m]"]
-
-    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_PROJECT")
-    ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
-
 
 excel_caller = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm"
-#apply_bladed_py_curves("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", ".", "FLS_(Reloading_BE)")
-#fill_bladed_py_dropdown("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "I:/2024/A/24A525_EnBW_Dreekant_FEED/02_Statik/01_Geotechnik/2025-09-24_-_Design_Positions_(15MW)/B1/24A525-JBO-TNSPDP-EN-XXXX-01 - Preliminary Concept Design - Monopile - Appendix B01-G-0 - Springs_(L).csv")
-#create_JBOOST_soil_configs(excel_caller)
-#load_JBOOST_soil_file(excel_caller, "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Lateral_Stiffness.csv")
-#export_JBOOST(excel_caller, ".")
-#plot_bladed_py("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", selected_loadcase)
+# apply_bladed_py_curves("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", ".", "FLS_(Reloading_BE)")
+# fill_bladed_py_dropdown("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "I:/2024/A/24A525_EnBW_Dreekant_FEED/02_Statik/01_Geotechnik/2025-09-24_-_Design_Positions_(15MW)/B1/24A525-JBO-TNSPDP-EN-XXXX-01 - Preliminary Concept Design - Monopile - Appendix B01-G-0 - Springs_(L).csv")
+# create_JBOOST_soil_configs(excel_caller)
+# load_JBOOST_soil_file(excel_caller, "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Lateral_Stiffness.csv")
+# export_JBOOST(excel_caller, ".")
+# plot_bladed_py("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", selected_loadcase)
