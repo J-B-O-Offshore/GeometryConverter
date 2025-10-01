@@ -876,8 +876,8 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
 
         # Save figures
         for i, fig in enumerate(Interpol_control_FIGs, start=1):
-            fig_path = os.path.join(figs_folder, f"interpol_control_fig_{i}.png")
-            fig.savefig(fig_path, dpi=300, bbox_inches="tight")
+            fig_path = os.path.join(figs_folder, f"interpol_control_fig_{str(i).zfill(3)}.png")
+            fig.savefig(fig_path, dpi=200, bbox_inches="tight")
 
 
     except ValueError as err:
@@ -922,7 +922,7 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
 
 
 excel_caller = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm"
-# apply_bladed_py_curves("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", ".", "FLS_(Reloading_BE)")
+#apply_bladed_py_curves("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "I:/2024/A/24A525_EnBW_Dreekant_FEED/02_Statik/01_Geotechnik/2025-09-24_-_Design_Positions_(15MW)/B1/24A525-JBO-TNSPDP-EN-XXXX-01 - Preliminary Concept Design - Monopile - Appendix B01-G-0 - Springs_(L).csv", ".", "FLS_(Reloading_BE)")
 # fill_bladed_py_dropdown("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "I:/2024/A/24A525_EnBW_Dreekant_FEED/02_Statik/01_Geotechnik/2025-09-24_-_Design_Positions_(15MW)/B1/24A525-JBO-TNSPDP-EN-XXXX-01 - Preliminary Concept Design - Monopile - Appendix B01-G-0 - Springs_(L).csv")
 # create_JBOOST_soil_configs(excel_caller)
 # load_JBOOST_soil_file(excel_caller, "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Lateral_Stiffness.csv")

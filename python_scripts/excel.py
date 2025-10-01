@@ -621,18 +621,11 @@ def add_unique_row(df1, df2, exclude_columns=None):
 def call_vba_dropdown_macro(workbook_name: str, sheet_name: str, dropdown_name: str, new_value: str):
     wb = xw.Book(workbook_name)  # Adjust path or use xw.Book.caller()
     wb.macro('set_dropdown_value')(sheet_name, dropdown_name, new_value)
-
-
 def insert_plot(fig, workbook_name, sheet_name, named_range, replace=False):
     """
-    Insert a Matplotlib Figure into an already open Excel workbook at the named range.
-
-    Parameters:
-    - fig: matplotlib.figure.Figure object
-    - workbook_name: str, name of the open Excel workbook (e.g., 'file.xlsx')
-    - sheet_name: str, name of the sheet in the workbook
-    - named_range: str, named range in the sheet to place the image at
-    - replace: bool, if True, try to delete an existing picture with the same name first
+    Insert a Matplotlib Figure into an already open Excel workbook at the named range,
+    unless the target cell is in a hidden row/column. If hidden, any existing picture
+    with that name will be deleted instead.
     """
 
     app = xw.apps.active
@@ -642,13 +635,22 @@ def insert_plot(fig, workbook_name, sheet_name, named_range, replace=False):
 
     pic_name = f"Fig_{named_range}"
 
-    # Optionally try to delete the old picture
+    # If the target cell is hidden -> delete any existing picture and exit
+    if rng.api.EntireColumn.Hidden or rng.api.EntireRow.Hidden:
+        try:
+            sheet.pictures[pic_name].delete()
+            print(f"🗑️ Deleted picture {pic_name} (target cell hidden).")
+        except KeyError:
+            pass  # No picture with this name exists
+        except Exception as e:
+            print(f"⚠️ Could not delete picture {pic_name}: {e}")
+        return None
+
+    # Optionally try to delete the old picture before inserting
     if replace:
         try:
-            old_pic = sheet.pictures[pic_name]
-            old_pic.delete()
+            sheet.pictures[pic_name].delete()
         except KeyError:
-            # No picture with this name exists, ignore
             pass
         except Exception as e:
             print(f"⚠️ Could not delete old picture {pic_name}: {e}")
@@ -679,7 +681,7 @@ def insert_plot(fig, workbook_name, sheet_name, named_range, replace=False):
             )
         os.remove(tmpfile.name)
 
-
+    return sheet.pictures[pic_name]
 def read_named_range(path, name, sheet_name=None, dtype=None, use_header=True):
     """
     Read a named range from an Excel file (supports workbook-level and sheet-level names).

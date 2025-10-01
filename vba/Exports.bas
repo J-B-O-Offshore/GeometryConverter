@@ -80,7 +80,7 @@ Sub load_JBOOST_soil_stiffness()
     
     args.Add path
 
-    RunPythonWrapper "export", "fill_bladed_py_dropdown", path
+    RunPythonWrapper "export", "load_JBOOST_soil_file", path
 End Sub
 
 
