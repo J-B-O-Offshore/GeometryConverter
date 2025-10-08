@@ -132,7 +132,6 @@ Sub export_run_JBOOST()
     
     jboost_path = Range("JBOOST_Path").Value
     
-    
     RunPythonWrapper "export", "run_JBOOST_excel", jboost_path
 End Sub
 

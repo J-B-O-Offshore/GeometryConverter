@@ -841,6 +841,9 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
         Bladed_Settings["Parameter"] == "PJ file name", "Value"
     ].values[0]
     PJ_file_name += ".$PJ"
+    soil_density = Bladed_Settings.loc[
+        Bladed_Settings["Parameter"] == "Soil density", "Value"
+    ].values[0]
 
     # insert springs
     Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
@@ -867,8 +870,7 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
 
         # Save PJ file
         path_PJ_file = os.path.join(pj_export_path, PJ_file_name)
-        with open(path_PJ_file, 'w') as file:
-            file.write(PJ_txt)
+
 
         # Create subfolder for figs
         figs_folder = os.path.join(pj_export_path, "interpol_control_figs")
@@ -878,7 +880,6 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
         for i, fig in enumerate(Interpol_control_FIGs, start=1):
             fig_path = os.path.join(figs_folder, f"interpol_control_fig_{str(i).zfill(3)}.png")
             fig.savefig(fig_path, dpi=200, bbox_inches="tight")
-
 
     except ValueError as err:
         ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make sure it is the right format and it is reachable.")
@@ -911,8 +912,20 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
 
     # Build dataframes
     Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
-        Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META, cut_embedded=False, PY_springs=PY_loadcase_spring_heigths
+        Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META, cut_embedded=False, PY_springs=PY_loadcase_spring_heigths, soil_density=soil_density
     )
+
+    # extra definition lines and saving
+    Nodes_with_spring = Bladed_Nodes.loc[
+        Bladed_Nodes["Foundation"].apply(lambda x: isinstance(x, str) and x != ""),
+        "Node [-]"
+    ].values
+
+    node_def_lines = pe.create_bladed_PJ_node_defnition(Nodes_with_spring)
+    text_combined = node_def_lines + "\n\n\n\n\n" + PJ_txt
+    # add node definition line to PJ file
+    with open(path_PJ_file, 'w') as file:
+        file.write(text_combined)
 
     # Write outputs
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)

@@ -891,5 +891,36 @@ Sub InstallPythonRequirements()
     cmd = "cmd /K """ & pyPath & " -m pip install" & reqList & """"
     
     ' Run command
-    Shell cmd, vbNormalFocus
+    shell cmd, vbNormalFocus
+End Sub
+
+Option Explicit
+
+Public Sub MapNetworkDriveSilent()
+    Dim batFile As String
+    Dim shell As Object
+    Dim exitCode As Long
+    Dim tempPath As String
+    Dim fnum As Integer
+    
+    ' Create temporary batch file
+    tempPath = Environ$("TEMP") & "\map_drive.bat"
+    fnum = FreeFile
+    Open tempPath For Output As #fnum
+    Print #fnum, "@ECHO OFF"
+    Print #fnum, "NET USE O: \\HH-DC02.jbo.local\daten >nul 2>&1"
+    Close #fnum
+    
+    ' Run batch file silently
+    Set shell = CreateObject("WScript.Shell")
+    exitCode = shell.run("""" & tempPath & """", 0, True) ' 0 = hidden, True = wait
+    
+    ' Show error only if it fails
+    If exitCode <> 0 Then
+        MsgBox "Failed to map drive O:. Error code: " & exitCode, vbCritical, "Error"
+    End If
+    
+    ' Cleanup
+    On Error Resume Next
+    Kill tempPath
 End Sub
