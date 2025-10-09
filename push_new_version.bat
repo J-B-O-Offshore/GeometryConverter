@@ -1,7 +1,7 @@
 @echo on
-REM ================================
-REM Git Commit + Tag + Push Script
-REM ================================
+REM =========================================
+REM Git Commit + Tag + Push Script (Retag)
+REM =========================================
 
 REM Check if version number is provided as argument
 IF "%~1"=="" (
@@ -24,15 +24,23 @@ git add .
 REM Commit with message
 git commit -m "Release %VERSION%"
 
-REM Create tag
+REM Check if tag already exists
+git rev-parse %VERSION% >nul 2>&1
+IF %ERRORLEVEL%==0 (
+    echo Tag %VERSION% already exists. Deleting old tag...
+    git tag -d %VERSION%
+    git push origin :refs/tags/%VERSION%
+)
+
+REM Create new tag
 git tag %VERSION%
 
 REM Push commits
 git push origin main
 
-REM Push tags
+REM Push new tag
 git push origin %VERSION%
 
 echo.
-echo Done! Pushed commit and tag %VERSION%.
+echo Done! Committed and retagged version %VERSION%.
 pause
