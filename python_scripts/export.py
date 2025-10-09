@@ -558,6 +558,7 @@ def run_JBOOST_excel(excel_caller, export_path=""):
 
 def load_JBOOST_soil_file(excel_caller, path):
     excel_filename = os.path.basename(excel_caller)
+
     try:
         _, sparse = pe.read_soil_stiffness_matrix_csv(path)
         sparse = sparse.T
@@ -795,6 +796,7 @@ def fill_bladed_py_dropdown(excel_caller, py_path):
     py_path = os.path.abspath(py_path)
     excel_filename = os.path.basename(excel_caller)
 
+
     try:
         PY_data = pe.read_geo_py_curves(py_path)
     except ValueError as err:
@@ -810,10 +812,17 @@ def fill_bladed_py_dropdown(excel_caller, py_path):
 def plot_bladed_py(excel_caller, py_path, selected_loadcase):
     py_path = os.path.abspath(py_path)
     excel_filename = os.path.basename(excel_caller)
+
     Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
-    max_lines = Bladed_Settings.loc[
-        Bladed_Settings["Parameter"] == "py lines per axis", "Value"
-    ].values[0]
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+
+    max_lines = Bladed_Settings.loc[Bladed_Settings["Parameter"] == "py lines per axis", "Value"].values[0]
+
+    basename = STRUCTURE_META.loc[ STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
+    if basename is None:
+        basename = "Bladed_PJ_file"
+
+    Bladed_Settings.loc[Bladed_Settings["Parameter"] == "PJ file name", "Value"] = basename + f"_{selected_loadcase}"
 
     try:
         PY_data = pe.read_geo_py_curves(py_path)
@@ -827,6 +836,9 @@ def plot_bladed_py(excel_caller, py_path, selected_loadcase):
         ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make sure it is the right format and it is reachable.")
         ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
         return
+
+    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Settings", Bladed_Settings)
+
 
     return
 

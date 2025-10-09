@@ -896,7 +896,7 @@ End Sub
 
 Option Explicit
 
-Public Sub MapNetworkDriveSilent()
+Public Sub MapNetworkDrive()
     Dim batFile As String
     Dim shell As Object
     Dim exitCode As Long
