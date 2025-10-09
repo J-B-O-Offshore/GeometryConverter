@@ -897,9 +897,10 @@ End Sub
 Option Explicit
 
 Public Sub MapNetworkDrive()
+    On Error Resume Next  ' Suppress all VBA runtime errors
+    
     Dim batFile As String
     Dim shell As Object
-    Dim exitCode As Long
     Dim tempPath As String
     Dim fnum As Integer
     
@@ -913,14 +914,8 @@ Public Sub MapNetworkDrive()
     
     ' Run batch file silently
     Set shell = CreateObject("WScript.Shell")
-    exitCode = shell.run("""" & tempPath & """", 0, True) ' 0 = hidden, True = wait
+    shell.run """" & tempPath & """", 0, True  ' 0 = hidden window, True = wait until done
     
-    ' Show error only if it fails
-    If exitCode <> 0 Then
-        MsgBox "Failed to map drive O:. Error code: " & exitCode, vbCritical, "Error"
-    End If
-    
-    ' Cleanup
-    On Error Resume Next
+    ' Cleanup silently
     Kill tempPath
 End Sub
