@@ -1,4 +1,4 @@
-@echo off
+@echo on
 REM ================================
 REM Git Commit + Tag + Push Script
 REM ================================
@@ -35,3 +35,4 @@ git push origin %VERSION%
 
 echo.
 echo Done! Pushed commit and tag %VERSION%.
+pause
