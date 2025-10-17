@@ -15,14 +15,28 @@ def valid_data(data):
 
 
 def sanity_check_structure(excel_filename, df):
-    # check, if sections are on top of each other
-    height_diff = (df["Top [m]"].values[1:] - df["Bottom [m]"].values[:-1]) == 0
-    if not all(height_diff):
-        missaligned_sections = [int(df.iloc[i, 0]) for i, value in enumerate(height_diff) if not value]
-        ex.show_message_box(excel_filename, f"The sections overlap or have gaps between them - at section(s): {missaligned_sections}.")
+    required_cols = ["Top [m]", "Bottom [m]"]
+
+    if not all(col in df.columns for col in required_cols):
+        ex.show_message_box(excel_filename, "Missing columns: 'Top [m]' or 'Bottom [m]'.")
         return False
-    else:
-        return True
+
+    # Calculate difference between the bottom of one section and the top of the next
+    height_diff = df["Top [m]"].values[1:] - df["Bottom [m]"].values[:-1]
+    # check, if sections are on top of each other
+
+    if not np.allclose(height_diff, 0, atol=1e-6):
+        # Get indices of problematic sections (the next section that doesn't align)
+        misaligned_indices = [
+            df.index[i + 1] for i, diff in enumerate(height_diff) if abs(diff) > 1e-6
+        ]
+        ex.show_message_box(
+            excel_filename,
+            f"The sections overlap or have gaps between them at index/indices: {misaligned_indices}."
+        )
+        return False
+
+    return True
 
 
 def check_convert_structure(excel_filename, df: pd.DataFrame, Table):
@@ -224,176 +238,232 @@ def add_element(df, z_new, defaults=None, add_outside_bound=False):
     return df
 
 
-def assemble_structure(MP_DATA, TP_DATA, TOWER_DATA=None, MP_MASSES=None, TP_MASSES=None, TOWER_MASSES=None, excel_caller=None, interactive=True, rho=7900, ignore_hovering=False, overlapp_mode="Skirt"):
+def assemble_structure(MP_DATA=None, TP_DATA=None, TOWER_DATA=None, MP_MASSES=None, TP_MASSES=None, TOWER_MASSES=None, excel_caller=None, interactive=True, rho=7900, strict_build=True, overlapp_mode="Skirt"):
     """
-    Assemble the full offshore wind turbine structure from Monopile (MP), Transition Piece (TP),
-    and Tower data. Handles geometric overlaps, continuity, and integrates additional mass data.
+    Assemble the complete offshore wind turbine support structure by combining Monopile (MP),
+    Transition Piece (TP), and Tower data. Ensures geometric continuity, resolves overlaps, and
+    integrates additional mass data from all sections.
 
     Parameters
     ----------
-    MP_DATA : pd.DataFrame
-        Structural data for the Monopile section. Must include columns:
-        - "Top [m]", "Bottom [m]", "t [mm]", "D, top [m]", "D, bottom [m]"
+    MP_DATA : pd.DataFrame, optional
+        Structural data for the Monopile section.
+        Must contain the following columns:
+        - "Top [m]"
+        - "Bottom [m]"
+        - "t [mm]"
+        - "D, top [m]"
+        - "D, bottom [m]"
 
-    TP_DATA : pd.DataFrame
-        Structural data for the Transition Piece. Same required columns as `MP_DATA`.
+    TP_DATA : pd.DataFrame, optional
+        Structural data for the Transition Piece. Requires the same columns as `MP_DATA`.
 
-    TOWER_DATA : pd.DataFrame
-        Structural data for the Tower. Same required columns as `MP_DATA`.
+    TOWER_DATA : pd.DataFrame, optional
+        Structural data for the Tower. Requires the same columns as `MP_DATA`.
 
     MP_MASSES : pd.DataFrame, optional
-        Optional additional point or distributed masses associated with the Monopile.
+        Additional point or distributed masses associated with the Monopile.
 
     TP_MASSES : pd.DataFrame, optional
-        Optional additional point or distributed masses associated with the Transition Piece.
+        Additional point or distributed masses associated with the Transition Piece.
 
     TOWER_MASSES : pd.DataFrame, optional
-        Optional additional point or distributed masses associated with the Tower.
+        Additional point or distributed masses associated with the Tower. Automatically
+        adjusted in elevation if a tower offset is applied.
 
     excel_caller : object, optional
-        Excel interface object used for displaying interactive message boxes. Required if `interactive=True`.
+        Excel interface object used to display interactive message boxes.
+        Required if `interactive=True`.
 
     interactive : bool, default=True
-        If True, prompts the user to resolve overlaps and connection issues via message boxes.
-        Requires `excel_caller` to be defined.
+        If True, user decisions are requested via Excel message boxes to resolve
+        overlap or alignment issues. Requires `excel_caller` to be defined.
 
     rho : float, default=7900
-        Density in kg/m³ used for calculating skirt weight. Default assumes steel.
+        Material density in kg/m³ used for calculating skirt mass. Default corresponds to steel.
 
-    ignore_hovering : bool, default=False
-        If True, allows structures to remain disconnected (e.g., TP hovering above MP) without raising an error.
+    strict_build : bool, default=False
+        If True, the function enforces continuous structural contact between MP, TP,
+        and Tower sections. Any “hovering” TP (disconnected from MP) raises an error.
 
     overlapp_mode : {"Skirt", "Grout"}, default="Skirt"
-        Mode for resolving overlaps between MP and TP if not interactive:
-        - "Skirt": add overlapping TP section to MP as a skirt and compute mass.
-        - "Grout": placeholder mode; currently not implemented.
+        Determines how overlaps between MP and TP are handled when `interactive=False`:
+        - "Skirt": Add the overlapping TP section to the MP as a skirt, computing its mass.
+        - "Grout": Placeholder option (not yet implemented).
 
     Returns
     -------
     WHOLE_STRUCTURE : pd.DataFrame
-        Combined structural DataFrame for the MP, TP, and Tower sections.
-        Includes a "Section" column with continuous indexing and an "Affiliation" column indicating origin.
+        Combined structural DataFrame including all connected sections.
+        Contains:
+        - "Section" : continuous index
+        - "Affiliation" : indicates source section ("MP", "TP", "TOWER", "SKIRT")
 
     ALL_MASSES : pd.DataFrame or None
-        Combined and elevation-adjusted DataFrame of all additional masses.
+        Combined DataFrame of all additional masses, elevation-adjusted for tower offset.
         Returns None if no mass data was provided.
 
     SKIRT : pd.DataFrame or None
-        If a skirt is added to resolve MP-TP overlap, returns the structural data for the skirt.
-        Otherwise, returns None.
+        DataFrame containing structural details of the added skirt if overlap resolution
+        in "Skirt" mode is triggered. Otherwise, None.
 
     SKIRT_POINTMASS : pd.DataFrame or None
-        If a skirt is added, returns a single-row DataFrame representing the skirt's equivalent point mass.
-        Otherwise, returns None.
+        Equivalent single-row DataFrame representing the skirt’s point mass with columns:
+        ["Affiliation", "Elevation [m]", "Mass [t]", "comment"].
+        None if no skirt was created.
 
     Notes
     -----
-    - The function modifies the input DataFrames by adding an "Affiliation" column and may insert or alter elevation values.
-    - If `interactive=True` and `excel_caller=None`, a ValueError is raised.
-    - The top of the MP must not be lower than the bottom of the TP unless `ignore_hovering=True`.
-    - If overlap is detected, it is resolved by either:
-        - User decision (interactive mode), or
-        - Automatically using the `overlapp_mode` setting (non-interactive).
-    - The function currently only implements the "Skirt" resolution mode.
-    - Elevations are adjusted to ensure structural continuity from MP → TP → Tower.
+    - The function modifies input DataFrames by adding an "Affiliation" column.
+    - If `interactive=True` but `excel_caller` is None, a ValueError is raised.
+    - If `strict_build=True`, any gap between MP and TP causes an exception.
+    - Overlaps are resolved either:
+        - Interactively (user choice), or
+        - Automatically via `overlapp_mode` (non-interactive).
+    - Only the "Skirt" overlap mode is currently implemented.
+    - Tower elevations are automatically adjusted to ensure continuous geometry.
     """
-    if "Affiliation" not in MP_DATA.columns:
-        MP_DATA.insert(0, "Affiliation", "MP")
-    else:
-        MP_DATA["Affiliation"] = "MP"
+    STRUC_LIST = []
 
-    if "Affiliation" not in TP_DATA.columns:
-        TP_DATA.insert(0, "Affiliation", "TP")
-    else:
-        TP_DATA["Affiliation"] = "TP"
+    if MP_DATA is not None and len(MP_DATA) == 0:
+        MP_DATA = None
+    if TP_DATA is not None and len(TP_DATA) == 0:
+        TP_DATA = None
+    if TOWER_DATA is not None and len(TOWER_DATA) == 0:
+        TOWER_DATA = None
+
+    if MP_DATA is not None:
+        if "Affiliation" not in MP_DATA.columns:
+            MP_DATA.insert(0, "Affiliation", "MP")
+        else:
+            MP_DATA["Affiliation"] = "MP"
+        range_MP = MP_DATA["Top [m]"].to_list() + list([MP_DATA["Bottom [m]"].values[-1]])
+
+        MP_top = range_MP[0]
+
+        STRUC_LIST.append(MP_DATA)
+
+    if TP_DATA is not None:
+        if "Affiliation" not in TP_DATA.columns:
+            TP_DATA.insert(0, "Affiliation", "TP")
+        else:
+            TP_DATA["Affiliation"] = "TP"
+        range_TP = TP_DATA["Top [m]"].to_list() + list([TP_DATA["Bottom [m]"].values[-1]])
+
+        TP_bot = range_TP[-1]
+
+    #    STRUC_LIST.append(TP_DATA)
+
     if TOWER_DATA is not None:
         if "Affiliation" not in TOWER_DATA.columns:
             TOWER_DATA.insert(0, "Affiliation", "TOWER")
         else:
             TOWER_DATA["Affiliation"] = "TOWER"
+       # STRUC_LIST.append(TOWER_DATA)
 
     SKIRT = None
     SKIRT_POINTMASS = None
     # Extract ranges
-    range_MP = MP_DATA["Top [m]"].to_list() + list([MP_DATA["Bottom [m]"].values[-1]])
-    range_TP = TP_DATA["Top [m]"].to_list() + list([TP_DATA["Bottom [m]"].values[-1]])
 
     if interactive:
         if excel_caller is None:
             raise ValueError("excel_caller is None, has to be defined when interactive is True")
 
-    WHOLE_STRUCTURE = MP_DATA
-
-    # Assemble MP TP
-    MP_top = range_MP[0]
-    TP_bot = range_TP[-1]
-
-    if MP_top > TP_bot:
-
+    if MP_DATA is None and TP_DATA is None and TOWER_DATA is None:
         if interactive:
-            result = ex.show_message_box(excel_caller,
-                                         f"The MP and the TP are overlapping by {-range_TP[-1] + range_MP[0]}m. Combine stiffness etc as grouted connection (yes) or add as skirt (no)?",
-                                         buttons="vbYesNo", icon="vbYesNo", )
-        else:
-            if overlapp_mode == "Grout":
-                result = "Yes"
-            elif overlapp_mode == "Skirt":
-                result = "No"
-            else:
-                raise ValueError("overlapp_mode has to be Skirt or Grout.")
-
-        if result == "Yes":
-
             ex.show_message_box(excel_caller,
-                                f"under construction...")
-            return
-
-        elif result == "No":
-
-            TP_DATA = add_element(TP_DATA, MP_top)
-            SKIRT = TP_DATA.loc[TP_DATA["Top [m]"] <= MP_top]
-            SKIRT.loc[:, "Affiliation"] = "SKIRT"
-            SKIRT = SKIRT.drop("Section", axis=1)
-            skirt_weights = calc_weight(rho, SKIRT["t [mm]"].values / 1000, SKIRT["Top [m]"].values, SKIRT["Bottom [m]"].values, SKIRT["D, top [m]"].values,
-                                        SKIRT["D, bottom [m]"].values) / 1000
-            skirt_heihgts = center_of_mass_hollow_frustum(SKIRT["D, bottom [m]"].values, SKIRT["D, top [m]"].values, SKIRT["Bottom [m]"], SKIRT["Top [m]"].values,
-                                                          SKIRT["t [mm]"].values / 1000)
-            skirt_weight = sum(skirt_weights)
-
-            skirt_center_of_mass = sum([m * h for m, h in zip(list(skirt_weights), list(skirt_heihgts))]) / skirt_weight
-
-            # cut TP
-            TP_DATA = TP_DATA.loc[TP_DATA["Bottom [m]"] >= MP_top]
-            WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
-
-            SKIRT_POINTMASS = pd.DataFrame(columns=["Affiliation", "Elevation [m]", "Mass [t]", "comment"], index=[0])
-            SKIRT_POINTMASS.loc[:, "Affiliation"] = "SKIRT"
-            SKIRT_POINTMASS.loc[:, "Elevation [m]"] = skirt_center_of_mass
-            SKIRT_POINTMASS.loc[:, "Mass [t]"] = skirt_weight
-            SKIRT_POINTMASS.loc[:, "comment"] = "Skirt"
-
-    elif MP_top < TP_bot:
-        if not ignore_hovering:
-            if interactive:
-                ex.show_message_box(excel_caller,
-                                    f"The top of the MP at {range_MP[0]} is lower than the bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. This can't work, aborting.")
-
-            raise ValueError
+                                f"Please define MP or TP or TOWER.")
         else:
+            raise ValueError("Please define MP or TP or TOWER.")
+
+    if strict_build:
+        if MP_DATA is None:
+            raise ValueError("MP_DATA is None, has to be defined when strict_build is True")
+        if MP_DATA is not None and TP_DATA is not None:
+            if MP_top < TP_bot:
+                if interactive:
+                    ex.show_message_box(excel_caller,
+                                        f"The top of the MP at {range_MP[0]} is lower than the bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. This can't work, aborting.")
+                    return
+                else:
+                    raise ValueError("TP is hovering over MP, now allowed if strict mode is True")
+
+    # from here on only ovelapping or perfect fit or no MP and or TP and or TOWER data or hovering allowed
+    #MP and TP is there
+    if MP_DATA is not None and TP_DATA is not None:
+        # overlapping case:
+        if MP_top > TP_bot:
+
+            if interactive:
+                result = ex.show_message_box(excel_caller,
+                                             f"The MP and the TP are overlapping by {-range_TP[-1] + range_MP[0]}m. Combine stiffness etc as grouted connection (yes) or add as skirt (no)?",
+                                             buttons="vbYesNo", icon="vbYesNo", )
+            else:
+                if overlapp_mode == "Grout":
+                    result = "Yes"
+                elif overlapp_mode == "Skirt":
+                    result = "No"
+                else:
+                    raise ValueError("overlapp_mode has to be Skirt or Grout.")
+
+            if result == "Yes":
+
+                ex.show_message_box(excel_caller,
+                                    f"under construction...")
+                return
+
+            elif result == "No":
+
+                TP_DATA = add_element(TP_DATA, MP_top)
+                SKIRT = TP_DATA.loc[TP_DATA["Top [m]"] <= MP_top]
+                SKIRT.loc[:, "Affiliation"] = "SKIRT"
+                SKIRT = SKIRT.drop("Section", axis=1)
+                skirt_weights = calc_weight(rho, SKIRT["t [mm]"].values / 1000, SKIRT["Top [m]"].values, SKIRT["Bottom [m]"].values, SKIRT["D, top [m]"].values,
+                                            SKIRT["D, bottom [m]"].values) / 1000
+                skirt_heihgts = center_of_mass_hollow_frustum(SKIRT["D, bottom [m]"].values, SKIRT["D, top [m]"].values, SKIRT["Bottom [m]"], SKIRT["Top [m]"].values,
+                                                              SKIRT["t [mm]"].values / 1000)
+                skirt_weight = sum(skirt_weights)
+
+                skirt_center_of_mass = sum([m * h for m, h in zip(list(skirt_weights), list(skirt_heihgts))]) / skirt_weight
+
+                # cut TP
+                TP_DATA = TP_DATA.loc[TP_DATA["Bottom [m]"] >= MP_top]
+                WHOLE_STRUCTURE = pd.concat([TP_DATA, MP_DATA], axis=0)
+
+                SKIRT_POINTMASS = pd.DataFrame(columns=["Affiliation", "Elevation [m]", "Mass [t]", "comment"], index=[0])
+                SKIRT_POINTMASS.loc[:, "Affiliation"] = "SKIRT"
+                SKIRT_POINTMASS.loc[:, "Elevation [m]"] = skirt_center_of_mass
+                SKIRT_POINTMASS.loc[:, "Mass [t]"] = skirt_weight
+                SKIRT_POINTMASS.loc[:, "comment"] = "Skirt"
+
+        elif MP_top < TP_bot:
             if interactive:
                 ex.show_message_box(excel_caller,
                                         f"The top of the MP at {range_MP[0]} is lower than the bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. Not aborting because of function setting ignore_hovering=True.")
 
-            WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
-    else:
-        if interactive:
-            ex.show_message_box(excel_caller, f"The MP and the TP are fitting together perfectly.")
+            WHOLE_STRUCTURE = pd.concat([TP_DATA, MP_DATA], axis=0)
+        else:
+            if interactive:
+                ex.show_message_box(excel_caller, f"The MP and the TP are fitting together perfectly.")
 
-        WHOLE_STRUCTURE = pd.concat([TP_DATA, WHOLE_STRUCTURE], axis=0)
+            WHOLE_STRUCTURE = pd.concat([TP_DATA, MP_DATA], axis=0)
+
+    elif MP_DATA is not None and TP_DATA is None:
+        WHOLE_STRUCTURE = MP_DATA
+
+    elif MP_DATA is None and TP_DATA is not None:
+        WHOLE_STRUCTURE = TP_DATA
+
+    else:
+        WHOLE_STRUCTURE = None
 
     if TOWER_DATA is not None:
-        # Add Tower
-        WHOLE_STRUCTURE, tower_offset = add_tower_on_top(WHOLE_STRUCTURE, TOWER_DATA)
+        if WHOLE_STRUCTURE is not None:
+            # Add Tower
+            WHOLE_STRUCTURE, tower_offset = add_tower_on_top(WHOLE_STRUCTURE, TOWER_DATA)
+        else:
+            WHOLE_STRUCTURE = TOWER_DATA
+            tower_offset = 0
 
         WHOLE_STRUCTURE.rename(columns={"Section": "local Section"}, inplace=True)
         WHOLE_STRUCTURE = WHOLE_STRUCTURE.reset_index(drop=True)
@@ -424,7 +494,7 @@ def assemble_structure(MP_DATA, TP_DATA, TOWER_DATA=None, MP_MASSES=None, TP_MAS
     return WHOLE_STRUCTURE, ALL_MASSES, SKIRT, SKIRT_POINTMASS
 
 
-def assemble_structure_excel(excel_caller, rho, RNA_config):
+def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TOWER_identifier, RNA_identifier):
     def all_same_ignoring_none(*values):
         non_none = [v for v in values if v is not None]
         return len(non_none) <= 1 or all(v == non_none[0] for v in non_none)
@@ -440,26 +510,38 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
     TP_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_META")
     TOWER_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_META")
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    Structue_Components = ex.read_excel_table(excel_filename, "StructureOverview", "Structue_Components")
+    Structue_Components.loc[:, "Identifier"] = None
+
     STRUCTURE_META.loc[:, "Value"] = ""
 
     MP_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "MP_MASSES", dropnan=True)
     TP_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_MASSES", dropnan=True)
     TOWER_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_MASSES", dropnan=True)
 
-    if len(MP_DATA) == 0:
-        ex.show_message_box(excel_filename, f"Please provide a MP structure to assamble.")
-        return
-    if len(TP_DATA) == 0:
-        ex.show_message_box(excel_filename, f"Please provide a TP structure to assamble.")
-        return
-
     # Quality Checks/Warings of single datasets, if any fail fataly, abort
     sucess_MP, MP_DATA = check_convert_structure(excel_filename, MP_DATA, "MP")
     sucess_TP, TP_DATA = check_convert_structure(excel_filename, TP_DATA, "TP")
     sucess_TOWER, TOWER_DATA = check_convert_structure(excel_filename, TOWER_DATA, "TOWER")
+    # Read dropdown values of Identifieres
+
+    Structue_Components.loc[Structue_Components["Component"] == "MP", "Identifier"] = MP_identifier
+    Structue_Components.loc[Structue_Components["Component"] == "TP", "Identifier"] = TP_identifier
+    Structue_Components.loc[Structue_Components["Component"] == "TOWER", "Identifier"] = TOWER_identifier
+    Structue_Components.loc[Structue_Components["Component"] == "RNA", "Identifier"] = RNA_identifier
+
+    ex.write_df_to_table(excel_filename, "StructureOverview", "Structue_Components", Structue_Components)
+
+    if len(MP_DATA) == 0:
+        ex.show_message_box(excel_filename, f"Please provide a MP structure to assamble.")
+        return
+
+    if len(TP_DATA) == 0:
+        TP_DATA = None
 
     if len(TOWER_DATA) == 0:
         TOWER_DATA = None
+
     if len(TOWER_MASSES) == 0:
         TOWER_MASSES = None
 
@@ -467,39 +549,43 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
         return
 
     # RNA choosing
-    if RNA_config == "":
+    if RNA_identifier == "":
         ex.show_message_box(excel_filename,
                             f"Caution, no RNA selected.")
     else:
-        if not RNA_config in RNA_DATA["Identifier"].values:
+        if not RNA_identifier in RNA_DATA["Identifier"].values:
             ex.show_message_box(excel_filename,
                                 f"Chosen RNA not in RNA dropdown menu. Aborting.")
             return None
         else:
-            RNA = RNA_DATA.loc[RNA_DATA["Identifier"] == RNA_config, :]
+            RNA = RNA_DATA.loc[RNA_DATA["Identifier"] == RNA_identifier, :]
             ex.write_df_to_table(excel_filename, "StructureOverview", "RNA", RNA)
 
     # Height Reference handling
-    WL_ref_MP = MP_META.loc[0, "Height Reference"]
-    WL_ref_MT = TP_META.loc[0, "Height Reference"]
-    WL_ref_TOWER = TOWER_META.loc[0, "Height Reference"]
+    height_refs = [MP_META.loc[0, "Height Reference"]]
+    if TP_META is not None:
+        height_refs.append(TP_META.loc[0, "Height Reference"])
+    if TP_META is not None:
+        height_refs.append(TOWER_META.loc[0, "Height Reference"])
 
-    if not all_same_ignoring_none(WL_ref_MP, WL_ref_MT):
+    if not all_same_ignoring_none(*height_refs):
         answer = ex.show_message_box(excel_filename,
-                                     f"Warning, MP and TP height reference are not the same (MP: {WL_ref_MP}, TP: {WL_ref_MT}). Assemble anyway?",
+                                     f"Warning, MP and TP height reference are not the same ({height_refs}). Assemble anyway?",
                                      buttons="vbYesNo", icon="warning")
         if answer == "No":
             return
     else:
-        STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"] = [v for v in [WL_ref_MP, WL_ref_MT, WL_ref_TOWER] if v is not None][0]
+        STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"] = [v for v in height_refs if v is not None][0]
 
     # waterdepth handling
     if MP_META.loc[0, "Water Depth [m]"] is not None:
         STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"] = - float(MP_META.loc[0, "Water Depth [m]"])
 
     try:
+
         WHOLE_STRUCTURE, ALL_MASSES, SKIRT, SKIRT_POINTMASS = assemble_structure(MP_DATA, TP_DATA, TOWER_DATA, MP_MASSES=MP_MASSES, TP_MASSES=TP_MASSES, TOWER_MASSES=TOWER_MASSES,
                                                                                  excel_caller=excel_filename, rho=rho)
+
     except ValueError:
         GCplt.plot_Assambly_Overview(excel_caller)
         return
@@ -507,6 +593,7 @@ def assemble_structure_excel(excel_caller, rho, RNA_config):
     ex.write_df_to_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", WHOLE_STRUCTURE)
     ex.write_df_to_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
     ex.write_df_to_table(excel_filename, "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
+    ex.write_df_to_table(excel_filename, "StructureOverview", "Structue_Components", Structue_Components)
 
     if SKIRT is not None:
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT", SKIRT)

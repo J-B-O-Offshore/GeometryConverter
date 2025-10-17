@@ -420,26 +420,7 @@ def plot_Assambly_Build(excel_caller):
         seabed = None
         height_ref = None
 
-    SKIRT = None
-    if len(MP) > 0 and len(TP) > 0:
-        if len(TOWER) > 0:
-            WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
-        else:
-            WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, interactive=False, ignore_hovering=True, overlapp_mode="Skirt")
-
-    elif len(TP) > 0:
-        WHOLE_STRUCTURE = TP
-        if len(TOWER) > 0:
-            WHOLE_STRUCTURE, _ = mc.add_tower_on_top(WHOLE_STRUCTURE, TOWER)
-    elif len(MP) > 0:
-        WHOLE_STRUCTURE = MP
-        if len(TOWER) > 0:
-            WHOLE_STRUCTURE, _ = mc.add_tower_on_top(WHOLE_STRUCTURE, TOWER)
-    else:
-        if len(TOWER) > 0:
-            WHOLE_STRUCTURE = TOWER
-        else:
-            WHOLE_STRUCTURE = pd.DataFrame(columns=["Affiliation"])
+    WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, strict_build=False, overlapp_mode="Skirt")
 
     Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0, height_ref=height_ref)
     ex.insert_plot(Fig, excel_filename, "BuildYourStructure", f"Assambly_plot")

@@ -24,6 +24,19 @@ Sub select_Bladad_py_curves_output()
     
 End Sub
 
+Sub select_Bladad_py_curves_insert()
+    Dim prevValue As Variant
+    
+    PickFolderDialog "Bladed_py_insert_path"
+    
+End Sub
+
+Sub select_Bladad_py_curves_fig_insert()
+    Dim prevValue As Variant
+    
+    PickFolderDialog "Bladed_py_insert_fig_path"
+    
+End Sub
 
 Sub load_Bladed_dropdown()
     Dim path As String
@@ -113,12 +126,67 @@ Sub apply_py_curves()
     RunPythonWrapper "export", "apply_bladed_py_curves", args
 End Sub
 
+Sub apply_py_curves_insert_PJ()
+    Dim Bladed_py_path As String
+    Dim Bladed_py_insert_path As String
+    Dim Bladed_py_insert_fig_path As String
+    Dim config_name As String
+    Dim args As New Collection
+    Dim success As Boolean
+    Dim fso As Object
+    
+    Bladed_py_path = Range("Bladed_py_path").Value
+    Bladed_py_insert_path = Range("Bladed_py_insert_path").Value
+    Bladed_py_insert_fig_path = Range("Bladed_py_insert_fig_path").Value
+    
+    ' ? If Bladed_py_insert_fig_path is empty, use the folder of the insert file
+    If Trim(Bladed_py_insert_fig_path) = "" Then
+        Set fso = CreateObject("Scripting.FileSystemObject")
+        Bladed_py_insert_fig_path = fso.GetParentFolderName(Bladed_py_insert_path)
+    End If
+    
+    config_name = get_dropdown_value("ExportStructure", "Dropdown_Bladed_py_loadcase")
+    
+    ' --- File existence checks ---
+    success = FileExists(Bladed_py_path)
+    If Not success Then
+        MsgBox "The Bladed file does not exist or is not reachable: " & Bladed_py_path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    
+    success = FileExists(Bladed_py_insert_path)
+    If Not success Then
+        MsgBox "The PJ output file does not exist or is not reachable: " & Bladed_py_insert_path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    
+    ' ?? No FolderExists() check here — path can be a file or folder
+    ' The Python function will handle both
+    
+    args.Add Bladed_py_path
+    args.Add Bladed_py_insert_path
+    args.Add config_name
+    args.Add True
+    args.Add Bladed_py_insert_fig_path
+    
+    RunPythonWrapper "export", "apply_bladed_py_curves", args
+End Sub
+
 Sub export_JBOOST()
-    Dim lua_path As Variant
+    Dim jboost_path As String
     Dim run As Boolean
     Dim args As New Collection
     
     jboost_path = Range("JBOOST_Path").Value
+    
+    
+        ' --- File existence checks ---
+    success = FolderExists(jboost_path)
+    If Not success Then
+        MsgBox "JBOOST folder does not exist or is not reachable: " & jboost_path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    
     
     args.Add jboost_path
 
@@ -162,9 +230,19 @@ Sub select_WLGen_out()
 End Sub
 
 Sub export_WLGen()
-    Dim lua_path As Variant
-    lua_path = Range("WLGen_Path").Value
-    RunPythonWrapper "export", "export_WLGen", lua_path
+    Dim path As String
+    path = Range("WLGen_Path").Value
+    
+    ' --- File existence checks ---
+    success = FolderExists(path)
+    If Not success Then
+        MsgBox "WLgen folder does not exist or is not reachable: " & path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    
+    
+    fill_WLGenMasses
+    RunPythonWrapper "export", "export_WLGen", path
 End Sub
 
 Sub fill_WLGenMasses()
@@ -183,7 +261,7 @@ Sub show_WLGen_section()
 End Sub
 
 Sub show_Bladed_section()
-    ShowOnlySelectedColumns "E:BW", "U:AQ"
+    ShowOnlySelectedColumns "E:BW", "T:AQ"
 End Sub
 
 Sub show_JBOOST_section()

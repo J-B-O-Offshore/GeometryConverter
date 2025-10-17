@@ -1,4 +1,8 @@
-matplotlib
-numpy
-pandas
-xlwings
+e57==0.2.1a1
+matplotlib==3.8.3
+numpy==2.3.4
+openpyxl==3.1.2
+pandas==2.3.3
+scipy==1.16.2
+tqdm==4.67.1
+xlwings==0.33.11

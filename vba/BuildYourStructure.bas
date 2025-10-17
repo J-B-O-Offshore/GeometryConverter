@@ -505,13 +505,27 @@ Sub assamble_structure()
     ClearTableContents "StructureOverview", "RNA"
     
     args.Add 7860
+    MP_config = get_dropdown_value("BuildYourStructure", "Dropdown_MP_Structures2")
+    TP_config = get_dropdown_value("BuildYourStructure", "Dropdown_TP_Structures2")
+    TOWER_config = get_dropdown_value("BuildYourStructure", "Dropdown_TOWER_Structures2")
     RNA_config = get_dropdown_value("BuildYourStructure", "Dropdown_RNA_Structures")
+    args.Add MP_config
+    args.Add TP_config
+    args.Add TOWER_config
     args.Add RNA_config
     
     RunPythonWrapper "misc", "assemble_structure_excel", args
     
     Worksheets("StructureOverview").Activate
 End Sub
+
+Sub reload_databasis()
+        load_MP_DB
+        load_TP_DB
+        load_TOWER_DB
+        load_RNA_DB
+End Sub
+
 
 Sub show_MP_section()
     ShowOnlySelectedColumns "E:EN", "E:X"

@@ -1032,7 +1032,7 @@ def load_TOWERMasses_from_GeomConv(excel_caller, GeomConv_path):
             "Name", "Top [m]", "Bottom [m]", "Mass [kg]", "Diameter [m]",
             "Orientation [°]", "Distance Axis to Axis", "Gap between surfaces", "Surface roughness [m]"
         ]]
-        Structure = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_DATA", dtype=float)
+        Structure = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TOWER_DATA", dtype=float)
 
         Structure = Structure.dropna(how="all")
 
@@ -1041,9 +1041,9 @@ def load_TOWERMasses_from_GeomConv(excel_caller, GeomConv_path):
                                 f"Please provide TOWER Data")
             return
 
-        heigt_range = (Structure.loc[0, "Top [m]"], None)
+        heigt_range = (Structure.loc[0, "Top [m]"], Structure.iloc[-1].loc["Bottom [m]"])
 
-        Data = Data.loc[Data["Top [m]"] >= heigt_range[0], :]
+        Data = Data.loc[(Data["Top [m]"] <= heigt_range[0]) & (Data["Bottom [m]"] >= heigt_range[1]), :]
 
         ex.write_df_to_table(excel_filename, "BuildYourStructure", "TOWER_MASSES", Data)
 
@@ -1104,4 +1104,4 @@ def delete_RNA_data(excel_caller, selected_structure):
 
     return
 
-# load_MPMasses_from_GeomConv("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeomConv_V1.18_Dreekant-15MW236-N12.1_DP-A2_L0G2S1.xlsm")
+#load_MPMasses_from_GeomConv("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeomConv_V1.18_Dreekant-15MW236-N12.1_DP-A2_L0G2S1.xlsm")

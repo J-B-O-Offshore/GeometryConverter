@@ -4,13 +4,12 @@ import excel as ex
 import misc as mc
 import numpy as np
 from pandas.api.types import CategoricalDtype
+import os
 
 from ALaPy import periphery as pe
 
 import plot as plt
 # %% helpers
-import os
-
 os.environ["MPLBACKEND"] = "Agg"  # kein GUI nötig
 
 # optional zusätzlich:
@@ -843,64 +842,127 @@ def plot_bladed_py(excel_caller, py_path, selected_loadcase):
     return
 
 
-def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadcase):
+
+def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=False, fig_path=None):
+    """
+    Apply p–y curves to a Bladed project by generating and inserting corresponding PJ files,
+    figures, and updated structural data.
+
+    This function reads configuration and structural data from Excel, loads the p–y curve data
+    from a Python-formatted file, generates Bladed-compatible PJ input text, and optionally
+    inserts the results into an existing PJ file. It also creates control figures for
+    interpolation verification and updates relevant Excel tables.
+
+    Parameters
+    ----------
+    excel_caller : str
+        Path to the Excel file that calls this function.
+    py_path : str
+        Path to the `.py` file containing the p–y curve data.
+    Bladed_pj_path : str
+        Directory path to the Bladed project where the PJ file will be created or updated.
+    selected_loadcase : str
+        The load case name to extract from the p–y curve data.
+    insert_mode : bool, optional
+        If True, inserts new data blocks into an existing PJ file instead of overwriting it.
+        Default is False.
+    fig_path : str, optional
+        Directory path where interpolation control figures will be saved. If None, defaults
+        to the Bladed project folder.
+
+    Returns
+    -------
+    None
+        Writes PJ file(s), figures, and Excel tables as side effects.
+
+    Raises
+    ------
+    FileNotFoundError
+        If any of the required files or directories cannot be found.
+    ValueError
+        If the p–y curve data or required Excel fields are missing or malformed.
+    """
+
+    # --- Validate and normalize paths ---
     py_path = os.path.abspath(py_path)
-    pj_export_path = os.path.abspath(pj_export_path)
+    Bladed_pj_path = os.path.abspath(Bladed_pj_path)
+    fig_path = os.path.abspath(os.path.dirname(Bladed_pj_path) or os.path.dirname(Bladed_pj_path))
     excel_filename = os.path.basename(excel_caller)
-    Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
-    PJ_file_name = Bladed_Settings.loc[
-        Bladed_Settings["Parameter"] == "PJ file name", "Value"
-    ].values[0]
-    PJ_file_name += ".$PJ"
-    soil_density = Bladed_Settings.loc[
-        Bladed_Settings["Parameter"] == "Soil density", "Value"
-    ].values[0]
 
-    # insert springs
-    Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
-    Bladed_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Material", dropnan=True)
-    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
-    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
-    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
-    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    if not os.path.exists(py_path):
+        raise FileNotFoundError(f"p–y curve file not found: {py_path}")
+    if not os.path.exists(Bladed_pj_path):
+        raise FileNotFoundError(f"Bladed project path not found: {Bladed_pj_path}")
 
+    # --- Read Excel configuration and data ---
+    try:
+        Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
+        Bladed_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Material", dropnan=True)
+        GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
+        MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
+        MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
+        STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    except Exception as err:
+        raise ValueError(f"Failed to read one or more required Excel tables: {err}")
+
+    # --- Extract basic configuration values ---
+    try:
+        PJ_file_name = Bladed_Settings.loc[
+            Bladed_Settings["Parameter"] == "PJ file name", "Value"
+        ].values[0] + ".$PJ"
+        soil_density = Bladed_Settings.loc[
+            Bladed_Settings["Parameter"] == "Soil density", "Value"
+        ].values[0]
+        print_figs = Bladed_Settings.loc[
+            Bladed_Settings["Parameter"] == "export PJ validation figures", "Value"
+        ].values[0]
+        print_figs = str_to_bool(print_figs)
+        seabed_level = STRUCTURE_META.loc[
+            STRUCTURE_META["Parameter"] == "Seabed level", "Value"
+        ].values[0]
+    except Exception:
+        ex.show_message_box(excel_filename, "Missing or invalid parameters in Bladed_Settings or STRUCTURE_META.")
+        return
+
+    # --- Path assignmet ---
+    if insert_mode:
+        if not os.path.isfile(Bladed_pj_path):
+            raise ValueError("Bladed_pj_path has to point to a file")
+    else:
+        Bladed_pj_path = os.path.join(os.path.dirname(Bladed_pj_path), PJ_file_name)
+
+    # --- Split masses into point and extended types ---
     APPURTANCES = MASSES[MASSES["Top [m]"] != MASSES["Bottom [m]"]]
     ADDITIONAL_MASSES = MASSES[MASSES["Top [m]"] == MASSES["Bottom [m]"]]
+    pile_end = GEOMETRY.iloc[-1]["Bottom [m]"]
 
-    seabed_level = STRUCTURE_META.loc[
-        STRUCTURE_META["Parameter"] == "Seabed level", "Value"
-    ].values[0]
-
-    pile_end = GEOMETRY.iloc[-1].loc["Bottom [m]"]
-
+    # --- Load and process p–y curve data ---
     try:
         PY_data = pe.read_geo_py_curves(py_path)
+        if selected_loadcase not in PY_data:
+            raise ValueError(f"Selected loadcase '{selected_loadcase}' not found in {py_path}.")
         PY_loadcase = PY_data[selected_loadcase]
 
-        PJ_txt, Interpol_control_FIGs = pe.create_bladed_PJ_py_file(PY_loadcase, pile_end=pile_end)
-
-        # Save PJ file
-        path_PJ_file = os.path.join(pj_export_path, PJ_file_name)
-
-        # Create subfolder for figs
-        figs_folder = os.path.join(pj_export_path, "interpol_control_figs")
-        os.makedirs(figs_folder, exist_ok=True)
-
-        # Save figures
-        for i, fig in enumerate(Interpol_control_FIGs, start=1):
-            fig_path = os.path.join(figs_folder, f"interpol_control_fig_{str(i).zfill(3)}.png")
-            fig.savefig(fig_path, dpi=200, bbox_inches="tight")
-
-    except ValueError as err:
-        ex.show_message_box(excel_filename, f"PY data file could not be read or {selected_loadcase} not part of the file, make sure it is the right format and it is reachable.")
+        PJ_txt, Interpol_control_FIGs = pe.create_bladed_PJ_py_file(PY_loadcase, pile_end=pile_end, make_plots=print_figs)
+    except Exception as err:
+        ex.show_message_box(excel_filename,
+            f"PY data file could not be read or loadcase '{selected_loadcase}' not found.\nError: {err}"
+        )
         ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
         return
 
-    np.unique(PY_loadcase["z [m]"])
+    # --- Save interpolation control figures ---
+    if print_figs:
+        figs_folder = os.path.join(fig_path, "interpol_control_figs")
+        os.makedirs(figs_folder, exist_ok=True)
+        for i, fig in enumerate(Interpol_control_FIGs, start=1):
+            try:
+                fig_out_path = os.path.join(figs_folder, f"interpol_control_fig_{i:03d}.png")
+                fig.savefig(fig_out_path, dpi=200, bbox_inches="tight")
+            except Exception as err:
+                print(f"Warning: Failed to save figure {i}: {err}")
 
-    PY_loadcase_spring_heigths = pd.Series(np.unique(PY_loadcase["z [m]"]), index=np.unique(PY_loadcase["Spring [-]"]))
-
-    # check
+    # --- Run input checks (explicit, one by one for clarity) ---
     ok, err = check_added_masses(ADDITIONAL_MASSES, "ADDITIONAL_MASSES")
     if not ok:
         ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Added masses: {err}")
@@ -908,7 +970,7 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
 
     ok, err = check_appurtenances(APPURTANCES)
     if not ok:
-        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Appurtances definition: {err}")
+        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Appurtenances definition: {err}")
         return
 
     ok, err = check_marine_growth(MARINE_GROWTH, "MARINE_GROWTH")
@@ -917,40 +979,59 @@ def apply_bladed_py_curves(excel_caller, py_path, pj_export_path, selected_loadc
         return
 
     if seabed_level is None:
-        ex.show_message_box(excel_filename, f"Seabed level has to be proided (StrucutreOverview) when py curves are applied! Aborting.")
+        ex.show_message_box(excel_filename, "Seabed level must be provided in STRUCTURE_META when p–y curves are applied.")
         return
 
-    # Build dataframes
-    Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
-        Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META, cut_embedded=False, PY_springs=PY_loadcase_spring_heigths, soil_density=soil_density
-    )
+    # --- Build Bladed structure data ---
+    try:
+        PY_loadcase_spring_heights = pd.Series(
+            np.unique(PY_loadcase["z [m]"]),
+            index=np.unique(PY_loadcase["Spring [-]"])
+        )
 
-    # extra definition lines and saving
-    Nodes_with_spring = Bladed_Nodes.loc[
-        Bladed_Nodes["Foundation"].apply(lambda x: isinstance(x, str) and x != ""),
-        "Node [-]"
-    ].values
+        Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
+            Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META,
+            cut_embedded=False, PY_springs=PY_loadcase_spring_heights, soil_density=soil_density
+        )
+    except Exception as err:
+        ex.show_message_box(excel_filename, f"Error building Bladed dataframes: {err}")
+        return
 
-    node_def_lines = pe.create_bladed_PJ_node_defnition(Nodes_with_spring)
-    text_combined = node_def_lines + "\n\n\n\n\n" + PJ_txt
-    # add node definition line to PJ file
-    with open(path_PJ_file, 'w') as file:
-        file.write(text_combined)
+    # --- Generate node definitions and save PJ file ---
+    try:
+        Nodes_with_spring = Bladed_Nodes.loc[
+            Bladed_Nodes["Foundation"].apply(lambda x: isinstance(x, str) and x != ""),
+            "Node [-]"
+        ].values
+        node_def_lines = pe.create_bladed_PJ_node_defnition(Nodes_with_spring)
 
-    # Write outputs
-    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
-    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
+        if insert_mode:
+            pe.replace_pj_blocks(Bladed_pj_path, PJ_txt, node_def_lines[0], node_def_lines[1])
+            ex.show_message_box(excel_filename, f"PY foundation configuration inserted into PJ file '{Bladed_pj_path}'.")
+        else:
+            with open(Bladed_pj_path, 'w') as file:
+                file.write("\n".join(node_def_lines) + "\n\n\n\n\n" + PJ_txt)
+            ex.show_message_box(excel_filename, f"PY foundation configuration saved to PJ file '{Bladed_pj_path}'.")
 
-    return
+    except Exception as err:
+        ex.show_message_box(excel_filename, f"Failed to write PJ file: {err}")
+        return
+
+    # --- Export resulting DataFrames back to Excel ---
+    try:
+        ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
+        ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
+    except Exception as err:
+        ex.show_message_box(excel_filename, f"Failed to write output tables to Excel: {err}")
+        return
 
 
-#excel_caller = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm"
-#fill_Bladed_table(excel_caller)
-
-#apply_bladed_py_curves("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "I:/2024/A/24A525_EnBW_Dreekant_FEED/02_Statik/01_Geotechnik/2025-09-24_-_Design_Positions_(15MW)/B1/24A525-JBO-TNSPDP-EN-XXXX-01 - Preliminary Concept Design - Monopile - Appendix B01-G-0 - Springs_(L).csv", ".", "FLS_(Reloading_BE)")
-# fill_bladed_py_dropdown("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "I:/2024/A/24A525_EnBW_Dreekant_FEED/02_Statik/01_Geotechnik/2025-09-24_-_Design_Positions_(15MW)/B1/24A525-JBO-TNSPDP-EN-XXXX-01 - Preliminary Concept Design - Monopile - Appendix B01-G-0 - Springs_(L).csv")
-# create_JBOOST_soil_configs(excel_caller)
-# load_JBOOST_soil_file(excel_caller, "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Lateral_Stiffness.csv")
+excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
+# py_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Springs_(L).csv"
+# Bladed_pj_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/insert_pj_mode/DKT_12_v04_Wdir270_Wavedir300_yen8_s01_____.$PJ"
+# selected_loadcase  = "FLS_(Reloading_BE)"
+# insert_mode = True
 #
-# export_JBOOST(excel_caller, ".")
-# plot_bladed_py("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/new/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/Validation/old/Input/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1.csv", selected_loadcase)
+# apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=insert_mode, fig_path=None)
+# #excel_caller = "I:/2025/A/518_RWE_WBO_FOU_Design/100_Engr/110_Loads/01_LILA/02_preLILA_Vestas/2025-10-14_GeometryConverter_v1.5_MP_DP-C_013Hz_L0_G0_S1-BCe.xlsm"
+run_JBOOST_excel(excel_caller, export_path="")
