@@ -166,7 +166,7 @@ Sub apply_py_curves_insert_PJ()
     args.Add Bladed_py_path
     args.Add Bladed_py_insert_path
     args.Add config_name
-    args.Add True
+    args.Add "True"
     args.Add Bladed_py_insert_fig_path
     
     RunPythonWrapper "export", "apply_bladed_py_curves", args

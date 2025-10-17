@@ -842,7 +842,6 @@ def plot_bladed_py(excel_caller, py_path, selected_loadcase):
     return
 
 
-
 def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=False, fig_path=None):
     """
     Apply p–y curves to a Bladed project by generating and inserting corresponding PJ files,
@@ -882,6 +881,8 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
     ValueError
         If the p–y curve data or required Excel fields are missing or malformed.
     """
+
+    insert_mode = str_to_bool(insert_mode)
 
     # --- Validate and normalize paths ---
     py_path = os.path.abspath(py_path)
@@ -1026,7 +1027,7 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
         return
 
 
-excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
+# excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
 # py_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Springs_(L).csv"
 # Bladed_pj_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/insert_pj_mode/DKT_12_v04_Wdir270_Wavedir300_yen8_s01_____.$PJ"
 # selected_loadcase  = "FLS_(Reloading_BE)"
@@ -1034,4 +1035,3 @@ excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/Geome
 #
 # apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=insert_mode, fig_path=None)
 # #excel_caller = "I:/2025/A/518_RWE_WBO_FOU_Design/100_Engr/110_Loads/01_LILA/02_preLILA_Vestas/2025-10-14_GeometryConverter_v1.5_MP_DP-C_013Hz_L0_G0_S1-BCe.xlsm"
-run_JBOOST_excel(excel_caller, export_path="")
