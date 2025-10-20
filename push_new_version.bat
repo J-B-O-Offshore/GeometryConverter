@@ -1,4 +1,4 @@
-@echo on
+@echo off
 REM =========================================
 REM Git Commit + Tag + Push Script (Retag)
 REM =========================================
