@@ -168,6 +168,8 @@ Sub apply_py_curves_insert_PJ()
     args.Add config_name
     args.Add "True"
     args.Add Bladed_py_insert_fig_path
+    args.Add "False"
+    
     
     RunPythonWrapper "export", "apply_bladed_py_curves", args
 End Sub
@@ -255,6 +257,32 @@ Sub fill_Bladed_table()
     ClearTableContents "ExportStructure", "Bladed_Elements"
     RunPythonWrapper "export", "fill_Bladed_table"
 End Sub
+
+Sub fill_Bladed_table_py()
+    Dim args As New Collection
+    Dim Bladed_py_path As String
+    Dim config_name As String
+    
+    Bladed_py_path = Range("Bladed_py_path").Value
+    config_name = get_dropdown_value("ExportStructure", "Dropdown_Bladed_py_loadcase")
+    
+    success = FileExists(Bladed_py_path)
+    If Not success Then
+        MsgBox "The Bladed file does not exist or is not reachable: " & Bladed_py_path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    
+    ClearTableContents "ExportStructure", "Bladed_Nodes"
+    ClearTableContents "ExportStructure", "Bladed_Elements"
+    
+    args.Add "True"
+    args.Add config_name
+    args.Add Bladed_py_path
+    
+    
+    RunPythonWrapper "export", "fill_Bladed_table", args
+End Sub
+
 
 Sub show_WLGen_section()
     ShowOnlySelectedColumns "E:BW", "E:S"

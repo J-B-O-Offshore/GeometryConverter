@@ -621,6 +621,8 @@ def add_unique_row(df1, df2, exclude_columns=None):
 def call_vba_dropdown_macro(workbook_name: str, sheet_name: str, dropdown_name: str, new_value: str):
     wb = xw.Book(workbook_name)  # Adjust path or use xw.Book.caller()
     wb.macro('set_dropdown_value')(sheet_name, dropdown_name, new_value)
+
+    
 def insert_plot(fig, workbook_name, sheet_name, named_range, replace=False):
     """
     Insert a Matplotlib Figure into an already open Excel workbook at the named range,
@@ -682,6 +684,8 @@ def insert_plot(fig, workbook_name, sheet_name, named_range, replace=False):
         os.remove(tmpfile.name)
 
     return sheet.pictures[pic_name]
+
+
 def read_named_range(path, name, sheet_name=None, dtype=None, use_header=True):
     """
     Read a named range from an Excel file (supports workbook-level and sheet-level names).

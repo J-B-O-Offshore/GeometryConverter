@@ -751,9 +751,9 @@ def fill_WLGenMasses(excel_caller):
 
 # %% BLADED
 
-def fill_Bladed_table(excel_caller):
+def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=None, py_path=None):
     excel_filename = os.path.basename(excel_caller)
-
+    incluce_py_nodes = str_to_bool(incluce_py_nodes)
     # Read inputs
     Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
     Bladed_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Material", dropnan=True)
@@ -764,6 +764,10 @@ def fill_Bladed_table(excel_caller):
 
     APPURTANCES = MASSES[MASSES["Top [m]"] != MASSES["Bottom [m]"]]
     ADDITIONAL_MASSES = MASSES[MASSES["Top [m]"] == MASSES["Bottom [m]"]]
+    soil_density = Bladed_Settings.loc[
+        Bladed_Settings["Parameter"] == "Soil density", "Value"
+    ].values[0]
+
 
     # check
     ok, err = check_added_masses(ADDITIONAL_MASSES, "ADDITIONAL_MASSES")
@@ -781,9 +785,25 @@ def fill_Bladed_table(excel_caller):
         ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Marine Growth: {err}")
         return
 
-    # Build dataframes
+    if incluce_py_nodes:
+        PY_data = pe.read_geo_py_curves(py_path)
+        if selected_loadcase not in PY_data:
+            raise ValueError(f"Selected loadcase '{selected_loadcase}' not found in {py_path}.")
+        PY_loadcase = PY_data[selected_loadcase]
+
+        PY_loadcase_spring_heights = pd.Series(
+            np.unique(PY_loadcase["z [m]"]),
+            index=np.unique(PY_loadcase["Spring [-]"])
+        )
+        cut_embedded = False
+
+    else:
+        cut_embedded = True
+        PY_loadcase_spring_heights = None
+
     Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
-        Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META
+        Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META,
+        cut_embedded=cut_embedded, PY_springs=PY_loadcase_spring_heights, soil_density=soil_density
     )
 
     # Write outputs
@@ -842,7 +862,7 @@ def plot_bladed_py(excel_caller, py_path, selected_loadcase):
     return
 
 
-def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=False, fig_path=None):
+def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=False, fig_path=None, update_tables=True):
     """
     Apply p–y curves to a Bladed project by generating and inserting corresponding PJ files,
     figures, and updated structural data.
@@ -883,11 +903,16 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
     """
 
     insert_mode = str_to_bool(insert_mode)
+    update_tables = str_to_bool(update_tables)
 
     # --- Validate and normalize paths ---
     py_path = os.path.abspath(py_path)
     Bladed_pj_path = os.path.abspath(Bladed_pj_path)
-    fig_path = os.path.abspath(os.path.dirname(Bladed_pj_path) or os.path.dirname(Bladed_pj_path))
+    if fig_path is None:
+        fig_path = os.path.abspath(os.path.dirname(Bladed_pj_path))
+    else:
+        fig_path = os.path.abspath(fig_path)
+
     excel_filename = os.path.basename(excel_caller)
 
     if not os.path.exists(py_path):
@@ -1019,13 +1044,15 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
         return
 
     # --- Export resulting DataFrames back to Excel ---
-    try:
-        ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
-        ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
-    except Exception as err:
-        ex.show_message_box(excel_filename, f"Failed to write output tables to Excel: {err}")
+    if update_tables:
+        try:
+            ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
+            ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
+        except Exception as err:
+            ex.show_message_box(excel_filename, f"Failed to write output tables to Excel: {err}")
+            return
+    else:
         return
-
 
 # excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
 # py_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Springs_(L).csv"
