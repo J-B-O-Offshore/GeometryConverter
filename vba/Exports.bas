@@ -27,7 +27,7 @@ End Sub
 Sub select_Bladad_py_curves_insert()
     Dim prevValue As Variant
     
-    PickFolderDialog "Bladed_py_insert_path"
+    OpenFileDialog "Bladed_py_insert_path"
     
 End Sub
 
@@ -45,7 +45,9 @@ Sub load_Bladed_dropdown()
     
     path = Range("Bladed_py_path").Value
     success = FileExists(path)
-
+    
+    ClearFormDropDown "ExportStructure", "Dropdown_Bladed_py_loadcase"
+    DeleteFigure "ExportStructure", "Fig_FIG_PY_CURVES"
     If Not success Then
         MsgBox "The Bladed file does not exist or is not reachable: " & path, vbExclamation, "Error"
         Exit Sub
@@ -84,8 +86,11 @@ Sub load_JBOOST_soil_stiffness()
     Dim args As New Collection
     
     path = Range("JBOOST_soil_path").Value
+    
+    ClearTableContents "ExportStructure", "JBOOST_soil_stiffness"
+    
     success = FileExists(path)
-
+    
     If Not success Then
         MsgBox "The soil stiffness matrix csv file does not exist or is not reachable: " & path, vbExclamation, "Error"
         Exit Sub
@@ -242,8 +247,6 @@ Sub export_WLGen()
         Exit Sub
     End If
     
-    
-    fill_WLGenMasses
     RunPythonWrapper "export", "export_WLGen", path
 End Sub
 

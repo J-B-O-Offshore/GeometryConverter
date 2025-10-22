@@ -1054,7 +1054,9 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
     else:
         return
 
-# excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
+#excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
+
+#fill_Bladed_table(excel_caller)
 # py_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Springs_(L).csv"
 # Bladed_pj_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/insert_pj_mode/DKT_12_v04_Wdir270_Wavedir300_yen8_s01_____.$PJ"
 # selected_loadcase  = "FLS_(Reloading_BE)"

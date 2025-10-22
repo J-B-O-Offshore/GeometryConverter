@@ -921,3 +921,24 @@ Public Sub MapNetworkDrive()
 End Sub
 
 
+Sub DeleteFigure(sheetName As String, figureName As String)
+    Dim ws As Worksheet
+    Dim shp As Shape
+    
+    ' Attempt to set the worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets(sheetName)
+    On Error GoTo 0
+    
+    If ws Is Nothing Then
+        Exit Sub
+    End If
+    
+    ' Attempt to delete the shape
+    On Error Resume Next
+    ws.Shapes(figureName).Delete
+    If Err.Number <> 0 Then
+        Err.Clear
+    End If
+    On Error GoTo 0
+End Sub

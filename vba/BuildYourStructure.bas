@@ -503,6 +503,9 @@ Sub assamble_structure()
     ClearTableContents "StructureOverview", "SKIRT_POINTMASS"
     ClearTableContents "StructureOverview", "SKIRT"
     ClearTableContents "StructureOverview", "RNA"
+    ClearTableContents "ExportStructure", "APPURTANCES"
+    ClearTableContents "ExportStructure", "Bladed_Nodes"
+    ClearTableContents "ExportStructure", "Bladed_Elements"
     
     args.Add 7860
     MP_config = get_dropdown_value("BuildYourStructure", "Dropdown_MP_Structures2")
