@@ -1031,8 +1031,19 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
         ].values
         node_def_lines = pe.create_bladed_PJ_node_defnition(Nodes_with_spring)
 
+        TP_top_node_value = Bladed_Elements.loc[(Bladed_Elements["Affiliation [-]"]=="TP") | (Bladed_Elements["Affiliation [-]"]=="MP"), "Node [-]"].values[0]
+
+        TP_top_NODE_idx = Bladed_Nodes.loc[Bladed_Nodes["Node [-]"] == TP_top_node_value, "Node [-]"].index[0]
+        seabed_NODE_idx = Bladed_Nodes.loc[Bladed_Nodes["Elevation [m]"] == seabed_level, "Node [-]"].index[0]
+
+        Nodes_interface_mudline = Bladed_Nodes.loc[TP_top_NODE_idx:seabed_NODE_idx, "Node [-]"].values
+
+        Nodes_interface_mudline = list(Nodes_interface_mudline)
+
+        output_node_lines = pe.create_bladed_PJ_output_definition(Nodes_interface_mudline)
+
         if insert_mode:
-            pe.replace_pj_blocks(Bladed_pj_path, PJ_txt, node_def_lines[0], node_def_lines[1])
+            pe.replace_pj_blocks(Bladed_pj_path, PJ_txt, node_def_lines[0], node_def_lines[1], output_node_lines)
             ex.show_message_box(excel_filename, f"PY foundation configuration inserted into PJ file '{Bladed_pj_path}'.")
         else:
             with open(Bladed_pj_path, 'w') as file:
@@ -1054,13 +1065,13 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
     else:
         return
 
-#excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
+excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
 
 #fill_Bladed_table(excel_caller)
-# py_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Springs_(L).csv"
-# Bladed_pj_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/insert_pj_mode/DKT_12_v04_Wdir270_Wavedir300_yen8_s01_____.$PJ"
-# selected_loadcase  = "FLS_(Reloading_BE)"
-# insert_mode = True
+py_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Springs_(L).csv"
+Bladed_pj_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/insert_pj_mode/DKT_12_v04_Wdir270_Wavedir300_yen8_s01_____.$PJ"
+selected_loadcase  = "FLS_(Reloading_BE)"
+insert_mode = True
 #
-# apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=insert_mode, fig_path=None)
+apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=insert_mode, fig_path=None)
 # #excel_caller = "I:/2025/A/518_RWE_WBO_FOU_Design/100_Engr/110_Loads/01_LILA/02_preLILA_Vestas/2025-10-14_GeometryConverter_v1.5_MP_DP-C_013Hz_L0_G0_S1-BCe.xlsm"
