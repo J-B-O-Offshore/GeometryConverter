@@ -860,7 +860,18 @@ def plot_bladed_py(excel_caller, py_path, selected_loadcase):
 
 
     return
+def update_bladed_name(excel_caller, selected_loadcase):
+    excel_filename = os.path.basename(excel_caller)
+    Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    basename = STRUCTURE_META.loc[ STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
+    if basename is None:
+        basename = "Bladed_PJ_file"
+    Bladed_Settings.loc[Bladed_Settings["Parameter"] == "PJ file name", "Value"] = basename + f"_{selected_loadcase}"
 
+    ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Settings", Bladed_Settings)
+
+    return
 
 def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=False, fig_path=None, update_tables=True):
     """
@@ -1032,12 +1043,9 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
         node_def_lines = pe.create_bladed_PJ_node_defnition(Nodes_with_spring)
 
         TP_top_node_value = Bladed_Elements.loc[(Bladed_Elements["Affiliation [-]"]=="TP") | (Bladed_Elements["Affiliation [-]"]=="MP"), "Node [-]"].values[0]
-
         TP_top_NODE_idx = Bladed_Nodes.loc[Bladed_Nodes["Node [-]"] == TP_top_node_value, "Node [-]"].index[0]
         seabed_NODE_idx = Bladed_Nodes.loc[Bladed_Nodes["Elevation [m]"] == seabed_level, "Node [-]"].index[0]
-
         Nodes_interface_mudline = Bladed_Nodes.loc[TP_top_NODE_idx:seabed_NODE_idx, "Node [-]"].values
-
         Nodes_interface_mudline = list(Nodes_interface_mudline)
 
         output_node_lines = pe.create_bladed_PJ_output_definition(Nodes_interface_mudline)
@@ -1065,13 +1073,75 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
     else:
         return
 
-excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
 
-#fill_Bladed_table(excel_caller)
-py_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Springs_(L).csv"
-Bladed_pj_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/insert_pj_mode/DKT_12_v04_Wdir270_Wavedir300_yen8_s01_____.$PJ"
-selected_loadcase  = "FLS_(Reloading_BE)"
-insert_mode = True
-#
-apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=insert_mode, fig_path=None)
-# #excel_caller = "I:/2025/A/518_RWE_WBO_FOU_Design/100_Engr/110_Loads/01_LILA/02_preLILA_Vestas/2025-10-14_GeometryConverter_v1.5_MP_DP-C_013Hz_L0_G0_S1-BCe.xlsm"
+def load_Bladed_soil_file_mat(excel_caller, path):
+    excel_filename = os.path.basename(excel_caller)
+
+    try:
+        _, sparse, _ = pe.read_soil_stiffness_matrix_csv(path)
+        sparse = sparse.T
+
+        sparse.insert(0, "Stiffness", sparse.index)
+
+        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "Bladed_soil_stiffness_mat")
+        ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "Bladed_soil_stiffness_mat", sparse)
+
+        ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_stiff_mat", list(sparse.columns[1:]))
+
+    except:
+        ex.show_message_box(excel_filename, f"PY data file could not be read, make sure it is the right format and it is reachable.")
+        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "Bladed_soil_stiffness_mat")
+    return
+
+
+def apply_bladed_stiff_mat(excel_caller, Bladed_stiff_path, Bladed_pj_export_path, config_name):
+    excel_filename = os.path.basename(excel_caller)
+    Bladed_Nodes = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Nodes", dropnan=True)
+    Bladed_Elements = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Elements", dropnan=True)
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    seabed_level = STRUCTURE_META.loc[
+        STRUCTURE_META["Parameter"] == "Seabed level", "Value"
+    ].values[0]
+
+    try:
+        _, _, stiff_mat  = pe.read_soil_stiffness_matrix_csv(Bladed_stiff_path)
+
+        config_data = stiff_mat[config_name]
+
+        MFONDS_str = pe.create_bladed_pj_stiff_mat_file(config_data, config_name)
+
+        Nodes_with_spring = Bladed_Nodes.loc[Bladed_Nodes["Elevation [m]"] == seabed_level, "Node [-]"].values
+        node_def_lines = pe.create_bladed_PJ_node_defnition(Nodes_with_spring)
+
+        TP_top_node_value = Bladed_Elements.loc[(Bladed_Elements["Affiliation"]=="TP") | (Bladed_Elements["Affiliation"]=="MP"), "Node [-]"].values[0]
+        TP_top_NODE_idx = Bladed_Nodes.loc[Bladed_Nodes["Node [-]"] == TP_top_node_value, "Node [-]"].index[0]
+        seabed_NODE_idx = Bladed_Nodes.loc[Bladed_Nodes["Elevation [m]"] == seabed_level, "Node [-]"].index[0]
+        Nodes_interface_mudline = Bladed_Nodes.loc[TP_top_NODE_idx:seabed_NODE_idx, "Node [-]"].values
+        Nodes_interface_mudline = list(Nodes_interface_mudline)
+
+        output_node_lines = pe.create_bladed_PJ_output_definition(Nodes_interface_mudline)
+
+        pe.replace_pj_blocks(Bladed_pj_export_path, MFONDS_str, node_def_lines[0], node_def_lines[1],  output_node_lines)
+
+    except Exception as e:
+        ex.show_message_box(excel_filename, f"Failed to write PJ file: {e}")
+
+        return
+
+    return
+
+# excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
+# #
+# # #fill_Bladed_table(excel_caller)
+# # py_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Springs_(L).csv"
+# # Bladed_pj_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/insert_pj_mode/DKT_12_v04_Wdir270_Wavedir300_yen8_s01_____.$PJ"
+# # selected_loadcase  = "FLS_(Reloading_BE)"
+# # insert_mode = True
+# # #
+# stiff_Mat_path = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Lateral_Stiffness.csv"
+# # #pply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=insert_mode, fig_path=None)
+# # # #excel_caller = "I:/2025/A/518_RWE_WBO_FOU_Design/100_Engr/110_Loads/01_LILA/02_preLILA_Vestas/2025-10-14_GeometryConverter_v1.5_MP_DP-C_013Hz_L0_G0_S1-BCe.xlsm"
+# # #load_Bladed_soil_file_mat(excel_caller, stiff_Mat_path)
+# #
+# #
+# apply_bladed_stiff_mat(excel_caller, stiff_Mat_path, "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525_DP-B4_SG276_21p5_FLS_relo_load_Prod_EOG.prj", "LC1_FLS_reloading_initial")
