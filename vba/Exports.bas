@@ -102,6 +102,60 @@ Sub load_JBOOST_soil_stiffness()
 End Sub
 
 
+Sub load_Bladed_soil_stiffness_mat()
+    Dim pj_path As String
+    Dim args As New Collection
+
+    pj_path = Range("Bladed_soil_mat_path").Value
+    
+    ClearTableContents "ExportStructure", "Bladed_soil_stiffness_mat"
+    
+    success = FileExists(pj_path)
+    
+    If Not success Then
+        MsgBox "The soil stiffness matrix csv file does not exist or is not reachable: " & pj_path, vbExclamation, "Error"
+        Exit Sub
+    End If
+
+    
+    RunPythonWrapper "export", "load_Bladed_soil_file_mat", pj_path
+End Sub
+
+Sub apply_soil_stiff_Bladed()
+    Dim Bladed_stiff_path As String
+    Dim Bladed_pj_export_path As String
+    Dim config_name As String
+    Dim args As New Collection
+    
+    Bladed_stiff_path = Range("Bladed_soil_mat_path").Value
+    Bladed_pj_export_path = Range("Bladed_pj_file_stiff_mat_path").Value
+    config_name = get_dropdown_value("ExportStructure", "Dropdown_Bladed_stiff_mat")
+    
+    success = FileExists(Bladed_stiff_path)
+    If Not success Then
+        MsgBox "The Bladed file does not exist or is not reachable: " & Bladed_stiff_path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    
+    success = FileExists(Bladed_pj_export_path)
+    If Not success Then
+        MsgBox "The PJ output folder does not exist or is not reachable: " & Bladed_pj_export_path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    
+        
+    ClearTableContents "ExportStructure", "Bladed_Nodes"
+    ClearTableContents "ExportStructure", "Bladed_Elements"
+    RunPythonWrapper "export", "fill_Bladed_table"
+    
+    args.Add Bladed_stiff_path
+    args.Add Bladed_pj_export_path
+    args.Add config_name
+    
+    RunPythonWrapper "export", "apply_bladed_stiff_mat", args
+End Sub
+
+
 Sub apply_py_curves()
     Dim Bladed_py_path As String
     Dim Bladed_py_export_path As String
@@ -307,4 +361,13 @@ End Sub
 
 Sub open_JBOOST_soil_csv()
     OpenFileDialog "JBOOST_soil_path", "select so csv file", "csv files", "*.csv"
+End Sub
+
+Sub open_BLADED_pj_file_stiff_mat()
+    OpenFileDialog "Bladed_pj_file_stiff_mat_path", "Select %pj or prj file"
+End Sub
+
+
+Sub open_Bladed_soil_mat_csv()
+    OpenFileDialog "Bladed_soil_mat_path", "select so csv file", "csv files", "*.csv"
 End Sub
