@@ -147,7 +147,7 @@ Sub apply_soil_stiff_Bladed()
     ClearTableContents "ExportStructure", "Bladed_Nodes"
     ClearTableContents "ExportStructure", "Bladed_Elements"
     RunPythonWrapper "export", "fill_Bladed_table"
-    
+
     args.Add Bladed_stiff_path
     args.Add Bladed_pj_export_path
     args.Add config_name

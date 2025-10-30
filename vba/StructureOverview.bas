@@ -16,3 +16,6 @@ Sub plot_Assambly_Overview()
 End Sub
 
 
+Sub calculate_MarineGrowth()
+    RunPythonWrapper "misc", "calculate_MarineGrowth_excel"
+End Sub

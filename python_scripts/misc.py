@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import excel as ex
 import plot as GCplt
+from ALaPy import misc as mc
 
 def find_duplicate_masses(df: pd.DataFrame) -> list[list[int]]:
     """
@@ -788,3 +789,33 @@ def add_tower_on_top(STRUCTURE, TOWER):
 # excel_caller = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
 # assemble_structure_excel(excel_caller, 1000, "25A515_pre-FEED_MP_DP-C_013Hz_L0_G0_S1", "24A523_Conceptual_Design_SGRE_DP-x-D95_L0_G0_S0_struct-nominal", "25A518_pre-LILA_DP-C_013Hz_L0_G0_S1", "SG-15-236")
 # # #
+
+def calculate_MarineGrowth_excel(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+
+    MSL_difference = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height difference from height ref to MSL", "Value"].values[0]
+
+    if not isinstance(MSL_difference, (float, int)):
+        ex.show_message_box(excel_filename, "Please provide a numeric input for the 'Height difference to MSL' in the Global Parameters. Aborting")
+        return
+
+    global_area = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Global Area for Marine Growth (north sea / baltic sea)", "Value"].values[0]
+
+    if not isinstance(global_area, str) or ((global_area != "north sea") and (global_area != "baltic sea")):
+        ex.show_message_box(excel_filename, "Please provide a Global Area 'north sea' or 'baltic sea' in the Global Parameters. Aborting")
+        return
+
+    seabed_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0]
+
+    if not isinstance(seabed_level, (float, int)):
+        ex.show_message_box(excel_filename, "Please provide a seabed level in the Global Parameters. Aborting")
+        return
+
+    MARINE_GROWTH = mc.calculate_MarineGrowth(global_area, MSL_difference, seabed_level, MG_dens=1325, surf_rought=0)
+
+    ex.clear_excel_table_contents(excel_filename, "StructureOverview", "MARINE_GROWTH")
+    ex.write_df_to_table(excel_filename, "StructureOverview", "MARINE_GROWTH", MARINE_GROWTH)
+
+    return
