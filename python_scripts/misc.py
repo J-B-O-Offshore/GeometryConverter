@@ -4,6 +4,21 @@ import pandas as pd
 import excel as ex
 import plot as GCplt
 
+def find_duplicate_masses(df: pd.DataFrame) -> list[list[int]]:
+    """
+    Find duplicate rows in the DataFrame based on specific columns.
+    Returns a list of lists, where each nested list contains the indices of duplicate rows.
+    """
+    # Columns used to detect duplicates
+    subset_cols = ["Name", "Top [m]", "Bottom [m]", "Mass [kg]"]
+
+    # Group by the subset of columns
+    grouped = df.groupby(subset_cols, dropna=False)
+
+    # Collect groups with more than one entry
+    duplicates = [list(group.index) for _, group in grouped if len(group) > 1]
+
+    return duplicates
 
 def valid_data(data):
     if pd.isna(data.values).any():
@@ -465,9 +480,9 @@ def assemble_structure(MP_DATA=None, TP_DATA=None, TOWER_DATA=None, MP_MASSES=No
             WHOLE_STRUCTURE = TOWER_DATA
             tower_offset = 0
 
-        WHOLE_STRUCTURE.rename(columns={"Section": "local Section"}, inplace=True)
-        WHOLE_STRUCTURE = WHOLE_STRUCTURE.reset_index(drop=True)
-        WHOLE_STRUCTURE.insert(0, "Section", WHOLE_STRUCTURE.index.values + 1)
+    WHOLE_STRUCTURE.rename(columns={"Section": "local Section"}, inplace=True)
+    WHOLE_STRUCTURE = WHOLE_STRUCTURE.reset_index(drop=True)
+    WHOLE_STRUCTURE.insert(0, "Section", WHOLE_STRUCTURE.index.values + 1)
 
     all_masses = []
     if MP_MASSES is not None:
@@ -488,6 +503,25 @@ def assemble_structure(MP_DATA=None, TP_DATA=None, TOWER_DATA=None, MP_MASSES=No
     if len(all_masses) != 0:
         ALL_MASSES = pd.concat(all_masses, axis=0)
         ALL_MASSES.sort_values(inplace=True, ascending=False, axis=0, by=["Top [m]"])
+        ALL_MASSES.reset_index(drop=True, inplace=True)
+        duplicate_indx = find_duplicate_masses(ALL_MASSES)
+
+        if duplicate_indx:
+            msg_lines = []
+            for group in duplicate_indx:
+                # Use .at[] for a guaranteed scalar value (faster and avoids Series)
+                name = str(ALL_MASSES.at[group[0], "Name"]).strip()
+                rows = ", ".join(map(str, group))
+                count = len(group)
+                plural = "instances" if count > 1 else "instance"
+                msg_lines.append(f"Mass '{name}' has {count} identical {plural} in rows {rows}.")
+
+            # Use double newlines between entries for better readability in Excel
+            msg = "\n\n".join(msg_lines)
+
+            if interactive:
+                msg += "\n\nPlease check if this is intentional and reassemble if necessary."
+                ex.show_message_box(excel_caller, msg)
     else:
         ALL_MASSES = None
 
@@ -589,7 +623,7 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
     except ValueError:
         GCplt.plot_Assambly_Overview(excel_caller)
         return
-
+    WHOLE_STRUCTURE
     ex.write_df_to_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", WHOLE_STRUCTURE)
     ex.write_df_to_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
     ex.write_df_to_table(excel_filename, "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
@@ -750,3 +784,7 @@ def add_tower_on_top(STRUCTURE, TOWER):
     WHOLE_STRUCTURE = pd.concat([TOWER, STRUCTURE], axis=0)
 
     return WHOLE_STRUCTURE, tower_offset
+# # #
+# excel_caller = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
+# assemble_structure_excel(excel_caller, 1000, "25A515_pre-FEED_MP_DP-C_013Hz_L0_G0_S1", "24A523_Conceptual_Design_SGRE_DP-x-D95_L0_G0_S0_struct-nominal", "25A518_pre-LILA_DP-C_013Hz_L0_G0_S1", "SG-15-236")
+# # #
