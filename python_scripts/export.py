@@ -559,7 +559,7 @@ def load_JBOOST_soil_file(excel_caller, path):
     excel_filename = os.path.basename(excel_caller)
 
     try:
-        _, sparse = pe.read_soil_stiffness_matrix_csv(path)
+        _, sparse,_ = pe.read_soil_stiffness_matrix_csv(path)
         sparse = sparse.T
 
         # Set default value for all columns
