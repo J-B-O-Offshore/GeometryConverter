@@ -574,20 +574,20 @@ End Sub
 
 
 Sub show_MP_section()
-    ShowOnlySelectedColumns "E:EN", "E:X"
+    ShowOnlySelectedColumns "E:EQ", "E:Y"
 End Sub
 
 
 Sub show_TP_section()
-    ShowOnlySelectedColumns "E:EN", "AP:BI"
+    ShowOnlySelectedColumns "E:EQ", "AQ:BK"
 End Sub
 
 Sub show_TOWER_section()
-    ShowOnlySelectedColumns "E:EN", "CB:CU"
+    ShowOnlySelectedColumns "E:EQ", "CC:CW"
 End Sub
     
 Sub show_RNA_section()
-    ShowOnlySelectedColumns "E:EN", "DN:DW"
+    ShowOnlySelectedColumns "E:EQ", "DP:DZ"
 End Sub
 
 
