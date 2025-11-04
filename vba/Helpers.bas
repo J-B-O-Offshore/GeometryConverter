@@ -157,7 +157,7 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
         GoTo CleanExit
     End If
     ' Always include Excel filename first
-    excelFileName = ThisWorkbook.FullName
+    excelFileName = ThisWorkbook.fullName
     argsString = ProcessArgument(excelFileName)
 
     ' Append other arguments

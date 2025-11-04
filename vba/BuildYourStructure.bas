@@ -319,13 +319,44 @@ End Sub
 ' Utility Subroutines
 '==============================================================================
 
-
+'**********************************************************************
+' Subroutine: UpdateIdentifierColumn
+'
+' Purpose:
+'   Updates the "Name" column in a specified Excel table based on the
+'   "Project ID", "Phase", and "Structure ID" columns.
+'
+' Behavior:
+'   - Keeps the part of the existing "Name" value before the first "_".
+'   - When all three fields ("Project ID", "Phase", "Structure ID") are filled:
+'         Constructs a new name in the format:
+'             <basePart>_<ProjectID>_<Phase>_<StructureID>
+'     If <basePart> is empty, the result starts with an underscore.
+'   - When any of the three fields are empty:
+'         Removes everything after the first "_" in the "Name" cell.
+'   - Runs silently (no message boxes or error pop-ups).
+'
+' Parameters:
+'   wsName     [String]  - The name of the worksheet containing the table.
+'   TableName  [String]  - The name of the ListObject (Excel table) to update.
+'
+' Example:
+'   Before: "A12_x" with Project ID="P1", Phase="DEV", Structure ID="S05"
+'   After:  "A12_P1_DEV_S05"
+'
+'   If Phase is later cleared:
+'   Result: "A12"
+'
+'**********************************************************************
 Sub UpdateIdentifierColumn(wsName As String, TableName As String)
     Dim ws As Worksheet, tbl As ListObject, row As ListRow
-    Dim idColIndex As Long, projectID As String, phase As String, structureID As String, ID As String
+    Dim nameColIndex As Long
+    Dim projectID As String, phase As String, structureID As String
+    Dim basePart As String, newName As String
     Dim col As ListColumn, colFound As Boolean
+    Dim fullName As String
     
-    On Error GoTo ErrHandler
+    On Error Resume Next  ' silent error handling
     
     Set ws = ThisWorkbook.Worksheets(wsName)
     Set tbl = ws.ListObjects(TableName)
@@ -334,40 +365,48 @@ Sub UpdateIdentifierColumn(wsName As String, TableName As String)
     colFound = False
     For Each col In tbl.ListColumns
         If Trim(col.name) = "Name" Then
-            idColIndex = col.Index
+            nameColIndex = col.Index
             colFound = True
             Exit For
         End If
     Next col
     
-    If Not colFound Then
-        MsgBox "Column 'Name' not found!", vbExclamation
-        Exit Sub
-    End If
+    If Not colFound Then Exit Sub
+    
+    On Error GoTo 0  ' restore normal error handling for loop
     
     For Each row In tbl.ListRows
         With row.Range
-            ' Treat empty ID as ""
-            ID = Trim(CStr(.Columns(tbl.ListColumns("ID").Index).Value))
+            fullName = Trim(CStr(.Columns(nameColIndex).Value))
             projectID = Trim(CStr(.Columns(tbl.ListColumns("Project ID").Index).Value))
             phase = Trim(CStr(.Columns(tbl.ListColumns("Phase").Index).Value))
             structureID = Trim(CStr(.Columns(tbl.ListColumns("Structure ID").Index).Value))
             
-            ' Only generate the combined name if the other three fields are not empty
-            If projectID <> "" And phase <> "" And structureID <> "" Then
-                .Cells(1, idColIndex).Value = ID & "_" & projectID & "_" & phase & "_" & structureID
+            ' Determine the part before the first underscore
+            If InStr(fullName, "_") > 0 Then
+                basePart = Left(fullName, InStr(fullName, "_") - 1)
             Else
-                .Cells(1, idColIndex).Value = ""
+                basePart = fullName ' may be empty
             End If
+            
+            ' Construct or clear name based on data availability
+            If projectID <> "" And phase <> "" And structureID <> "" Then
+                ' All fields filled ? construct new name
+                If basePart = "" Then
+                    newName = "_" & projectID & "_" & phase & "_" & structureID
+                Else
+                    newName = basePart & "_" & projectID & "_" & phase & "_" & structureID
+                End If
+            Else
+                ' One or more fields missing ? keep only the base part
+                newName = basePart
+            End If
+            
+            ' Assign new name
+            .Cells(1, nameColIndex).Value = newName
         End With
     Next row
-    
-    Exit Sub
-    
-ErrHandler:
-    MsgBox "Error: " & Err.Description, vbCritical
 End Sub
-
 Sub import_MP_from_MPTool()
     
     Dim path As String

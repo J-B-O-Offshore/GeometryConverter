@@ -21,6 +21,81 @@ import os
 import sqlite3
 import pandas as pd
 
+allowed_phases = ["FEED", "FEEDp*", "pFEED", "pFEEDp*", "LILA", "LILAp*", "LILA**", "ILA", "ILAp*" "ILA**", "CD", "CDp*", "CD**", "pLILAp*", "pLILA**"]
+
+
+def normalise_meta_values(Meta_values):
+    print(Meta_values)
+
+    for id in [1, 2]:
+        Meta_values[id] = Meta_values[id].strip("_")
+    old_ident = Meta_values[0].split("_")[0]
+    Meta_values[0] = old_ident + "_" + Meta_values[1].ljust(7, "_") + Meta_values[2].ljust(8, "_") + Meta_values[3]
+    print("inside normalise_meta_values")
+
+    print(Meta_values)
+    return Meta_values
+
+
+class MetaValueError(Exception):
+    """Custom exception for invalid Meta values."""
+    pass
+def check_meta_values(Meta_values):
+    """
+    Validates the Meta_values list and converts numeric strings to float.
+    Accepts '-' as a placeholder string. Collects all errors and returns them as a single string.
+
+    Args:
+        Meta_values (list): The metadata values to validate.
+
+    Returns:
+        tuple: (updated Meta_values, error_message)
+               error_message is None if no errors found, otherwise a string with all issues.
+    """
+    errors = []
+
+    # Unpack for readability
+    project_id = Meta_values[1]
+    phase = Meta_values[2]
+    value = Meta_values[5]
+
+    # Check phase
+    if not geomc.check_phases(phase):
+        errors.append(
+            f"The phase '{phase}' is not valid. Valid phases are {allowed_phases} "
+            "where '*' stands for any integer digit."
+        )
+
+    # Check ProjectID length
+    if len(project_id) > 6:
+        errors.append(f"The ProjectID '{project_id}' cannot have more than 6 characters.")
+
+    # Validate Water Depth value
+    if isinstance(value, str):
+        if value.strip() == "-":
+            # Placeholder allowed, leave as string
+            pass
+        else:
+            # Try converting to float
+            try:
+                value = float(value)
+            except ValueError:
+                errors.append(
+                    f"Water Depth '{value}' must be an integer, float, or '-' placeholder. Strings that cannot convert to float are not allowed."
+                )
+    elif not isinstance(value, (float, int)) or isinstance(value, bool):
+        errors.append(
+            "Water Depth must be an integer, a float, or '-' placeholder. Boolean values are not allowed."
+        )
+
+    # Update Meta_values with conversions
+    Meta_values[5] = value
+
+    # Combine errors into a single string, or None if no errors
+    error_message = "\n".join(errors) if errors else None
+
+    return Meta_values, error_message
+
 def drop_db_table(excel_filename, db_path, Identifier):
     """
     Drops (deletes) a table from an SQLite database.
@@ -234,7 +309,6 @@ def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, M
         - The number of metadata values is incorrect
         - The identifier already exists in the database
     """
-    allowed_phases = ["FEED", "FEEDp1", "pFEED", "pFEEDp*", "LILA", "LILAp*", "LILA**", "ILA", "ILAp*" "ILA**", "CD", "CDp*" "CD**", "pLILAp*", "pLILA**" ]
 
     # --- 1. Load existing META table and validate ---
     META = load_db_table(excel_filename, db_path, "META")
@@ -262,16 +336,12 @@ def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, M
         )
         return False, None
 
-    # Check if phase is one of the allowed values
+    Meta_values = normalise_meta_values(Meta_values)
 
-    if not geomc.check_phases(Meta_values[3]):
-        ex.show_message_box(
-            excel_filename,
-            f"The phase {Meta_values[3]} is not valid. Valid phases are {allowed_phases} where the * stands for any integer digit."
-        )
+    Meta_values, error_message = check_meta_values(Meta_values)
+    if error_message:
+        ex.show_message_box(excel_filename, error_message)
         return False, None
-
-    Meta_values[3] = Meta_values[3].ljust(7, "_")
 
     # --- 2. Generate unique identifier for the new dataset ---
     Identifier = Meta_values[0]  # Base identifier (user-defined or from Excel)
@@ -288,11 +358,11 @@ def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, M
     three_letters = mc.generate_unique_code(taken)
 
     # Update metadata with user information and new identifier
-    Meta_values[5] = ex.get_excel_user(excel_filename)
+    Meta_values[4] = ex.get_excel_user(excel_filename)
     Identifier = curr_date + three_letters + Identifier
     Meta_values[0] = Identifier
-    Meta_values[1] = curr_date + three_letters
 
+    # --- 3. Convert Meta_values to DataFrame for saving ---
     # --- 3. Convert Meta_values to DataFrame for saving ---
     Meta_infos = pd.DataFrame([Meta_values], columns=meta_columns)
 
@@ -395,15 +465,38 @@ def replace_db_element(excel_filename, db_path, Structure_data, added_masses_dat
 
     META = load_db_table(excel_filename, db_path, "META", dtype=str)
     if META is None:
-        return
+        return False, None
 
     Meta_infos = list(Meta_infos)
+
+    Meta_infos = normalise_meta_values(Meta_infos)
+
+    Meta_values, error_message = check_meta_values(Meta_infos)
+    if error_message:
+        ex.show_message_box(excel_filename, error_message)
+        return False, None
+
     new_id = Meta_infos[0]
+
+    print(Meta_infos)
 
     # Check for existing entry and valid update
     if old_id not in META["Name"].values:
         ex.show_message_box(excel_filename, f"No existing entry found for '{old_id}' in the database.")
-        return False
+        return False, None
+
+    db_code = old_id.split("_")[0]
+    xl_code = new_id.split("_")[0]
+    code_len_old = len(xl_code)
+
+
+    if db_code != xl_code:
+        ex.show_message_box(excel_filename, f"Unique code (like 251104KUK) validated. In the excel it is: {xl_code}, in the database (as stated in the dropdown above) it is: {db_code}. Retrieving {db_code} as database code prefix.")
+        xl_code = db_code
+
+    new_id = xl_code + Meta_infos[0][code_len_old:]
+
+    Meta_infos[0] = new_id
 
     # Replace row in META
     META.loc[META["Name"] == old_id, :] = Meta_infos
@@ -411,25 +504,25 @@ def replace_db_element(excel_filename, db_path, Structure_data, added_masses_dat
     # Ensure no duplicate Identifiers after update
     if META["Name"].value_counts().get(new_id, 0) > 1:
         ex.show_message_box(excel_filename, f"The identifier '{new_id}' is already used more than once. Please choose a unique name.")
-        return False
+        return False, None
 
     # Save new data
     if not hardwrite_db_element_data(excel_filename, db_path, new_id, Structure_data, added_masses_data):
-        return False
+        return False, None
 
     # Drop old tables if identifier was changed
     if new_id != old_id:
         if not drop_db_table(excel_filename, db_path, old_id):
-            return False
+            return False, None
         if not drop_db_table(excel_filename, db_path, f"{old_id}__ADDED_MASSES"):
-            return False
+            return False, None
 
     # Save updated META table
     if not create_db_table(excel_filename, db_path, "META", META, if_exists="replace"):
-        return False
+        return False, None
 
     ex.show_message_box(excel_filename, f"Data for '{old_id}' successfully replaced with new entry '{new_id}'.")
-    return True
+    return True, new_id
 
 
 def hardwrite_db_element_data(excel_filename, db_path, change_id, Structure_data, added_masses_data):
@@ -588,7 +681,7 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
 
     def saving_logic(META_FULL, META_DB, META_CURR, META_CURR_NEW, DATA_DB, DATA_CURR, MASSES_DB, MASSES_CURR):
 
-        needed_Meta_entries = [0, 2, 3, 4, 6, 7]
+        needed_Meta_entries = [0, 1, 2, 3, 5, 6]
 
         def valid_data(data):
             if pd.isna(data.values).any():
@@ -640,10 +733,10 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
             if selected_structure == "":
                 _ = ex.show_message_box(excel_filename, "Now database loaded. Please enter data into \"NEW\" data field to create new database.")
 
-            sucess = replace_db_element(excel_filename, db_path, DATA_CURR, MASSES_CURR, META_CURR.values[0], selected_structure)
+            sucess, db_ident = replace_db_element(excel_filename, db_path, DATA_CURR, MASSES_CURR, META_CURR.values[0], selected_structure)
 
             if sucess:
-                return True, META_CURR["Name"].values[0]
+                return True, db_ident
             else:
                 return False, None
 
