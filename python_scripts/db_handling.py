@@ -5,7 +5,8 @@ import sqlite3
 import excel as ex
 import numpy as np
 import plot as ex_plt
-
+from ALaPy import misc as mc
+import misc as geomc
 
 class ConciveError(Exception):
     """
@@ -233,47 +234,87 @@ def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, M
         - The number of metadata values is incorrect
         - The identifier already exists in the database
     """
-    # Load existing META table and schema
+    allowed_phases = ["FEED", "FEEDp1", "pFEED", "pFEEDp*", "LILA", "LILAp*", "LILA**", "ILA", "ILAp*" "ILA**", "CD", "CDp*" "CD**", "pLILAp*", "pLILA**" ]
+
+    # --- 1. Load existing META table and validate ---
     META = load_db_table(excel_filename, db_path, "META")
     if META is None:
-        return
+        # Exit early if META table could not be loaded
+        return False, None
 
     meta_columns = META.columns.tolist()
     Meta_values = list(Meta_values)
 
+    # Check consistency between provided meta values and META schema
     if len(Meta_values) != len(meta_columns):
         ex.show_message_box(
             excel_filename,
-            f"The number of provided meta data values ({len(Meta_values)}) does not match to the expected number of columns ({len(meta_columns)})."
+            f"The number of provided meta data values ({len(Meta_values)}) "
+            f"does not match the expected number of columns ({len(meta_columns)})."
         )
-        return False
+        return False, None
 
-    Identifier = Meta_values[0]
-    if Identifier in META["Identifier"].values:
+    # check if data is there:
+    if (len(Structure_data) == 0) and (len(added_masses_data) == 0):
         ex.show_message_box(
             excel_filename,
-            "The provided Identifier already exists in the database. Please provide a unique name."
+            f"No data found in Structure and added masses, aborting."
         )
-        return False
+        return False, None
 
-    # Convert list to DataFrame with correct columns
+    # Check if phase is one of the allowed values
+
+    if not geomc.check_phases(Meta_values[3]):
+        ex.show_message_box(
+            excel_filename,
+            f"The phase {Meta_values[3]} is not valid. Valid phases are {allowed_phases} where the * stands for any integer digit."
+        )
+        return False, None
+
+    Meta_values[3] = Meta_values[3].ljust(7, "_")
+
+    # --- 2. Generate unique identifier for the new dataset ---
+    Identifier = Meta_values[0]  # Base identifier (user-defined or from Excel)
+    curr_date = mc.get_current_date_code()  # Example format: '20251103'
+
+    # Collect all existing dataset names from META
+    DB_idents = list(META.loc[:, "Name"].values)
+
+    # Check for entries created on the same date
+    same_date = [i for i, s in enumerate(DB_idents) if curr_date in s]
+    taken = [DB_idents[i][6:8] for i in same_date] if same_date else []
+
+    # Generate a unique 3-letter code (e.g. A, B, C, ...) for this date
+    three_letters = mc.generate_unique_code(taken)
+
+    # Update metadata with user information and new identifier
+    Meta_values[5] = ex.get_excel_user(excel_filename)
+    Identifier = curr_date + three_letters + Identifier
+    Meta_values[0] = Identifier
+    Meta_values[1] = curr_date + three_letters
+
+    # --- 3. Convert Meta_values to DataFrame for saving ---
     Meta_infos = pd.DataFrame([Meta_values], columns=meta_columns)
 
-    # Save structure data
+    # --- 4. Save structure data and added masses to DB ---
+    # Main structure data
     if not create_db_table(excel_filename, db_path, Identifier, Structure_data, if_exists='fail'):
-        return False
+        return False, None
 
-    # Save added masses data
+    # Added masses data (stored as separate table)
     if not create_db_table(excel_filename, db_path, f"{Identifier}__ADDED_MASSES", added_masses_data, if_exists='fail'):
-        return False
+        return False, None
 
-    # Append new metadata row and save updated META table
+    # --- 5. Update META table with the new metadata row ---
     META = pd.concat([META, Meta_infos], ignore_index=True)
-    if not create_db_table(excel_filename, db_path, "META", META, if_exists='replace'):
-        return False
 
+    # Replace the META table in the database with the updated one
+    if not create_db_table(excel_filename, db_path, "META", META, if_exists='replace'):
+        return False, None
+
+    # --- 6. Notify user and return success ---
     ex.show_message_box(excel_filename, f"Data saved in new database entry '{Identifier}'.")
-    return True
+    return True, Identifier
 
 
 def delete_db_element(excel_filename, db_path, Identifier):
@@ -303,7 +344,7 @@ def delete_db_element(excel_filename, db_path, Identifier):
     if META is None:
         return False
 
-    if Identifier not in META["Identifier"].values:
+    if Identifier not in META["Name"].values:
         ex.show_message_box(
             excel_filename,
             f"No entry found for Identifier '{Identifier}' in the database."
@@ -311,7 +352,7 @@ def delete_db_element(excel_filename, db_path, Identifier):
         return False
 
     # Remove the identifier row from META
-    META = META[META["Identifier"] != Identifier]
+    META = META[META["Name"] != Identifier]
 
     if not drop_db_table(excel_filename, db_path, Identifier):
         return False
@@ -360,15 +401,15 @@ def replace_db_element(excel_filename, db_path, Structure_data, added_masses_dat
     new_id = Meta_infos[0]
 
     # Check for existing entry and valid update
-    if old_id not in META["Identifier"].values:
+    if old_id not in META["Name"].values:
         ex.show_message_box(excel_filename, f"No existing entry found for '{old_id}' in the database.")
         return False
 
     # Replace row in META
-    META.loc[META["Identifier"] == old_id, :] = Meta_infos
+    META.loc[META["Name"] == old_id, :] = Meta_infos
 
     # Ensure no duplicate Identifiers after update
-    if META["Identifier"].value_counts().get(new_id, 0) > 1:
+    if META["Name"].value_counts().get(new_id, 0) > 1:
         ex.show_message_box(excel_filename, f"The identifier '{new_id}' is already used more than once. Please choose a unique name.")
         return False
 
@@ -453,13 +494,16 @@ def load_META(excel_filename, Structure, db_path):
         return
 
     # Sort by Identifier naturally
-    META_sorted = META.sort_values(by="Identifier", key=lambda col: col.map(natural_sort_key), ignore_index=True)
-
+    META_sorted = META.sort_values(
+        by="Name",
+        key=lambda col: col.map(lambda x: natural_sort_key(x[10:])),  # exclude first 10 chars
+        ignore_index=True
+    )
     ex.set_dropdown_values(
         excel_filename,
         sheet_name_structure_loading,
         f"Dropdown_{Structure}_Structures2",
-        META_sorted["Identifier"].values.tolist()
+        META_sorted["Name"].values.tolist()
     )
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_FULL", META_sorted)
     return
@@ -498,7 +542,7 @@ def load_DATA(excel_filename, Structure, Structure_name, db_path):
     if MASSES is None:
         return
 
-    META_relevant = META.loc[META["Identifier"] == Structure_name]
+    META_relevant = META.loc[META["Name"] == Structure_name]
 
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_TRUE", META_relevant)
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META", META_relevant)
@@ -544,6 +588,8 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
 
     def saving_logic(META_FULL, META_DB, META_CURR, META_CURR_NEW, DATA_DB, DATA_CURR, MASSES_DB, MASSES_CURR):
 
+        needed_Meta_entries = [0, 2, 3, 4, 6, 7]
+
         def valid_data(data):
             if pd.isna(data.values).any():
                 return False, data
@@ -572,23 +618,23 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
         if META_CURR_NEW.empty:
             meta_new_populated = False
         else:
-            meta_new_populated = (META_CURR_NEW.values[0][:-1] != '').any()
+            meta_new_populated = (META_CURR_NEW.values[0][needed_Meta_entries] != '').any()
 
         if meta_new_populated:
-            if ((META_CURR_NEW.values[0][0:-1] == '').any()):
+            if ((META_CURR_NEW.values[0][needed_Meta_entries] == '').any()):
                 _ = ex.show_message_box(excel_filename,
                                         "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded structure.")
                 return False, _
 
-            sucess = add_db_element(excel_filename, db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW.values[0])
+            sucess, db_ident = add_db_element(excel_filename, db_path, DATA_CURR, MASSES_CURR, META_CURR_NEW.values[0])
 
             if sucess:
-                return True, META_CURR_NEW["Identifier"].values[0]
+                return True, db_ident
             else:
                 return False, None
 
         if meta_loaded_changed:
-            if not ((META_CURR.values[0][0:-1] != None).all()):
+            if not ((META_CURR.values[0][needed_Meta_entries] != None).all()):
                 _ = ex.show_message_box(excel_filename, "Please fully populate the current Meta table to modify the DB entry.")
                 return False, _
             if selected_structure == "":
@@ -597,7 +643,7 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
             sucess = replace_db_element(excel_filename, db_path, DATA_CURR, MASSES_CURR, META_CURR.values[0], selected_structure)
 
             if sucess:
-                return True, META_CURR["Identifier"].values[0]
+                return True, META_CURR["Name"].values[0]
             else:
                 return False, None
 
@@ -605,7 +651,7 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
             sucess = hardwrite_db_element_data(excel_filename, db_path, selected_structure, DATA_CURR, MASSES_CURR)
 
             if sucess:
-                return True, META_CURR["Identifier"].values[0]
+                return True, META_CURR["Name"].values[0]
             else:
                 return False, None
 
@@ -627,7 +673,7 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
     DATA_CURR = DATA_CURR.dropna(how='all')
     MASSES_CURR = MASSES_CURR.dropna(how='all')
 
-    META_DB = META_FULL.loc[META_FULL["Identifier"] == selected_structure]
+    META_DB = META_FULL.loc[META_FULL["Name"] == selected_structure]
 
     if selected_structure != "":
         DATA_DB = load_db_table(excel_filename, db_path, selected_structure)
@@ -1068,7 +1114,7 @@ def load_RNA_DATA(excel_caller, db_path):
         excel_filename,
         sheet_name_structure_loading,
         f"Dropdown_RNA_Structures",
-        list(data.loc[:, "Identifier"].values)
+        list(data.loc[:, "Name"].values)
     )
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"RNA_DATA_TRUE", data)
 
@@ -1080,7 +1126,7 @@ def save_RNA_data(excel_caller, db_path, selected_structure):
 
     DATA_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"RNA_DATA", dtype=str)
     DATA_CURR = DATA_CURR.replace("", np.nan).dropna(how="all")
-    is_unique = DATA_CURR['Identifier'].is_unique
+    is_unique = DATA_CURR['Name'].is_unique
     if is_unique:
         create_db_table(excel_filename, db_path, "data", DATA_CURR, if_exists='replace')
         load_RNA_DATA(excel_caller, db_path)
@@ -1099,9 +1145,13 @@ def delete_RNA_data(excel_caller, selected_structure):
     RNA_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", f"RNA_DATA", dtype=str)
 
     RNA_DATA = RNA_DATA.dropna(how="all")
-    RNA_DATA.loc[RNA_DATA['Identifier'] == selected_structure, :] = float("nan")
+    RNA_DATA.loc[RNA_DATA['Name'] == selected_structure, :] = float("nan")
     ex.write_df_to_table(excel_filename, "BuildYourStructure", f"RNA_DATA", RNA_DATA)
 
     return
-
-#load_MPMasses_from_GeomConv("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeomConv_V1.18_Dreekant-15MW236-N12.1_DP-A2_L0G2S1.xlsm")
+# excel_caller = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
+# db_path = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/Database_Generation/MP.db"
+# selected_structure = ""
+#
+# #load_MPMasses_from_GeomConv("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeomConv_V1.18_Dreekant-15MW236-N12.1_DP-A2_L0G2S1.xlsm")
+# save_MP_data(excel_caller, db_path, selected_structure)

@@ -322,7 +322,7 @@ End Sub
 
 Sub UpdateIdentifierColumn(wsName As String, TableName As String)
     Dim ws As Worksheet, tbl As ListObject, row As ListRow
-    Dim idColIndex As Long, projectID As String, phase As String, structureID As String
+    Dim idColIndex As Long, projectID As String, phase As String, structureID As String, ID As String
     Dim col As ListColumn, colFound As Boolean
     
     On Error GoTo ErrHandler
@@ -330,9 +330,10 @@ Sub UpdateIdentifierColumn(wsName As String, TableName As String)
     Set ws = ThisWorkbook.Worksheets(wsName)
     Set tbl = ws.ListObjects(TableName)
     
+    ' Find the "Name" column
     colFound = False
     For Each col In tbl.ListColumns
-        If Trim(col.name) = "Identifier" Then
+        If Trim(col.name) = "Name" Then
             idColIndex = col.Index
             colFound = True
             Exit For
@@ -340,18 +341,21 @@ Sub UpdateIdentifierColumn(wsName As String, TableName As String)
     Next col
     
     If Not colFound Then
-        MsgBox "Column 'Identifier' not found!", vbExclamation
+        MsgBox "Column 'Name' not found!", vbExclamation
         Exit Sub
     End If
     
     For Each row In tbl.ListRows
         With row.Range
-            projectID = Trim(.Columns(tbl.ListColumns("Project ID").Index).Value)
-            phase = Trim(.Columns(tbl.ListColumns("Phase").Index).Value)
-            structureID = Trim(.Columns(tbl.ListColumns("Structure ID").Index).Value)
+            ' Treat empty ID as ""
+            ID = Trim(CStr(.Columns(tbl.ListColumns("ID").Index).Value))
+            projectID = Trim(CStr(.Columns(tbl.ListColumns("Project ID").Index).Value))
+            phase = Trim(CStr(.Columns(tbl.ListColumns("Phase").Index).Value))
+            structureID = Trim(CStr(.Columns(tbl.ListColumns("Structure ID").Index).Value))
             
+            ' Only generate the combined name if the other three fields are not empty
             If projectID <> "" And phase <> "" And structureID <> "" Then
-                .Cells(1, idColIndex).Value = projectID & "_" & phase & "_" & structureID
+                .Cells(1, idColIndex).Value = ID & "_" & projectID & "_" & phase & "_" & structureID
             Else
                 .Cells(1, idColIndex).Value = ""
             End If
@@ -644,7 +648,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
             If Not Intersect(Target, watchRng) Is Nothing Then
-                Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
+                Set idCol = ws.ListObjects(tblName).ListColumns("Name").DataBodyRange
                 If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
                     UpdateIdentifierColumn "BuildYourStructure", tblName
                 End If
@@ -657,7 +661,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
             If Not Intersect(Target, watchRng) Is Nothing Then
-                Set idCol = ws.ListObjects(tblName).ListColumns("Identifier").DataBodyRange
+                Set idCol = ws.ListObjects(tblName).ListColumns("Name").DataBodyRange
                 If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
                     UpdateIdentifierColumn "BuildYourStructure", tblName
                 End If

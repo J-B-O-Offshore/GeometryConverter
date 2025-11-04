@@ -819,3 +819,48 @@ def calculate_MarineGrowth_excel(excel_caller):
     ex.write_df_to_table(excel_filename, "StructureOverview", "MARINE_GROWTH", MARINE_GROWTH)
 
     return
+
+
+def check_phases(value, allowed_phases=None):
+    """
+    Check if a given value matches any of the allowed phase schemes.
+
+    Rules for allowed schemes:
+    - '*'  : exactly one digit
+    - '**' : exactly two digits
+    - all other characters must match literally
+
+    Returns True if the value matches any scheme, False otherwise.
+    """
+    if allowed_phases is None:
+        allowed_phases = [
+            "FEED", "FEEDp*", "pFEED", "pFEEDp*",
+            "LILA", "LILAp*", "LILA**",
+            "ILA", "ILAp*", "ILA**",
+            "CD", "CDp*", "CD**",
+            "pLILAp*", "pLILA**"
+        ]
+    value = value.replace("_", "")
+    def matches_pattern(value, pattern):
+        i = j = 0
+        while i < len(pattern) and j < len(value):
+            if pattern[i] == '*':
+                # check if it's ** (two-digit)
+                if i + 1 < len(pattern) and pattern[i + 1] == '*':
+                    if j + 2 > len(value) or not value[j:j + 2].isdigit():
+                        return False
+                    i += 2
+                    j += 2
+                else:
+                    if not value[j].isdigit():
+                        return False
+                    i += 1
+                    j += 1
+            else:
+                if pattern[i] != value[j]:
+                    return False
+                i += 1
+                j += 1
+        return i == len(pattern) and j == len(value)
+
+    return any(matches_pattern(value, p) for p in allowed_phases)
