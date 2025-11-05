@@ -21,7 +21,7 @@ import os
 import sqlite3
 import pandas as pd
 
-allowed_phases = ["FEED", "FEEDp*", "pFEED", "pFEEDp*", "LILA", "LILAp*", "LILA**", "ILA", "ILAp*" "ILA**", "CD", "CDp*", "CD**", "pLILAp*", "pLILA**"]
+allowed_phases = ["FEED", "FEEDp*", "pFEED", "pFEEDp*", "pLILA", "pLILAp*", "pLILA**", "LILA", "LILAp*", "LILA**", "ILA", "ILAp*" "ILA**", "CD", "CDp*", "CD**", "pLILAp*", "pLILA**"]
 
 
 def normalise_meta_values(Meta_values):
@@ -60,7 +60,7 @@ def check_meta_values(Meta_values):
     value = Meta_values[5]
 
     # Check phase
-    if not geomc.check_phases(phase):
+    if not geomc.check_phases(phase, allowed_phases=allowed_phases):
         errors.append(
             f"The phase '{phase}' is not valid. Valid phases are {allowed_phases} "
             "where '*' stands for any integer digit."

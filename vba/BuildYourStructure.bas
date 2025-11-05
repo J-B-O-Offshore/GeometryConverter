@@ -611,7 +611,7 @@ End Sub
 
 
 
-Public Sub BuildYourStructureChange(ByVal Target As Range)
+Public Sub BuildYourStructureChange(ByVal target As Range)
 
     On Error GoTo CleanExit
     'Application.EnableEvents = False
@@ -629,7 +629,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
     ' --- Special case for RNA path ---
     Set watchRng = RangeFromNameOrTable(ws, "TextBox_RNA_db_path")
     If Not watchRng Is Nothing Then
-        If Not Intersect(Target, watchRng) Is Nothing Then
+        If Not Intersect(target, watchRng) Is Nothing Then
             ' Add code to handle RNA path changes (similar to MP/TP/TOWER)
             load_RNA_DB
         End If
@@ -638,7 +638,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
     ' --- Special case for RNA data ---
     Set watchRng = RangeFromNameOrTable(ws, "RNA_DATA")
     If Not watchRng Is Nothing Then
-        If Not Intersect(Target, watchRng) Is Nothing Then
+        If Not Intersect(target, watchRng) Is Nothing Then
             CompareTablesAndHighlightDifferences "BuildYourStructure", "RNA_DATA_TRUE", "BuildYourStructure", "RNA_DATA", , RGB(255, 199, 206)
         End If
     End If
@@ -651,7 +651,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         ' --- Path ---
         Set watchRng = RangeFromNameOrTable(ws, "TextBox_" & section & "_db_path")
         If Not watchRng Is Nothing Then
-            If Not Intersect(Target, watchRng) Is Nothing Then
+            If Not Intersect(target, watchRng) Is Nothing Then
                  Select Case section
                     Case "MP": load_MP_DB
                     Case "TP": load_TP_DB
@@ -664,7 +664,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         tblName = section & "_DATA"
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
-            If Not Intersect(Target, watchRng) Is Nothing Then
+            If Not Intersect(target, watchRng) Is Nothing Then
                 ResizeTableToData tblName
                 CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
 
@@ -675,7 +675,7 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         tblName = section & "_MASSES"
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
-            If Not Intersect(Target, watchRng) Is Nothing Then
+            If Not Intersect(target, watchRng) Is Nothing Then
                 ResizeTableToData tblName
                 CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
 
@@ -686,9 +686,9 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         tblName = section & "_META"
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
-            If Not Intersect(Target, watchRng) Is Nothing Then
+            If Not Intersect(target, watchRng) Is Nothing Then
                 Set idCol = ws.ListObjects(tblName).ListColumns("Name").DataBodyRange
-                If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
+                If Intersect(target, idCol) Is Nothing Or ForceUpdate Then
                     UpdateIdentifierColumn "BuildYourStructure", tblName
                 End If
                 CompareTablesAndHighlightDifferences "BuildYourStructure", tblName & "_TRUE", "BuildYourStructure", tblName, , RGB(255, 199, 206)
@@ -699,9 +699,9 @@ Public Sub BuildYourStructureChange(ByVal Target As Range)
         tblName = section & "_META_NEW"
         Set watchRng = RangeFromNameOrTable(ws, tblName)
         If Not watchRng Is Nothing Then
-            If Not Intersect(Target, watchRng) Is Nothing Then
+            If Not Intersect(target, watchRng) Is Nothing Then
                 Set idCol = ws.ListObjects(tblName).ListColumns("Name").DataBodyRange
-                If Intersect(Target, idCol) Is Nothing Or ForceUpdate Then
+                If Intersect(target, idCol) Is Nothing Or ForceUpdate Then
                     UpdateIdentifierColumn "BuildYourStructure", tblName
                 End If
             End If

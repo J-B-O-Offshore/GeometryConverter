@@ -943,12 +943,10 @@ Sub DeleteFigure(sheetName As String, figureName As String)
     On Error GoTo 0
 End Sub
 
-
-
 Sub DeleteSelectedFormControlDropdowns()
     ' Define the names of the dropdowns you want to delete
     Dim dropdownNames As Variant
-    dropdownNames = Array("Dropdown_RNA_Structures") ' <-- edit your dropdown names here
+    dropdownNames = Array("TextBox_TP_db_path") ' <-- edit your dropdown names here
     
     Dim ws As Worksheet
     Dim shp As Shape
@@ -956,6 +954,7 @@ Sub DeleteSelectedFormControlDropdowns()
     Dim nm As name
     Dim namesToDelete As Collection
     Dim nameToCheck As Variant
+    Dim linkedRange As String
     
     Set namesToDelete = New Collection
     
@@ -971,10 +970,12 @@ Sub DeleteSelectedFormControlDropdowns()
                         If shp.name = nameToCheck Then
                             ' Collect linked name to delete
                             On Error Resume Next
-                            If shp.ControlFormat.ListFillRange <> "" Then
-                                namesToDelete.Add shp.ControlFormat.ListFillRange
-                            End If
+                            linkedRange = shp.ControlFormat.ListFillRange
                             On Error GoTo 0
+                            
+                            If Len(linkedRange) > 0 Then
+                                namesToDelete.Add linkedRange
+                            End If
                             
                             ' Delete the dropdown
                             shp.Delete
@@ -986,22 +987,82 @@ Sub DeleteSelectedFormControlDropdowns()
         Next i
     Next ws
     
-    ' --- Delete associated names safely ---2
-        On Error Resume Next
-        For Each nameToCheck In namesToDelete
-            If InStr(1, nm.name, nameToCheck, vbTextCompare) > 0 Then
+    ' --- Delete associated named ranges ---
+    On Error Resume Next
+    For Each nameToCheck In namesToDelete
+        For Each nm In ThisWorkbook.Names
+            ' Delete if the name matches exactly (case-insensitive)
+            If StrComp(nm.name, nameToCheck, vbTextCompare) = 0 Then
                 nm.Delete
                 Exit For
             End If
-        Next nameToCheck
-        On Error GoTo 0
-
+        Next nm
+    Next nameToCheck
+    On Error GoTo 0
     
     MsgBox "Selected Form Control dropdowns and their associated names have been deleted."
 End Sub
 
 
+Sub DeleteSelectedNamedRanges()
+    Dim namesToDelete As Variant
+    Dim nm As name
+    Dim target As Variant
+    Dim deletedCount As Long
+    
+    ' === Define the names you want to delete here ===
+    namesToDelete = Array( _
+        "TextBox_TP_db_path" _
+    )
+    
+    ' === Loop through all names and delete matches ===
+    On Error Resume Next
+    For Each nm In ThisWorkbook.Names
+        For Each target In namesToDelete
+            If StrComp(nm.name, target, vbTextCompare) = 0 Then
+                nm.Delete
+                deletedCount = deletedCount + 1
+                Exit For
+            End If
+        Next target
+    Next nm
+    On Error GoTo 0
+    
+    ' === Report result ===
+    MsgBox deletedCount & " named range(s) deleted.", vbInformation
+End Sub
 
+Sub DeleteTableReferences()
+    Dim tableNames As Variant
+    Dim nm As name
+    Dim target As Variant
+    Dim deletedCount As Long
+    
+    ' === Define your table names here ===
+    tableNames = Array( _
+        "Table_MP_META", _
+        "Table_Tower_Structures", _
+        "TempTable_Test" _
+    )
+    
+    ' === Loop through all workbook names ===
+    On Error Resume Next
+    For Each nm In ThisWorkbook.Names
+        For Each target In tableNames
+            ' Check if the name belongs to one of the tables
+            If InStr(1, nm.name, target & "[", vbTextCompare) > 0 Or _
+               StrComp(nm.name, target, vbTextCompare) = 0 Then
+                nm.Delete
+                deletedCount = deletedCount + 1
+                Exit For
+            End If
+        Next target
+    Next nm
+    On Error GoTo 0
+    
+    ' === Report result ===
+    MsgBox deletedCount & " table reference name(s) deleted.", vbInformation
+End Sub
 
 ' Core routine: copy column widths from src to tgt (must be same # of columns, single-area ranges)
 Sub CopyColumnWidths(ByVal src As Range, ByVal tgt As Range)
