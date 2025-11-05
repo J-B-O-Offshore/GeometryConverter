@@ -546,7 +546,7 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
     TOWER_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_META")
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
     Structue_Components = ex.read_excel_table(excel_filename, "StructureOverview", "Structue_Components")
-    Structue_Components.loc[:, "Identifier"] = None
+    Structue_Components.loc[:, "Name"] = None
 
     STRUCTURE_META.loc[:, "Value"] = ""
 
@@ -560,10 +560,10 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
     sucess_TOWER, TOWER_DATA = check_convert_structure(excel_filename, TOWER_DATA, "TOWER")
     # Read dropdown values of Identifieres
 
-    Structue_Components.loc[Structue_Components["Component"] == "MP", "Identifier"] = MP_identifier
-    Structue_Components.loc[Structue_Components["Component"] == "TP", "Identifier"] = TP_identifier
-    Structue_Components.loc[Structue_Components["Component"] == "TOWER", "Identifier"] = TOWER_identifier
-    Structue_Components.loc[Structue_Components["Component"] == "RNA", "Identifier"] = RNA_identifier
+    Structue_Components.loc[Structue_Components["Component"] == "MP", "Name"] = MP_identifier
+    Structue_Components.loc[Structue_Components["Component"] == "TP", "Name"] = TP_identifier
+    Structue_Components.loc[Structue_Components["Component"] == "TOWER", "Name"] = TOWER_identifier
+    Structue_Components.loc[Structue_Components["Component"] == "RNA", "Name"] = RNA_identifier
 
     ex.write_df_to_table(excel_filename, "StructureOverview", "Structue_Components", Structue_Components)
 
@@ -588,20 +588,18 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
         ex.show_message_box(excel_filename,
                             f"Caution, no RNA selected.")
     else:
-        if not RNA_identifier in RNA_DATA["Identifier"].values:
+        if not RNA_identifier in RNA_DATA["Name"].values:
             ex.show_message_box(excel_filename,
                                 f"Chosen RNA not in RNA dropdown menu. Aborting.")
             return None
         else:
-            RNA = RNA_DATA.loc[RNA_DATA["Identifier"] == RNA_identifier, :]
+            RNA = RNA_DATA.loc[RNA_DATA["Name"] == RNA_identifier, :]
             ex.write_df_to_table(excel_filename, "StructureOverview", "RNA", RNA)
 
     # Height Reference handling
     height_refs = [MP_META.loc[0, "Height Reference"]]
     if TP_META is not None:
         height_refs.append(TP_META.loc[0, "Height Reference"])
-    if TP_META is not None:
-        height_refs.append(TOWER_META.loc[0, "Height Reference"])
 
     if not all_same_ignoring_none(*height_refs):
         answer = ex.show_message_box(excel_filename,
