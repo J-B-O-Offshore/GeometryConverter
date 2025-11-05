@@ -738,3 +738,43 @@ def read_named_range(path, name, sheet_name=None, dtype=None, use_header=True):
         app.quit()
 
     return data
+
+def get_excel_user(workbook_name):
+    """
+    Returns the Excel user for an open workbook (by name) using xlwings.
+    Raises FileNotFoundError if the workbook is not open.
+    Prints an error message and returns 'unknown.user' if accessing the username fails.
+
+    Parameters
+    ----------
+    workbook_name : str
+        The name of the open Excel workbook (e.g., 'example.xlsx').
+
+    Returns
+    -------
+    str
+        The Excel username (Application.UserName), or 'unknown.user' if reading fails.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the workbook is not currently open in Excel.
+    """
+    try:
+        # Loop through all active Excel apps and their open workbooks
+        for app in xw.apps:
+            for wb in app.books:
+                if wb.name.lower() == workbook_name.lower():
+                    try:
+                        user = app.api.UserName
+                        return user.strip() if user else "unknown.user"
+                    except Exception as e:
+                        print(f"Error reading Excel username: {e}")
+                        return "unknown.user"
+        # Workbook not found
+        raise FileNotFoundError(f"Workbook '{workbook_name}' is not currently open in Excel.")
+    except FileNotFoundError:
+        raise
+    except Exception as e:
+        print(f"Unexpected xlwings error: {e}")
+        return "unknown.user"

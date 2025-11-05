@@ -1,5 +1,5 @@
 Attribute VB_Name = "Helpers"
-
+Option Explicit
 '------------------------------------------------------------------------------
 ' OpenFileDialog
 '
@@ -157,7 +157,7 @@ Sub RunPythonWrapper(module_name As String, Optional function_name As String = "
         GoTo CleanExit
     End If
     ' Always include Excel filename first
-    excelFileName = ThisWorkbook.FullName
+    excelFileName = ThisWorkbook.fullName
     argsString = ProcessArgument(excelFileName)
 
     ' Append other arguments
@@ -942,3 +942,196 @@ Sub DeleteFigure(sheetName As String, figureName As String)
     End If
     On Error GoTo 0
 End Sub
+
+Sub DeleteSelectedFormControlDropdowns()
+    ' Define the names of the dropdowns you want to delete
+    Dim dropdownNames As Variant
+    dropdownNames = Array("TextBox_TP_db_path") ' <-- edit your dropdown names here
+    
+    Dim ws As Worksheet
+    Dim shp As Shape
+    Dim i As Long
+    Dim nm As name
+    Dim namesToDelete As Collection
+    Dim nameToCheck As Variant
+    Dim linkedRange As String
+    
+    Set namesToDelete = New Collection
+    
+    ' --- Delete specified Form Control dropdowns ---
+    For Each ws In ThisWorkbook.Worksheets
+        ' Loop backwards to safely delete shapes
+        For i = ws.Shapes.Count To 1 Step -1
+            Set shp = ws.Shapes(i)
+            If shp.Type = msoFormControl Then
+                If shp.FormControlType = xlDropDown Then
+                    ' Check if this dropdown is in our list
+                    For Each nameToCheck In dropdownNames
+                        If shp.name = nameToCheck Then
+                            ' Collect linked name to delete
+                            On Error Resume Next
+                            linkedRange = shp.ControlFormat.ListFillRange
+                            On Error GoTo 0
+                            
+                            If Len(linkedRange) > 0 Then
+                                namesToDelete.Add linkedRange
+                            End If
+                            
+                            ' Delete the dropdown
+                            shp.Delete
+                            Exit For
+                        End If
+                    Next nameToCheck
+                End If
+            End If
+        Next i
+    Next ws
+    
+    ' --- Delete associated named ranges ---
+    On Error Resume Next
+    For Each nameToCheck In namesToDelete
+        For Each nm In ThisWorkbook.Names
+            ' Delete if the name matches exactly (case-insensitive)
+            If StrComp(nm.name, nameToCheck, vbTextCompare) = 0 Then
+                nm.Delete
+                Exit For
+            End If
+        Next nm
+    Next nameToCheck
+    On Error GoTo 0
+    
+    MsgBox "Selected Form Control dropdowns and their associated names have been deleted."
+End Sub
+
+
+Sub DeleteSelectedNamedRanges()
+    Dim namesToDelete As Variant
+    Dim nm As name
+    Dim target As Variant
+    Dim deletedCount As Long
+    
+    ' === Define the names you want to delete here ===
+    namesToDelete = Array( _
+        "TextBox_TP_db_path" _
+    )
+    
+    ' === Loop through all names and delete matches ===
+    On Error Resume Next
+    For Each nm In ThisWorkbook.Names
+        For Each target In namesToDelete
+            If StrComp(nm.name, target, vbTextCompare) = 0 Then
+                nm.Delete
+                deletedCount = deletedCount + 1
+                Exit For
+            End If
+        Next target
+    Next nm
+    On Error GoTo 0
+    
+    ' === Report result ===
+    MsgBox deletedCount & " named range(s) deleted.", vbInformation
+End Sub
+
+Sub DeleteTableReferences()
+    Dim tableNames As Variant
+    Dim nm As name
+    Dim target As Variant
+    Dim deletedCount As Long
+    
+    ' === Define your table names here ===
+    tableNames = Array( _
+        "Table_MP_META", _
+        "Table_Tower_Structures", _
+        "TempTable_Test" _
+    )
+    
+    ' === Loop through all workbook names ===
+    On Error Resume Next
+    For Each nm In ThisWorkbook.Names
+        For Each target In tableNames
+            ' Check if the name belongs to one of the tables
+            If InStr(1, nm.name, target & "[", vbTextCompare) > 0 Or _
+               StrComp(nm.name, target, vbTextCompare) = 0 Then
+                nm.Delete
+                deletedCount = deletedCount + 1
+                Exit For
+            End If
+        Next target
+    Next nm
+    On Error GoTo 0
+    
+    ' === Report result ===
+    MsgBox deletedCount & " table reference name(s) deleted.", vbInformation
+End Sub
+
+' Core routine: copy column widths from src to tgt (must be same # of columns, single-area ranges)
+Sub CopyColumnWidths(ByVal src As Range, ByVal tgt As Range)
+    Dim i As Long
+    
+    On Error GoTo ErrHandler
+    
+    ' Basic validation
+    If src Is Nothing Or tgt Is Nothing Then
+        MsgBox "Source or target range is not set.", vbExclamation
+        Exit Sub
+    End If
+    
+    If src.Areas.Count > 1 Or tgt.Areas.Count > 1 Then
+        MsgBox "Both source and target must be single continuous ranges (no multi-area selection).", vbExclamation
+        Exit Sub
+    End If
+    
+    If src.Columns.Count <> tgt.Columns.Count Then
+        MsgBox "Source and target must have the same number of columns." & vbCrLf & _
+               "Source columns: " & src.Columns.Count & "  Target columns: " & tgt.Columns.Count, vbCritical
+        Exit Sub
+    End If
+    
+    ' Copy widths column-by-column
+    For i = 1 To src.Columns.Count
+        ' Use the ColumnWidth property of the i-th column within each range
+        tgt.Columns(i).ColumnWidth = src.Columns(i).ColumnWidth
+    Next i
+    
+    Exit Sub
+
+ErrHandler:
+    MsgBox "Error " & Err.Number & ": " & Err.Description, vbCritical
+End Sub
+
+
+' Wrapper that asks the user to select source and target ranges with the mouse
+Sub CopyColumnWidths_Prompt()
+    Dim src As Range
+    Dim tgt As Range
+    
+    On Error Resume Next
+    Set src = Application.InputBox("Select SOURCE range (columns to copy from):", "Select Source", Type:=8)
+    If src Is Nothing Then
+        MsgBox "Operation cancelled (no source selected).", vbInformation
+        Exit Sub
+    End If
+    
+    Set tgt = Application.InputBox("Select TARGET range (columns to copy to):", "Select Target", Type:=8)
+    If tgt Is Nothing Then
+        MsgBox "Operation cancelled (no target selected).", vbInformation
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    CopyColumnWidths src, tgt
+    MsgBox "Column widths copied.", vbInformation
+End Sub
+
+
+
+
+Sub UnifyColsMPTPTOWER()
+
+    CopyColumnWidths Worksheets("BuildYourStructure").Range("E:Y"), Worksheets("BuildYourStructure").Range("AQ:BK")
+    CopyColumnWidths Worksheets("BuildYourStructure").Range("E:Y"), Worksheets("BuildYourStructure").Range("CC:CW")
+End Sub
+
+
+
+
