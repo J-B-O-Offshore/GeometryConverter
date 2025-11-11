@@ -1,9 +1,12 @@
 import os
+
 import numpy as np
 import pandas as pd
+
 import excel as ex
 import plot as GCplt
 from ALaPy import misc as mc
+
 
 def find_duplicate_masses(df: pd.DataFrame) -> list[list[int]]:
     """
@@ -20,6 +23,7 @@ def find_duplicate_masses(df: pd.DataFrame) -> list[list[int]]:
     duplicates = [list(group.index) for _, group in grouped if len(group) > 1]
 
     return duplicates
+
 
 def valid_data(data):
     if pd.isna(data.values).any():
@@ -212,12 +216,9 @@ def add_element(df, z_new, defaults=None, add_outside_bound=False):
     id_inter = id_inter[0]
     df = df.copy()
     row_base = df.loc[id_inter]
-    new_row = {}
+    new_row = {"Top [m]": z_new, "Bottom [m]": row_base["Bottom [m]"], "t [mm]": row_base["t [mm]"]}
 
     # Required fields
-    new_row["Top [m]"] = z_new
-    new_row["Bottom [m]"] = row_base["Bottom [m]"]
-    new_row["t [mm]"] = row_base["t [mm]"]
 
     if "Affiliation" in df.columns:
         new_row["Affiliation"] = row_base["Affiliation"]
@@ -254,7 +255,8 @@ def add_element(df, z_new, defaults=None, add_outside_bound=False):
     return df
 
 
-def assemble_structure(MP_DATA=None, TP_DATA=None, TOWER_DATA=None, MP_MASSES=None, TP_MASSES=None, TOWER_MASSES=None, excel_caller=None, interactive=True, rho=7900, strict_build=True, overlapp_mode="Skirt"):
+def assemble_structure(MP_DATA=None, TP_DATA=None, TOWER_DATA=None, MP_MASSES=None, TP_MASSES=None, TOWER_MASSES=None, excel_caller=None, interactive=True, rho=7900,
+                       strict_build=True, overlapp_mode="Skirt"):
     """
     Assemble the complete offshore wind turbine support structure by combining Monopile (MP),
     Transition Piece (TP), and Tower data. Ensures geometric continuity, resolves overlaps, and
@@ -375,7 +377,7 @@ def assemble_structure(MP_DATA=None, TP_DATA=None, TOWER_DATA=None, MP_MASSES=No
             TOWER_DATA.insert(0, "Affiliation", "TOWER")
         else:
             TOWER_DATA["Affiliation"] = "TOWER"
-       # STRUC_LIST.append(TOWER_DATA)
+    # STRUC_LIST.append(TOWER_DATA)
 
     SKIRT = None
     SKIRT_POINTMASS = None
@@ -405,7 +407,7 @@ def assemble_structure(MP_DATA=None, TP_DATA=None, TOWER_DATA=None, MP_MASSES=No
                     raise ValueError("TP is hovering over MP, now allowed if strict mode is True")
 
     # from here on only ovelapping or perfect fit or no MP and or TP and or TOWER data or hovering allowed
-    #MP and TP is there
+    # MP and TP is there
     if MP_DATA is not None and TP_DATA is not None:
         # overlapping case:
         if MP_top > TP_bot:
@@ -455,7 +457,7 @@ def assemble_structure(MP_DATA=None, TP_DATA=None, TOWER_DATA=None, MP_MASSES=No
         elif MP_top < TP_bot:
             if interactive:
                 ex.show_message_box(excel_caller,
-                                        f"The top of the MP at {range_MP[0]} is lower than the bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. Not aborting because of function setting ignore_hovering=True.")
+                                    f"The top of the MP at {range_MP[0]} is lower than the bottom of the TP at {range_TP[-1]}, so the TP is hovering midair at {range_TP[-1] - range_MP[0]}m over the MP. Not aborting because of function setting ignore_hovering=True.")
 
             WHOLE_STRUCTURE = pd.concat([TP_DATA, MP_DATA], axis=0)
         else:
@@ -711,7 +713,7 @@ def extract_nodes_from_elements(df_elements: pd.DataFrame) -> pd.DataFrame:
         """
 
     # Ensure sorting by Top depth (descending), in case not already sorted
-    #df_sorted = df_elements.sort_values(by='Top [m]', ascending=False).reset_index(drop=True)
+    # df_sorted = df_elements.sort_values(by='Top [m]', ascending=False).reset_index(drop=True)
 
     nodes = []
 
@@ -783,6 +785,8 @@ def add_tower_on_top(STRUCTURE, TOWER):
     WHOLE_STRUCTURE = pd.concat([TOWER, STRUCTURE], axis=0)
 
     return WHOLE_STRUCTURE, tower_offset
+
+
 # # #
 # excel_caller = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
 # assemble_structure_excel(excel_caller, 1000, "25A515_pre-FEED_MP_DP-C_013Hz_L0_G0_S1", "24A523_Conceptual_Design_SGRE_DP-x-D95_L0_G0_S0_struct-nominal", "25A518_pre-LILA_DP-C_013Hz_L0_G0_S1", "SG-15-236")
@@ -839,6 +843,7 @@ def check_phases(value, allowed_phases=None):
             "pLILAp*", "pLILA**"
         ]
     value = value.replace("_", "")
+
     def matches_pattern(value, pattern):
         i = j = 0
         while i < len(pattern) and j < len(value):

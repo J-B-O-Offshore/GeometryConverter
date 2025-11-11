@@ -1,12 +1,16 @@
+import os
 import os.path
-import xlwings as xw
-import pandas as pd
 import sqlite3
-import excel as ex
+
 import numpy as np
+import pandas as pd
+import xlwings as xw
+
+import excel as ex
+import misc as geomc
 import plot as ex_plt
 from ALaPy import misc as mc
-import misc as geomc
+
 
 class ConciveError(Exception):
     """
@@ -17,18 +21,15 @@ class ConciveError(Exception):
     pass
 
 
-import os
-import sqlite3
-import pandas as pd
-
-allowed_phases = ["FEED", "FEEDp*", "pFEED", "pFEEDp*", "pLILA", "pLILAp*", "pLILA**", "LILA", "LILAp*", "LILA**", "ILA", "ILAp*" "ILA**", "CD", "CDp*", "CD**", "pLILAp*", "pLILA**"]
+allowed_phases = ["FEED", "FEEDp*", "pFEED", "pFEEDp*", "pLILA", "pLILAp*", "pLILA**", "LILA", "LILAp*", "LILA**", "ILA", "ILAp*" "ILA**", "CD", "CDp*", "CD**", "pLILAp*",
+                  "pLILA**"]
 
 
 def normalise_meta_values(Meta_values):
     print(Meta_values)
 
-    for id in [1, 2]:
-        Meta_values[id] = Meta_values[id].strip("_")
+    for i in [1, 2]:
+        Meta_values[i] = Meta_values[i].strip("_")
     old_ident = Meta_values[0].split("_")[0]
     Meta_values[0] = old_ident + "_" + Meta_values[1].ljust(7, "_") + Meta_values[2].ljust(8, "_") + Meta_values[3]
     print("inside normalise_meta_values")
@@ -40,6 +41,8 @@ def normalise_meta_values(Meta_values):
 class MetaValueError(Exception):
     """Custom exception for invalid Meta values."""
     pass
+
+
 def check_meta_values(Meta_values):
     """
     Validates the Meta_values list and converts numeric strings to float.
@@ -95,6 +98,7 @@ def check_meta_values(Meta_values):
     error_message = "\n".join(errors) if errors else None
 
     return Meta_values, error_message
+
 
 def drop_db_table(excel_filename, db_path, Identifier):
     """
@@ -284,6 +288,7 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
     return df
 
 
+# noinspection PyIncorrectDocstring
 def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, Meta_values):
     """
     Adds a new structure entry to the database using the provided data.
@@ -387,6 +392,7 @@ def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, M
     return True, Identifier
 
 
+# noinspection PyIncorrectDocstring
 def delete_db_element(excel_filename, db_path, Identifier):
     """
     Deletes an existing structure and its associated tables from the database.
@@ -435,6 +441,7 @@ def delete_db_element(excel_filename, db_path, Identifier):
     return True
 
 
+# noinspection PyIncorrectDocstring
 def replace_db_element(excel_filename, db_path, Structure_data, added_masses_data, Meta_infos, old_id):
     """
     Replaces an existing structure entry in the database with updated data and metadata.
@@ -489,9 +496,9 @@ def replace_db_element(excel_filename, db_path, Structure_data, added_masses_dat
     xl_code = new_id.split("_")[0]
     code_len_old = len(xl_code)
 
-
     if db_code != xl_code:
-        ex.show_message_box(excel_filename, f"Unique code (like 251104KUK) validated. In the excel it is: {xl_code}, in the database (as stated in the dropdown above) it is: {db_code}. Retrieving {db_code} as database code prefix.")
+        ex.show_message_box(excel_filename,
+                            f"Unique code (like 251104KUK) validated. In the excel it is: {xl_code}, in the database (as stated in the dropdown above) it is: {db_code}. Retrieving {db_code} as database code prefix.")
         xl_code = db_code
 
     new_id = xl_code + Meta_infos[0][code_len_old:]
@@ -525,6 +532,7 @@ def replace_db_element(excel_filename, db_path, Structure_data, added_masses_dat
     return True, new_id
 
 
+# noinspection PyIncorrectDocstring
 def hardwrite_db_element_data(excel_filename, db_path, change_id, Structure_data, added_masses_data):
     """
     Replaces the structure and added masses tables in the database with new data.
@@ -602,6 +610,7 @@ def load_META(excel_filename, Structure, db_path):
     return
 
 
+# noinspection PyIncorrectDocstring
 def load_DATA(excel_filename, Structure, Structure_name, db_path):
     """
     Load metadata and structure-specific data from the database
@@ -714,7 +723,7 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
             meta_new_populated = (META_CURR_NEW.values[0][needed_Meta_entries] != '').any()
 
         if meta_new_populated:
-            if ((META_CURR_NEW.values[0][needed_Meta_entries] == '').any()):
+            if (META_CURR_NEW.values[0][needed_Meta_entries] == '').any():
                 _ = ex.show_message_box(excel_filename,
                                         "Please fully populate the NEW Meta table to create a new DB entry or clear it of all data to overwrite the loaded structure.")
                 return False, _
@@ -807,6 +816,7 @@ def delete_data(excel_filename, Structure, db_path, selected_structure):
 
 
 # %% MP
+# noinspection PyIncorrectDocstring
 def load_MP_META(excel_caller, db_path):
     """
     Load the META table from the MP database and update the MP structures dropdown
@@ -822,6 +832,7 @@ def load_MP_META(excel_caller, db_path):
     load_META(excel_filename, "MP", db_path)
 
 
+# noinspection PyIncorrectDocstring
 def load_MP_DATA(excel_caller, Structure_name, db_path):
     """
     Load metadata and structure-specific data from the MP database
@@ -955,6 +966,7 @@ def load_MPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
 
 # %% TP
+# noinspection PyIncorrectDocstring
 def load_TP_META(excel_caller, db_path):
     """
     Load the META table from the MP database and update the MP structures dropdown
@@ -971,6 +983,7 @@ def load_TP_META(excel_caller, db_path):
     load_META(excel_filename, "TP", db_path)
 
 
+# noinspection PyIncorrectDocstring
 def load_TP_DATA(excel_caller, Structure_name, db_path):
     """
     Load metadata and structure-specific data from the TP database
@@ -1053,6 +1066,7 @@ def load_TPMasses_from_GeomConv(excel_caller, GeomConv_path):
 
 
 # %% TOWER
+# noinspection PyIncorrectDocstring
 def load_TOWER_META(excel_caller, db_path):
     """
     Load the META table from the MP database and update the MP structures dropdown
@@ -1069,6 +1083,7 @@ def load_TOWER_META(excel_caller, db_path):
     load_META(excel_filename, "TOWER", db_path)
 
 
+# noinspection PyIncorrectDocstring
 def load_TOWER_DATA(excel_caller, Structure_name, db_path):
     """
     Load metadata and structure-specific data from the TOWER database

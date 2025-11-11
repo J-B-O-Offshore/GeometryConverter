@@ -801,6 +801,7 @@ def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=No
         cut_embedded = True
         PY_loadcase_spring_heights = None
 
+
     Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
         Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META,
         cut_embedded=cut_embedded, PY_springs=PY_loadcase_spring_heights, soil_density=soil_density
@@ -911,6 +912,7 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
         If any of the required files or directories cannot be found.
     ValueError
         If the p–y curve data or required Excel fields are missing or malformed.
+        :param update_tables:
     """
 
     insert_mode = str_to_bool(insert_mode)
