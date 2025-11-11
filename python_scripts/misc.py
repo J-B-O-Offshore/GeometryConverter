@@ -538,10 +538,10 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
 
     excel_filename = os.path.basename(excel_caller)
     # load structure Data
-    MP_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "MP_DATA")
-    TP_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_DATA")
-    TOWER_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_DATA")
-    RNA_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "RNA_DATA")
+    MP_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "MP_DATA", dropnan=True)
+    TP_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_DATA", dropnan=True)
+    TOWER_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_DATA", dropnan=True)
+    RNA_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "RNA_DATA", dropnan=True)
 
     MP_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "MP_META")
     TP_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_META")

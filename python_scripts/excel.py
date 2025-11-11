@@ -372,54 +372,64 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
     return response_map.get(result, f"Unknown ({result})")
 
 
-def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=True, strip=True):
+
+
+def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=False, strip=True):
+    """
+    Read an Excel Table into a Pandas DataFrame, using the Table's header as column names.
+
+    Parameters:
+        workbook_name (str): The name of the workbook
+        sheet_name (str): The name of the sheet containing the table.
+        table_name (str): The name of the Excel Table (not the range name).
+        dtype (type or dict): Optional dtype to cast columns to.
+        dropnan (bool): Whether to drop rows that are completely NaN.
+        strip (bool): Whether to strip whitespace from string cells.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the table data with correct headers.
+    """
+
     wb = xw.Book(workbook_name)
     sheet = wb.sheets[sheet_name]
     table = sheet.tables[table_name]
 
+    data_range = table.data_body_range
     headers = [h.strip() if isinstance(h, str) else str(h) for h in table.header_row_range.value]
 
-    data_range = table.data_body_range
     if data_range is None:
         return pd.DataFrame(columns=headers)
 
-    raw_data = data_range.value
+    if dtype == str:
+        raw_data = [
+            [cell.api.Text for cell in row]
+            for row in data_range.rows
+        ]
+    else:
+        raw_data = data_range.value
+        if not isinstance(raw_data, (list, tuple)):
+            raw_data = [raw_data]
+        if not isinstance(raw_data[0], (list, tuple)):
+            raw_data = [raw_data]
 
-    # Normalize to 2D list
-    if not isinstance(raw_data, (list, tuple)):
-        raw_data = [[raw_data]]
-    elif not isinstance(raw_data[0], (list, tuple)):
-        raw_data = [raw_data]
+    df = pd.DataFrame(raw_data, columns=headers)
 
-    # Convert empty cells to np.nan
-    clean_data = []
-    for row in raw_data:
-        clean_row = []
-        for cell in row:
-            if cell is None:
-                clean_row.append(np.nan)
-            elif isinstance(cell, str):
-                val = cell.strip() if strip else cell
-                clean_row.append(val if val else np.nan)
-            else:
-                clean_row.append(cell)
-        clean_data.append(clean_row)
+    # Apply dtype conversions
+    if dtype is not None and dtype != str:
+        df = df.astype(dtype)
+    elif isinstance(dtype, dict):
+        for col, col_dtype in dtype.items():
+            df[col] = df[col].astype(col_dtype)
 
-    df = pd.DataFrame(clean_data, columns=headers)
+    # Strip whitespace from string values if enabled
+    if strip:
+        df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
 
-    # Drop fully empty rows BEFORE dtype conversion
     if dropnan:
         df = df.dropna(how='all')
 
-    # Apply dtype conversions AFTER dropping empty rows
-    if dtype is not None:
-        if isinstance(dtype, dict):
-            for col, col_dtype in dtype.items():
-                df[col] = df[col].astype(col_dtype)
-        else:
-            df = df.astype(dtype)
-
     return df
+
 def read_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
     """
     Read a specific Excel range or cell from an Excel file.
