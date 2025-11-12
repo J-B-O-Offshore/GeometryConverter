@@ -542,7 +542,8 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
     TP_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_DATA", dropnan=True)
     TOWER_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_DATA", dropnan=True)
     RNA_DATA = ex.read_excel_table(excel_filename, "BuildYourStructure", "RNA_DATA", dropnan=True)
-
+    print(RNA_DATA)
+    print(RNA_DATA.columns)
     MP_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "MP_META")
     TP_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_META")
     TOWER_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_META")
@@ -595,7 +596,10 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
                                 f"Chosen RNA not in RNA dropdown menu. Aborting.")
             return None
         else:
-            RNA = RNA_DATA.loc[RNA_DATA["Name"] == RNA_identifier, :]
+            RNA =RNA_DATA.loc[RNA_DATA["Name"] == RNA_identifier, :]
+            print(RNA)
+            print(RNA.columns)
+            print(RNA.dtypes)
             ex.write_df_to_table(excel_filename, "StructureOverview", "RNA", RNA)
 
     # Height Reference handling
@@ -624,15 +628,20 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
     except ValueError:
         GCplt.plot_Assambly_Overview(excel_caller)
         return
-    WHOLE_STRUCTURE
+
     ex.write_df_to_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", WHOLE_STRUCTURE)
     ex.write_df_to_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
+    print(ALL_MASSES)
+    print(ALL_MASSES.columns)
     ex.write_df_to_table(excel_filename, "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
     ex.write_df_to_table(excel_filename, "StructureOverview", "Structue_Components", Structue_Components)
 
     if SKIRT is not None:
+        print(SKIRT)
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT", SKIRT)
     if SKIRT_POINTMASS is not None:
+        print(SKIRT_POINTMASS)
+
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT_POINTMASS", SKIRT_POINTMASS)
 
     # plot assambly

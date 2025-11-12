@@ -4,7 +4,7 @@ Sub show_GEOMETRY_section()
 End Sub
 
 Sub show_ADDED_MASSES_section()
-    ShowOnlySelectedColumns "D:BE", "Q:z"
+    ShowOnlySelectedColumns "D:BE", "Q:Z"
 End Sub
 
 Sub show_MISC_section()

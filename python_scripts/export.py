@@ -567,32 +567,38 @@ def load_JBOOST_soil_file(excel_caller, path):
         sparse.loc["Short name", :] = sparse.columns
 
         # Boolean masks for columns
-        reloading_init_col = sparse.columns.str.contains("reloading") & sparse.columns.str.contains("init")
-        reloading_loaded_col = sparse.columns.str.contains("reloading") & sparse.columns.str.contains("loaded")
+        reloading_init_col = (sparse.columns.str.contains("reloading")
+                              & sparse.columns.str.contains("init")
+                              & sparse.columns.str.contains("FLS"))
+        reloading_loaded_col = (sparse.columns.str.contains("reloading")
+                                & sparse.columns.str.contains("loaded")
+                                & sparse.columns.str.contains("FLS"))
         static_red_init_col = (
                 sparse.columns.str.contains("static")
                 & sparse.columns.str.contains("init")
                 & sparse.columns.str.contains("red")
+                & sparse.columns.str.contains("ULS")
         )
         static_red_loaded_col = (
                 sparse.columns.str.contains("static")
                 & sparse.columns.str.contains("loaded")
                 & sparse.columns.str.contains("red")
+                & sparse.columns.str.contains("ULS")
         )
 
         # Apply changes if there are matches
         if reloading_init_col.any():
             sparse.loc["Use for JBOOST config? (Y/N)", reloading_init_col] = "Y"
-            sparse.loc["Short name", reloading_init_col] = "reloading_init"
+            sparse.loc["Short name", reloading_init_col] = "FLS_reloading_init"
         if reloading_loaded_col.any():
             sparse.loc["Use for JBOOST config? (Y/N)", reloading_loaded_col] = "Y"
-            sparse.loc["Short name", reloading_loaded_col] = "reloading_loaded"
+            sparse.loc["Short name", reloading_loaded_col] = "FLS_reloading_loaded"
         if static_red_init_col.any():
             sparse.loc["Use for JBOOST config? (Y/N)", static_red_init_col] = "Y"
-            sparse.loc["Short name", static_red_init_col] = "static_red_init"
+            sparse.loc["Short name", static_red_init_col] = "ULS_static_red_init"
         if static_red_loaded_col.any():
             sparse.loc["Use for JBOOST config? (Y/N)", static_red_loaded_col] = "Y"
-            sparse.loc["Short name", static_red_loaded_col] = "static_red_loaded"
+            sparse.loc["Short name", static_red_loaded_col] = "ULS_static_red_loaded"
 
         sparse.insert(0, "Stiffness", sparse.index)
 

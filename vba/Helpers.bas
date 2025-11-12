@@ -894,7 +894,7 @@ Sub InstallPythonRequirements()
     shell cmd, vbNormalFocus
 End Sub
 
-Option Explicit
+
 
 Public Sub MapNetworkDrive()
     On Error Resume Next  ' Suppress all VBA runtime errors
