@@ -5,7 +5,7 @@ import misc as mc
 import numpy as np
 from pandas.api.types import CategoricalDtype
 import os
-
+import shutil
 from ALaPy import periphery as pe
 
 import plot as plt
@@ -542,6 +542,9 @@ def run_JBOOST_excel(excel_caller, export_path=""):
                         sheet_names.append(key)
                         sheets.append(value)
                         pe.save_df_list_to_excel(path_out, sheets, sheet_names=sheet_names)
+
+
+                shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Results_JBOOST_Text/JBOOST.out"), os.path.join(path_config, "JBOOST.out"))
 
             Modeshapes[config_name] = JBOOST_OUT["Mode_shapes"]
             waterlevels[config_name] = config_struct["water_level"]
