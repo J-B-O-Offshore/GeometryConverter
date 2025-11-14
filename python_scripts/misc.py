@@ -552,6 +552,7 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
     Structue_Components.loc[:, "Name"] = None
 
     STRUCTURE_META.loc[:, "Value"] = ""
+    STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Water level", "Value"] = 0
 
     MP_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "MP_MASSES", dropnan=True)
     TP_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_MASSES", dropnan=True)
@@ -616,31 +617,34 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
     else:
         STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"] = [v for v in height_refs if v is not None][0]
 
-    # waterdepth handling
-    if MP_META.loc[0, "Water Depth [m]"] is not None:
-        STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"] = - float(MP_META.loc[0, "Water Depth [m]"])
-
     try:
 
         WHOLE_STRUCTURE, ALL_MASSES, SKIRT, SKIRT_POINTMASS = assemble_structure(MP_DATA, TP_DATA, TOWER_DATA, MP_MASSES=MP_MASSES, TP_MASSES=TP_MASSES, TOWER_MASSES=TOWER_MASSES,
                                                                                  excel_caller=excel_filename, rho=rho)
-
     except ValueError:
         GCplt.plot_Assambly_Overview(excel_caller)
         return
 
+    # waterdepth handling
+    if MP_META.loc[0, "Water Depth [m]"] is not None:
+        STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"] = - float(MP_META.loc[0, "Water Depth [m]"])
+        if (STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0] > WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE.index[0], "Top [m]"]) or (
+                STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0] < WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE.index[-1], "Bottom [m]"]):
+            ex.show_message_box(excel_filename, "Warning! Seabed level taken from MP water depth should be below the structure top and above or at the structure bottom for future calculations.")
+    else:
+        STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"] = float("nan")
+        ex.show_message_box(excel_filename, "Warning! Water Depth not provided in databases, has to be set for future calculations.")
+
+
     ex.write_df_to_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", WHOLE_STRUCTURE)
     ex.write_df_to_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
-    print(ALL_MASSES)
-    print(ALL_MASSES.columns)
+
     ex.write_df_to_table(excel_filename, "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
     ex.write_df_to_table(excel_filename, "StructureOverview", "Structue_Components", Structue_Components)
 
     if SKIRT is not None:
-        print(SKIRT)
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT", SKIRT)
     if SKIRT_POINTMASS is not None:
-        print(SKIRT_POINTMASS)
 
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT_POINTMASS", SKIRT_POINTMASS)
 
@@ -804,6 +808,8 @@ def add_tower_on_top(STRUCTURE, TOWER):
 def calculate_MarineGrowth_excel(excel_caller):
     excel_filename = os.path.basename(excel_caller)
 
+    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE")
+
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
 
     MSL_difference = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height difference from height ref to MSL", "Value"].values[0]
@@ -824,7 +830,11 @@ def calculate_MarineGrowth_excel(excel_caller):
         ex.show_message_box(excel_filename, "Please provide a seabed level in the Global Parameters. Aborting")
         return
 
-    MARINE_GROWTH = mc.calculate_MarineGrowth(global_area, MSL_difference, seabed_level, MG_dens=1325, surf_rought=0)
+    if (seabed_level > GEOMETRY.loc[GEOMETRY.index[0], "Top [m]"]) or (seabed_level < GEOMETRY.loc[GEOMETRY.index[-1], "Bottom [m]"]):
+        ex.show_message_box(excel_filename, "Seabed level must be below the structure top and above or at the structure bottom")
+        return
+
+    MARINE_GROWTH = mc.calculate_MarineGrowth(global_area, MSL_difference, seabed_level, GEOMETRY.loc[GEOMETRY.index[0], "Top [m]"], GEOMETRY.loc[GEOMETRY.index[-1], "Bottom [m]"],   MG_dens=1325, surf_rought=0)
 
     ex.clear_excel_table_contents(excel_filename, "StructureOverview", "MARINE_GROWTH")
     ex.write_df_to_table(excel_filename, "StructureOverview", "MARINE_GROWTH", MARINE_GROWTH)

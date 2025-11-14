@@ -370,7 +370,6 @@ def fill_JBOOST_auto_excel(excel_caller):
     PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
     hubheight = ex.read_named_range(excel_caller, "HubHeight", sheet_name="StructureOverview", dtype=float, use_header=False)
-
     # Use 'Project Settings' as the index
     PROJECT.index = PROJECT["Project Settings"]
 
@@ -794,6 +793,11 @@ def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=No
         ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Marine Growth: {err}")
         return
 
+    if (STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0] > GEOMETRY.loc[GEOMETRY.index[0], "Top [m]"]) or (STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0] < GEOMETRY.loc[GEOMETRY.index[-1], "Bottom [m]"]):
+        ex.show_message_box(excel_filename,
+                            "Seabed level has to be below the structure top and above or at the structure bottom. Aborting")
+        return
+
     if incluce_py_nodes:
         PY_data = pe.read_geo_py_curves(py_path)
         if selected_loadcase not in PY_data:
@@ -870,6 +874,7 @@ def plot_bladed_py(excel_caller, py_path, selected_loadcase):
 
 
     return
+
 def update_bladed_name(excel_caller, selected_loadcase):
     excel_filename = os.path.basename(excel_caller)
     Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
@@ -882,6 +887,7 @@ def update_bladed_name(excel_caller, selected_loadcase):
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Settings", Bladed_Settings)
 
     return
+
 
 def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=False, fig_path=None, update_tables=True):
     """
@@ -1029,6 +1035,11 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
     if seabed_level is None:
         ex.show_message_box(excel_filename, "Seabed level must be provided in STRUCTURE_META when p–y curves are applied.")
         return
+    else:
+        if (seabed_level > GEOMETRY.loc[GEOMETRY.index[0], "Top [m]"]) or (seabed_level < GEOMETRY.loc[GEOMETRY.index[-1], "Bottom [m]"]):
+            ex.show_message_box(excel_filename,
+                                "Seabed level has to be below the structure top and above or at the structure bottom. Aborting")
+            return
 
     # --- Build Bladed structure data ---
     try:
