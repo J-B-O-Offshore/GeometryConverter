@@ -12,6 +12,8 @@ import plot as ex_plt
 from ALaPy import misc as mc
 
 
+META_dtypes = [str, str, str, str, str, float, str, str]
+
 class ConciveError(Exception):
     """
     Custom exception for errors related to database operations
@@ -763,14 +765,14 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
     META_FULL = load_db_table(excel_filename, db_path, "META")
     if META_FULL is None:
         return
-    META_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META", dtype=str)
-    META_CURR_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META_NEW", dtype=str)
+
+    META_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META", dtype=META_dtypes, dropnan=True)
+
+    META_CURR_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META_NEW", dtype=META_dtypes, dropnan=True)
+
+
     DATA_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_DATA")
     MASSES_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_MASSES")
-
-    # drop "" and nan rows
-    META_CURR = META_CURR[~(META_CURR == "").all(axis=1)]
-    META_CURR_NEW = META_CURR_NEW[~(META_CURR_NEW == "").all(axis=1)]
 
     DATA_CURR = DATA_CURR.dropna(how='all')
     MASSES_CURR = MASSES_CURR.dropna(how='all')

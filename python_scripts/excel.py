@@ -372,8 +372,6 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
     return response_map.get(result, f"Unknown ({result})")
 
 
-
-
 def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=False, strip=True):
     """
     Read an Excel Table into a Pandas DataFrame, using the Table's header as column names.
@@ -415,20 +413,33 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=
     df = pd.DataFrame(raw_data, columns=headers)
 
     # Apply dtype conversions
-    if dtype is not None and dtype != str:
+    if dtype is not None and dtype != str and not isinstance(dtype, list):
         df = df.astype(dtype)
-    elif isinstance(dtype, dict):
-        for col, col_dtype in dtype.items():
-            df[col] = df[col].astype(col_dtype)
+    elif isinstance(dtype, list):
+        for col_index, col_type in enumerate(dtype):
+            if col_index < df.shape[1]:
+                col_name = df.columns[col_index]
+
+                # Handle string conversion with None → ""
+                if col_type is str:
+                    df[col_name] = df[col_name].where(df[col_name].notna(), "")
+                    df[col_name] = df[col_name].astype(str)
+
+                # For all other types: cast directly
+                else:
+                    df[col_name] = df[col_name].astype(col_type)
 
     # Strip whitespace from string values if enabled
     if strip:
         df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
 
     if dropnan:
+        df = df.replace({"": np.nan, 'None': np.nan, 'NaN': np.nan})
+        df = df.infer_objects(copy=False)
         df = df.dropna(how='all')
 
     return df
+
 
 def read_excel_range(path, sheet_name, cell_range, dtype=None, use_header=True):
     """
@@ -686,7 +697,6 @@ def insert_plot(fig, workbook_name, sheet_name, named_range, replace=False):
 
     return sheet.pictures[pic_name]
 
-
 def read_named_range(path, name, sheet_name=None, dtype=None, use_header=True):
     """
     Read a named range from an Excel file (supports workbook-level and sheet-level names).
@@ -739,6 +749,7 @@ def read_named_range(path, name, sheet_name=None, dtype=None, use_header=True):
         app.quit()
 
     return data
+
 
 def get_excel_user(workbook_name):
     """
