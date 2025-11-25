@@ -9,7 +9,8 @@ import pandas as pd
 from pathlib import Path
 import re
 from openpyxl import load_workbook
-
+import win32clipboard
+from PIL import ImageGrab
 
 def setup_logger():
     logger = logging.getLogger()
@@ -697,6 +698,38 @@ def insert_plot(fig, workbook_name, sheet_name, named_range, replace=False):
 
     return sheet.pictures[pic_name]
 
+
+def delete_figure(workbook_name, sheet_name, named_range):
+    """
+    Delete a picture associated with a named range in an open Excel workbook.
+    Does nothing if the picture does not exist.
+
+    Parameters
+    ----------
+    workbook_name : str
+        Name of the already open Excel workbook.
+    sheet_name : str
+        Name of the sheet containing the picture.
+    named_range : str
+        Named range whose associated picture name is `Fig_<named_range>`.
+    """
+
+    app = xw.apps.active
+    wb = app.books[workbook_name]
+    sheet = wb.sheets[sheet_name]
+
+    pic_name = f"Fig_{named_range}"
+
+    try:
+        sheet.pictures[pic_name].delete()
+        print(f"🗑️ Deleted picture {pic_name}.")
+    except KeyError:
+        print(f"⚠️ picutre does not exist for {pic_name}.")
+
+        pass  # picture does not exist
+    except Exception as e:
+        print(f"⚠️ Could not delete picture {pic_name}: {e}")
+
 def read_named_range(path, name, sheet_name=None, dtype=None, use_header=True):
     """
     Read a named range from an Excel file (supports workbook-level and sheet-level names).
@@ -790,3 +823,46 @@ def get_excel_user(workbook_name):
     except Exception as e:
         print(f"Unexpected xlwings error: {e}")
         return "unknown.user"
+
+
+def save_excel_picture_as_png(workbook_path, sheet_name, picture_name, output_path):
+    # Load workbook and get sheet
+    wb = xw.Book(workbook_path)
+    sheet = wb.sheets[sheet_name]
+
+    # Access the picture as a shape
+    try:
+        shp = sheet.api.Shapes(picture_name)
+    except Exception:
+        raise ValueError(f"Shape '{picture_name}' not found on sheet '{sheet_name}'")
+
+    # Copy the picture to the clipboard
+    shp.Copy()
+
+    # Retrieve image from clipboard
+    img = ImageGrab.grabclipboard()
+    if img is None:
+        raise RuntimeError("Failed to retrieve image from clipboard.")
+
+    # Save to PNG
+    img.save(output_path, 'PNG')
+    print(f"Saved picture as: {output_path}")
+
+def activate_sheet(workbook_name, sheet_name):
+    """
+    Activate a sheet in an already-open Excel workbook.
+
+    Equivalent to VBA: Worksheets("SheetName").Activate
+    """
+
+    app = xw.apps.active
+    wb = app.books[workbook_name]
+
+    try:
+        sheet = wb.sheets[sheet_name]
+        sheet.activate()
+        print(f"📄 Activated sheet '{sheet_name}'.")
+        return sheet
+    except Exception as e:
+        print(f"⚠️ Could not activate sheet '{sheet_name}': {e}")
+        return None

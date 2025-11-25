@@ -429,18 +429,14 @@ def plot_Assambly_Build(excel_caller):
 def plot_Assambly_Overview(excel_caller):
     excel_filename = os.path.basename(excel_caller)
     WHOLE_STRUCTURE = ex.read_excel_table(excel_filename, "StructureOverview", f"WHOLE_STRUCTURE", dropnan=True)
-    ALL_ADDED_MASSES = ex.read_excel_table(excel_filename, "StructureOverview", f"ALL_ADDED_MASSES", dropnan=True)
-    SKIRT_POINTMASS = ex.read_excel_table(excel_filename, "StructureOverview", f"SKIRT_POINTMASS", dropnan=True)
     SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", f"SKIRT", dropnan=True)
-    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", f"MARINE_GROWTH", dropnan=True)
-    HYDRO_COEFFICIENTS = ex.read_excel_table(excel_filename, "StructureOverview", f"HYDRO_COEFFICIENTS", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", f"STRUCTURE_META", dropnan=True)
 
     water_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Water level", "Value"]
     if water_level.empty:
         water_level = None
     elif water_level.values[0] is not None:
-        water_level = -water_level.values[0]
+        water_level = water_level.values[0]
     else:
         water_level = None
 
@@ -533,6 +529,11 @@ def plot_TOWER(excel_caller):
 
 
 def plot_modeshapes(data, order=(1, 2), waterlevels=None):
+    print(data)
+
+    columns = [item for o in order for item in (f"f order {o} [Hz]", f"alpha order {o} [%]")]
+    columns = ["config"] + columns
+    result_table = pd.DataFrame(columns=columns)
 
     fig, axis = plt.subplots(1, len(order), figsize=[6*len(order), 8])
 
@@ -544,6 +545,8 @@ def plot_modeshapes(data, order=(1, 2), waterlevels=None):
 
         ax.set_title(f"Modeshapes of order {n}")
         ax.set_ylabel("z in m")
+        ax.set_xlabel("normalised displacement [-]")
+
         #ax.set_xticks([])
         ax.grid(True)
 
@@ -554,22 +557,46 @@ def plot_modeshapes(data, order=(1, 2), waterlevels=None):
             shape = values.iloc[:, n+1]
             shape = shape * np.sign(shape[0])
 
+            freq_str = values.columns[n + 1]
+            remove = ["Mode shape", "(", ")", "f", "=", "Hz"]
+
+            for r in remove:
+                freq_str = freq_str.replace(r, "")
+
+            frequency = np.round(float(freq_str),4)
             if waterlevels is not None:
                 level = float(waterlevels[config])
                 alpha_value = abs(np.round(shape.loc[values["z"]==level].iloc[0] * 100,2))
-                label = f'{config} {values.columns[n + 1].replace("Mode shape ", "")}, $\\alpha(WL) = {alpha_value}\\%$'
+                label = f'{config} ({frequency}), $\\alpha(WL) = {alpha_value}\\%$'
+                result_table.loc[config, f"alpha order {n} [%]"] = alpha_value
             else:
-                label = f'{config} {values.columns[n + 1].replace("Mode shape ", "")}'
+                label = f'{config} ({frequency})'
 
             ax.plot(shape, values["z"], label=label, color=colors[i])
+            result_table.loc[config, f"f order {n} [Hz]"] = frequency
+            result_table.loc[config, f"config"] = config
+
             i += 1
 
         ax.legend(loc="lower right")
-
+    print(result_table)
     fig.tight_layout()
-    return fig
+    return fig, result_table
 
+def export_Modeshapes(excel_caller, jboost_path):
+    excel_filename = os.path.basename(excel_caller)
+    try:
+        MODESHAPES_TABLE = ex.read_excel_table(excel_filename, "ExportStructure", f"MODESHAPE_OVERVIEW")
 
+        ex.save_excel_picture_as_png(excel_filename, "ExportStructure", "Fig_FIG_JBOOST_MODESHAPES", os.path.join(jboost_path, "Modeshape_overview.png"))
+        MODESHAPES_TABLE.to_csv(os.path.join(jboost_path, "Modeshape_overview.csv"), index=False)
+    except Exception as e:
+        ex.show_message_box(excel_filename, f"Error exporting Modeshapes: {e}")
+
+        return
+    ex.show_message_box(excel_filename, f"Modeshapes exported successfully at {jboost_path}")
+
+    return
 def plot_py_curves(data, max_lines=10, crop_symetric=False, loadcase=None):
 
     Springs = list(np.unique(data["Spring [-]"].values))

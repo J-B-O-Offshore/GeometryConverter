@@ -280,8 +280,24 @@ Sub run_JBOOST()
     Dim args As New Collection
     
     jboost_path = ""
-    
+    DeleteFigure "ExportStrucure", "Fig_FIG_JBOOST_MODESHAPES"
     RunPythonWrapper "export", "run_JBOOST_excel", jboost_path
+End Sub
+
+Sub export_Modeshapes()
+    Dim path As String
+    Dim run As Boolean
+    Dim args As New Collection
+    
+    path = Range("JBOOST_Path").Value
+    ' --- File existence checks ---
+    success = FolderExists(path)
+    If Not success Then
+        MsgBox "JBOOST folder does not exist or is not reachable: " & path, vbExclamation, "Error"
+        Exit Sub
+    End If
+
+    RunPythonWrapper "plot", "export_Modeshapes", path
 End Sub
 
 

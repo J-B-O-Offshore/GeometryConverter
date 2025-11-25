@@ -547,7 +547,9 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
     TOWER_META = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_META")
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
     Structue_Components = ex.read_excel_table(excel_filename, "StructureOverview", "Structue_Components")
+
     Structue_Components.loc[:, "Name"] = None
+    RNA = None
 
     STRUCTURE_META.loc[:, "Value"] = ""
     STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Water level", "Value"] = 0
@@ -567,7 +569,6 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
     Structue_Components.loc[Structue_Components["Component"] == "TOWER", "Name"] = TOWER_identifier
     Structue_Components.loc[Structue_Components["Component"] == "RNA", "Name"] = RNA_identifier
 
-    ex.write_df_to_table(excel_filename, "StructureOverview", "Structue_Components", Structue_Components)
 
     if len(MP_DATA) == 0:
         ex.show_message_box(excel_filename, f"Please provide a MP structure to assamble.")
@@ -596,7 +597,6 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
             return None
         else:
             RNA = RNA_DATA.loc[RNA_DATA["Name"] == RNA_identifier, :]
-            ex.write_df_to_table(excel_filename, "StructureOverview", "RNA", RNA)
 
     # Height Reference handling
     height_refs = [MP_META.loc[0, "Height Reference"]]
@@ -630,23 +630,41 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
         STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"] = float("nan")
         ex.show_message_box(excel_filename, "Warning! Water Depth not provided in databases, has to be set for future calculations.")
 
+    ex.clear_excel_table_contents(excel_filename, "StructureOverview", "WHOLE_STRUCTURE")
     ex.write_df_to_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", WHOLE_STRUCTURE)
+
+    ex.clear_excel_table_contents(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
     ex.write_df_to_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", ALL_MASSES)
 
+    ex.clear_excel_table_contents(excel_filename, "StructureOverview", "STRUCTURE_META")
     ex.write_df_to_table(excel_filename, "StructureOverview", "STRUCTURE_META", STRUCTURE_META)
+
+    ex.clear_excel_table_contents(excel_filename, "StructureOverview", "Structue_Components")
     ex.write_df_to_table(excel_filename, "StructureOverview", "Structue_Components", Structue_Components)
 
-    ex.dele
+    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "APPURTANCES")
+    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "Bladed_Nodes")
+    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW")
+    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "Bladed_Elements")
+    ex.delete_figure(excel_filename, "ExportStructure", "FIG_JBOOST_MODESHAPES")
+    ex.delete_figure(excel_filename, "ExportStructure", "FIG_PY_CURVES")
 
+    ex.clear_excel_table_contents(excel_filename, "StructureOverview", "RNA")
+    if RNA is not None:
+        ex.write_df_to_table(excel_filename, "StructureOverview", "RNA", RNA)
+
+    ex.clear_excel_table_contents(excel_filename, "StructureOverview", "SKIRT")
     if SKIRT is not None:
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT", SKIRT)
 
+    ex.clear_excel_table_contents(excel_filename, "StructureOverview", "SKIRT_POINTMASS")
     if SKIRT_POINTMASS is not None:
         ex.write_df_to_table(excel_filename, "StructureOverview", "SKIRT_POINTMASS", SKIRT_POINTMASS)
 
     # plot assambly
     GCplt.plot_Assambly_Overview(excel_caller)
 
+    ex.activate_sheet(excel_filename, "StructureOverview")
     return
 
 

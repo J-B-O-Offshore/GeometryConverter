@@ -450,6 +450,8 @@ def run_JBOOST_excel(excel_caller, export_path=""):
         PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
         RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA", dropnan=True)
 
+        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW")
+
         if len(RNA) == 0:
             ex.show_message_box(excel_filename, "Please define RNA parameters. Aborting")
             return
@@ -543,17 +545,27 @@ def run_JBOOST_excel(excel_caller, export_path=""):
                         sheets.append(value)
                         pe.save_df_list_to_excel(path_out, sheets, sheet_names=sheet_names)
 
-
                 shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Results_JBOOST_Text/JBOOST.out"), os.path.join(path_config, "JBOOST.out"))
+
+                try:
+                    shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Result_JBOOST_Graph/Inclination.png"), os.path.join(path_config, "Inclination.png"))
+                    shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Result_JBOOST_Graph/Inclination_Moment.png"), os.path.join(path_config, "Inclination_Moment.png"))
+                    shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Result_JBOOST_Graph/mode_shapes.png"), os.path.join(path_config, "mode_shapes.png"))
+                except Exception as e:
+                    print(f"pictures could not be copied: {e}")
 
             Modeshapes[config_name] = JBOOST_OUT["Mode_shapes"]
             waterlevels[config_name] = config_struct["water_level"]
 
         reversed_dfs = {k: df.iloc[::-1].reset_index(drop=True) for k, df in Modeshapes.items()}
 
-        FIG = plt.plot_modeshapes(reversed_dfs, order=(1, 2, 3), waterlevels=waterlevels)
+        FIG, result_table = plt.plot_modeshapes(reversed_dfs, order=(1, 2, 3), waterlevels=waterlevels)
+
+        ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW", result_table)
 
         ex.insert_plot(FIG, excel_filename, "ExportStructure", f"FIG_JBOOST_MODESHAPES")
+
+
 
     return
 
@@ -706,7 +718,6 @@ def export_WLGen(excel_caller, WLGen_path):
     ex.show_message_box(excel_filename, f"WLGen Structure created successfully and saved at {WLGen_path}.")
     return
 
-
 def fill_WLGenMasses(excel_caller):
     excel_filename = os.path.basename(excel_caller)
     MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
@@ -717,17 +728,17 @@ def fill_WLGenMasses(excel_caller):
         if pd.isna(row['Top [m]']) or pd.isna(row['Mass [kg]']):
             return 'INVALID'
 
-        # Check if it qualifies as an APPURTENANCE
+        # Check fields used for WL classification
         has_bottom = not pd.isna(row['Bottom [m]'])
         has_diameter = not pd.isna(row['Diameter [m]'])
         has_orientation = not pd.isna(row['Orientation [°]'])
-        has_roughness = not pd.isna(row['Surface roughness [m]'])
+        # surface roughness no longer required
 
         has_axis_to_axis = not pd.isna(row['Distance Axis to Axis [m]'])
         has_gap = not pd.isna(row['Gap between surfaces [m]'])
-        # xor_axis_gap = has_axis_to_axis != has_gap  # exclusive OR
 
-        if all([has_bottom, has_diameter, has_orientation, has_roughness]) and (has_axis_to_axis or has_gap):
+        # New WL logic: roughness no longer part of the condition
+        if all([has_bottom, has_diameter, has_orientation]) and (has_axis_to_axis or has_gap):
             return 'WL'
         else:
             return 'AM'
@@ -738,6 +749,10 @@ def fill_WLGenMasses(excel_caller):
     for idx, row in MASSES.iterrows():
         kind = categorize_row(row)
 
+        # If WL but roughness missing → set to 0
+        if kind == "WL" and pd.isna(row["Surface roughness [m]"]):
+            row["Surface roughness [m]"] = 0
+
         row["Use For"] = kind
 
         row_df = row.to_frame().T  # Convert Series to 1-row DataFrame
@@ -746,20 +761,14 @@ def fill_WLGenMasses(excel_caller):
         MASSES_WL = pd.concat([MASSES_WL, row_aligned], ignore_index=True)
 
     # sort df
-    # Define custom order
     cat_order = CategoricalDtype(categories=["WL", "AM", "INVALID"], ordered=True)
-
-    # Convert the column to categorical
     MASSES_WL['Use For'] = MASSES_WL['Use For'].astype(cat_order)
-
-    # Sort the DataFrame
     MASSES_WL = MASSES_WL.sort_values('Use For')
 
     ex.write_df_to_table(excel_filename, "ExportStructure", "APPURTANCES", MASSES_WL)
 
 
 # %% BLADED
-
 def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=None, py_path=None):
     excel_filename = os.path.basename(excel_caller)
     incluce_py_nodes = str_to_bool(incluce_py_nodes)

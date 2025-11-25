@@ -541,14 +541,17 @@ End Sub
 Sub assamble_structure()
     Dim args As New Collection
     Dim RNA_config As String
-    ClearTableContents "StructureOverview", "WHOLE_STRUCTURE"
-    ClearTableContents "StructureOverview", "ALL_ADDED_MASSES"
-    ClearTableContents "StructureOverview", "SKIRT_POINTMASS"
-    ClearTableContents "StructureOverview", "SKIRT"
-    ClearTableContents "StructureOverview", "RNA"
-    ClearTableContents "ExportStructure", "APPURTANCES"
-    ClearTableContents "ExportStructure", "Bladed_Nodes"
-    ClearTableContents "ExportStructure", "Bladed_Elements"
+   ' ClearTableContents "StructureOverview", "WHOLE_STRUCTURE"
+   ' ClearTableContents "StructureOverview", "ALL_ADDED_MASSES"
+   ' ClearTableContents "StructureOverview", "SKIRT_POINTMASS"
+   ' ClearTableContents "StructureOverview", "SKIRT"
+   ' ClearTableContents "StructureOverview", "RNA"
+   ' ClearTableContents "ExportStructure", "APPURTANCES"
+   ' ClearTableContents "ExportStructure", "Bladed_Nodes"
+   ' ClearTableContents "ExportStructure", "MODESHAPE_OVERVIEW"
+   ' ClearTableContents "ExportStructure", "Bladed_Elements"
+   ' DeleteFigure "ExportStrucure", "Fig_FIG_JBOOST_MODESHAPES"
+   ' DeleteFigure "ExportStrucure", "Fig_FIG_PY_CURVES"
     
     args.Add 7860
     MP_config = get_dropdown_value("BuildYourStructure", "Dropdown_MP_Structures2")
@@ -562,7 +565,7 @@ Sub assamble_structure()
     
     RunPythonWrapper "misc", "assemble_structure_excel", args
     
-    Worksheets("StructureOverview").Activate
+    'Worksheets("StructureOverview").Activate
 End Sub
 
 Sub reload_databasis()

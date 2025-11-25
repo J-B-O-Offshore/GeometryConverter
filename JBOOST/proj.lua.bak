@@ -1,6 +1,7 @@
+
 -- ++++++++++++++++++++++++++++++++++++++++ Model Data +++++++++++++++++++++++++++++++++++++++++++++++++++
 
-model = getdata("Input JBOOST DP-C-D95_T80_WEK_LILA01_L2G1S3_IF+0p5_SGRE-tower-250815_wc.lua")
+model = getdata("struc.lua")
 model()
 wave = (getdata("wave.lua"))
 wave()
@@ -11,77 +12,77 @@ wind()
 
 os_LoadConfigGeneral(
 {
-    Config_name = "v0",
-    Result_name = "Result v0",
-    Scatter_name = "EMPTY",
-    FeModel_name = "WAK",
-    Wind_name = "WindLoc1",
-    Ocean_name = "test",
-	}
+	Config_name	= "Config_1",
+	Result_name	= "Result Config_1",
+	Scatter_name	= "test",
+	FeModel_name	= "test",
+	Wind_name	= "WindLoc1",
+	Ocean_name	= "test",
+}
 )
 
 -- ++++++++++++++++++++++++++++++++++++++++ FEModul Konfiguration ++++++++++++++++++++++++++++++++++++++++++++++++++++++
 os_LoadConfigFEModul(
 {
-    foundation_superelement = 501,  -- Knotennummer (-1=keine Ersatzmatizen fuer Pfahl, >0 Ersatzsteifigkeit bzw. -massen)
+	foundation_superelement		= 501,		-- Knotennummer (-1=keine Ersatzmatizen fuer Pfahl, >0 Ersatzsteifigkeit bzw. -massen)
 
-    found_stiff_trans = 2.20E+09,  
-    found_stiff_rotat = 6.40E+11,
-    found_stiff_coupl = -2.93E+10,
-    found_mass_trans = 0,
-    found_mass_rotat = 0,
-    found_mass_coupl = 0,
+		found_stiff_trans	=  3.97E+09,
+		found_stiff_rotat	=  5.58E+11,
+		found_stiff_coupl	=  -3.25E+10,
+		found_mass_trans	=  0.01,
+		found_mass_rotat	=  0.01,
+		found_mass_coupl	=  0,
 
-    shearCorr = 2,  -- Schubkorrekturfaktor (2.0 fuer Kreisquerschnitt und Timoshenko 0.0 fuer Bernoulli)
-    res_NumEF = 10,  -- Anzahl der Eigenfrequenzen, die ausgegeben werden
-    hydro_add_mass = 1,-- Added Mass fuer analysen der Strukturdynamik 1 = mit added mass
-    }
+	shearCorr		= 2.0,		-- Schubkorrekturfaktor (2.0 fr Kreisquerschnitt und Timoshenko 0.0 fr Bernoulli)
+	res_NumEF		= 10,		-- Anzahl der Eigenfrequenzen, die ausgegeben werden
+	hydro_add_mass	        = 1,		-- Added Mass fuer analysen der Strukturdynamik 1 = mit added mass
+}
 )
-
 os_LoadConfigOcean(
 {
-    water_density = 1027,  -- water density in [kg/m ]
-    water_level = 0,  -- wrt LAT in [m] !!! there must be a node @ this height !!!
-    seabed_level = -45.43,  -- wrt LAT in [m]
-    growth_density = 1325,-- marine growth density in [kg/m ]
-    }
+	water_density 		= 1025.7,		-- water density in [kg/m³]
+	water_level 		= 1.48,		-- wrt LAT in [m] !!! there must be a node @ this height !!!
+	seabed_level 		= -33.61,	-- wrt LAT in [m]
+	growth_density 		= 1325,		-- marine growth density in [kg/m³]
+}
 )
 
-os_OceanMG{id=HD, topMGsection = 140.49999999999997,   bottomMGsection = 3.1,    t=0.0} -- marine growth layer spec.
-os_OceanMG{id=HD, topMGsection = 3.1,   bottomMGsection = -8.9,    t=0.15} -- marine growth layer spec.
-os_OceanMG{id=HD, topMGsection = -8.9,   bottomMGsection = -38.9,    t=0.1} -- marine growth layer spec.
-os_OceanMG{id=HD, topMGsection = -38.9,   bottomMGsection = -43.5,    t=0.05} -- marine growth layer spec.
+os_OceanMG{id=HD, topMGsection = 3.48,   bottomMGsection = -8.52,    t=0.150} -- marine growth layer spec.
+os_OceanMG{id=HD, topMGsection = -8.52,  bottomMGsection = -33.61, t=0.100}
 
 os_LoadConfigFrequModul(
 {
-    frequRange = 2,  -- 0 Hz to frequRange in Hz
-    frequRangeSolution = 300,  -- no. of frequency components
-    maxEFcalc = 10,  -- max number of considered frequencies
-    damping_struct = 0.0075,  -- damping ratio structural (material, viscous, soil)
-    damping_tower = 0.0064,
-    damping_aerodyn = 0.01,  -- damping ratio aerodynamic (weighted mean value over wind speeds)
-    design_life = 36,  -- structural design life in years
-    N_ref = 10000000,  -- no. of cycles for DEL calculation
-    tech_availability = 0.895,  -- technical availability turbine in percent --> 0.95*30y/31.0y
-    -- Note that this coers also the commissioning and decommissioning times
-    SN_slope = 4,  -- S-N slope material
-    h_refwindspeed = 164.6,  -- height reference in m of wind speed data in wind wave scatter
-    h_hub = 164.6,  -- hub height wrt LAT in m
-    height_exp = 0.11,  -- height exponent
-    TM02_period = 0,  -- [0] if peak periods stated, [1] if zero crossing Tm02 periods stated -> noch nicht eingebaut...FOs
-    refineScatter = 0,  -- refinement of scatter data on Tp axis (factor 10 coded)  [0]=off; [1]=on; [2]=on incl. validation plots!
-    fullScatter = 1,  -- calc full real scatter FLS for validation purpose
-    WindspecDataBase = [[-]],  -- path on windspec database (*.csv) or "-" in case no wind load is to be considered
-    res_Nodes = {501.0}}
+	frequRange		= 2,	-- 0 Hz to frequRange in Hz
+	frequRangeSolution	= 300,	-- no. of frequency components
+	maxEFcalc		= 10,	-- max number of considered frequencies
+	damping_struct		= 0.0075,-- damping ratio structural (material, viscous, soil)
+	damping_tower		= 0.008,-- additional damping from tower damper						       
+	damping_aerodyn 	= 0.12,	-- damping ratio aerodynamic (weighted mean value over wind speeds)
+	design_life		= 36,	-- structural design life in years
+	N_ref			= 1.0E7,-- no. of cycles for DEL calculation
+	tech_availability	= 0.999, -- technical availability turbine in percent
+	SN_slope		= 3,	-- S-N slope material
+	h_refwindspeed		= 10.0,-- height reference in m of wind speed data in wind wave scatter
+	h_hub			= 145.1,-- hub height wrt LAT in m
+	height_exp		= 0.1,	-- height exponent
+	TM02_period		= 0,	-- [0] if peak periods stated, [1] if zero crossing Tm02 periods stated -> noch nicht eingebaut...FOs
+	refineScatter		= 0,	-- refinement of scatter data on Tp axis (factor 10 coded)  [0]=off; [1]=on; [2]=on incl. validation plots!
+	fullScatter		= 1, 	-- calc full real scatter FLS for validation purpose
+	WindspecDataBase 	= [[-]], -- path on windspec database (*.csv) or "-" in case no wind load is to be considered
+	res_Nodes		= {501,601}
+}
 )
+
 -- ----------------------------------------------
--- Execute program steps
+-- Exexute program steps
 -- ----------------------------------------------
 
-os_RunFEModul()
+--os_RunFEModul()
 --os_RunFrequencyDomain()
---os_RunHindcastValidation()
+os_RunHindcastValidation()
 
 -- Ausgabe der Textdateien
 os_WriteResultsText([[Results_JBOOST_Text]])
 os_PlotResultsGraph([[Result_JBOOST_Graph]])
+
+
