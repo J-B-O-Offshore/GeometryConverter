@@ -529,7 +529,6 @@ def plot_TOWER(excel_caller):
 
 
 def plot_modeshapes(data, order=(1, 2), waterlevels=None):
-    print(data)
 
     columns = [item for o in order for item in (f"f order {o} [Hz]", f"alpha order {o} [%]")]
     columns = ["config"] + columns
@@ -546,8 +545,6 @@ def plot_modeshapes(data, order=(1, 2), waterlevels=None):
         ax.set_title(f"Modeshapes of order {n}")
         ax.set_ylabel("z in m")
         ax.set_xlabel("normalised displacement [-]")
-
-        #ax.set_xticks([])
         ax.grid(True)
 
         i = 0
