@@ -282,7 +282,7 @@ def export_JBOOST(excel_caller, jboost_path):
         runFEModul = str_to_bool(config_data["runFEModul"])
         runFrequencyModul = str_to_bool(config_data["runFrequencyModul"])
 
-        struct_text = pe.create_JBOOST_struct(
+        struct_text, NODES, _ = pe.create_JBOOST_struct(
             GEOMETRY,
             RNA,
             (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Value"].values[0],
@@ -303,12 +303,14 @@ def export_JBOOST(excel_caller, jboost_path):
             create_node_tolerance=PARAMETERS.loc[
                 PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[0],
             seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
-            waterlevel=config_struct["water_level"]
+            waterlevel=config_struct["water_level"],
+            return_structure=True
         )
 
         if config_struct["res_Nodes"] == 'auto':
-            nodes_struct = pe.nodes_from_struct(struct_text)
-            config_struct["res_Nodes"] = "{" + ", ".join([f"{node:.1f}" for node in nodes_struct]) + "}"
+            idx_BORDER = NODES.loc[NODES["Affiliation"] == "BORDER"].index[-1]
+            nodes = NODES.loc[NODES.index<=idx_BORDER, "node"].values
+            config_struct["res_Nodes"] = "{" + ", ".join([f"{node:.1f}" for node in nodes]) + "}"
 
         proj_text = pe.create_JBOOST_proj(
             config_struct,
@@ -492,7 +494,7 @@ def run_JBOOST_excel(excel_caller, export_path=""):
             config_struct.pop("runFEModul", None)
             config_struct.pop("runFrequencyModul", None)
 
-            struct_text = pe.create_JBOOST_struct(
+            struct_text, NODES, _ = pe.create_JBOOST_struct(
                 GEOMETRY,
                 RNA,
                 (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Value"].values[0],
@@ -513,12 +515,14 @@ def run_JBOOST_excel(excel_caller, export_path=""):
                 create_node_tolerance=PARAMETERS.loc[
                     PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[0],
                 seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
-                waterlevel=config_struct["water_level"]
+                waterlevel=config_struct["water_level"],
+                return_structure=True
             )
 
             if config_struct["res_Nodes"] == 'auto':
-                nodes_struct = pe.nodes_from_struct(struct_text)
-                config_struct["res_Nodes"] = "{" + ", ".join([f"{node:.1f}" for node in nodes_struct]) + "}"
+                idx_BORDER = NODES.loc[NODES["Affiliation"] == "BORDER"].index[-1]
+                nodes = NODES.loc[NODES.index <= idx_BORDER, "node"].values
+                config_struct["res_Nodes"] = "{" + ", ".join([f"{node:.1f}" for node in nodes]) + "}"
 
             proj_text = pe.create_JBOOST_proj(
                 config_struct,
@@ -558,7 +562,7 @@ def run_JBOOST_excel(excel_caller, export_path=""):
                     shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Result_JBOOST_Graph/Inclination_Moment.png"), os.path.join(path_config, "Inclination_Moment.png"))
                     shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Result_JBOOST_Graph/mode_shapes.png"), os.path.join(path_config, "mode_shapes.png"))
                 except Exception as e:
-                    print(f"pictures could not be copied: {e}")
+                    print(f"pictures could not be copied: {e}, {os.path.join(os.path.dirname(script_dir), 'JBOOST/Result_JBOOST_Graph/mode_shapes.png')}")
 
             Modeshapes[config_name] = JBOOST_OUT["Mode_shapes"]
             waterlevels[config_name] = config_struct["water_level"]
