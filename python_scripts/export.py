@@ -282,18 +282,6 @@ def export_JBOOST(excel_caller, jboost_path):
         runFEModul = str_to_bool(config_data["runFEModul"])
         runFrequencyModul = str_to_bool(config_data["runFrequencyModul"])
 
-        proj_text = pe.create_JBOOST_proj(
-            config_struct,
-            MARINE_GROWTH,
-            modelname=Model_name,
-            runFEModul=runFEModul,
-            runFrequencyModul=runFrequencyModul,
-            runHindcastValidation=False,
-            wavefile="wave.lua",
-            windfile="wind.lua",
-            write_JBOOST_graph=True
-        )
-
         struct_text = pe.create_JBOOST_struct(
             GEOMETRY,
             RNA,
@@ -316,6 +304,22 @@ def export_JBOOST(excel_caller, jboost_path):
                 PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[0],
             seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
             waterlevel=config_struct["water_level"]
+        )
+
+        if config_struct["res_Nodes"] == 'auto':
+            nodes_struct = pe.nodes_from_struct(struct_text)
+            config_struct["res_Nodes"] = "{" + ", ".join([f"{node:.1f}" for node in nodes_struct]) + "}"
+
+        proj_text = pe.create_JBOOST_proj(
+            config_struct,
+            MARINE_GROWTH,
+            modelname=Model_name,
+            runFEModul=runFEModul,
+            runFrequencyModul=runFrequencyModul,
+            runHindcastValidation=False,
+            wavefile="wave.lua",
+            windfile="wind.lua",
+            write_JBOOST_graph=True
         )
 
         path_config = os.path.join(jboost_path, config_name)
@@ -368,9 +372,8 @@ def fill_JBOOST_auto_excel(excel_caller):
 
     # Load tables
     PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
-    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    #STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
     hubheight = ex.read_named_range(excel_caller, "HubHeight", sheet_name="StructureOverview", dtype=float, use_header=False)
-    print(hubheight)
     # Use 'Project Settings' as the index
     PROJECT.index = PROJECT["Project Settings"]
 
@@ -489,13 +492,6 @@ def run_JBOOST_excel(excel_caller, export_path=""):
             config_struct.pop("runFEModul", None)
             config_struct.pop("runFrequencyModul", None)
 
-            proj_text = pe.create_JBOOST_proj(
-                config_struct,
-                MARINE_GROWTH,
-                modelname=Model_name,
-                write_JBOOST_graph=True
-            )
-
             struct_text = pe.create_JBOOST_struct(
                 GEOMETRY,
                 RNA,
@@ -520,6 +516,16 @@ def run_JBOOST_excel(excel_caller, export_path=""):
                 waterlevel=config_struct["water_level"]
             )
 
+            if config_struct["res_Nodes"] == 'auto':
+                nodes_struct = pe.nodes_from_struct(struct_text)
+                config_struct["res_Nodes"] = "{" + ", ".join([f"{node:.1f}" for node in nodes_struct]) + "}"
+
+            proj_text = pe.create_JBOOST_proj(
+                config_struct,
+                MARINE_GROWTH,
+                modelname=Model_name,
+                write_JBOOST_graph=True
+            )
             JBOOST_OUT = pe.run_JBOOST(jboost_path, proj_text, struct_text, set_calculation={"FEModul": True, "FreqDomain": True, "HindValid": False})
 
             sheet_names = []
@@ -1164,16 +1170,4 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_stiff_path, Bladed_pj_export_pat
 
 # excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
 # #
-# # #fill_Bladed_table(excel_caller)
-# # py_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Springs_(L).csv"
-# # Bladed_pj_path  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/insert_pj_mode/DKT_12_v04_Wdir270_Wavedir300_yen8_s01_____.$PJ"
-# # selected_loadcase  = "FLS_(Reloading_BE)"
-# # insert_mode = True
-# # #
-# stiff_Mat_path = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525-JBO-TNMPCD-EN-1003-03 - Preliminary MP-TP Concept Design - Annex A1 - Lateral_Stiffness.csv"
-# # #pply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=insert_mode, fig_path=None)
-# # # #excel_caller = "I:/2025/A/518_RWE_WBO_FOU_Design/100_Engr/110_Loads/01_LILA/02_preLILA_Vestas/2025-10-14_GeometryConverter_v1.5_MP_DP-C_013Hz_L0_G0_S1-BCe.xlsm"
-# # #load_Bladed_soil_file_mat(excel_caller, stiff_Mat_path)
-# #
-# #
-# apply_bladed_stiff_mat(excel_caller, stiff_Mat_path, "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/PY-curves_Bladed/24A525_DP-B4_SG276_21p5_FLS_relo_load_Prod_EOG.prj", "LC1_FLS_reloading_initial")
+# export_JBOOST(excel_caller, ".")
