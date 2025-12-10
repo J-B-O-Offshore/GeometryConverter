@@ -374,7 +374,7 @@ def fill_JBOOST_auto_excel(excel_caller):
 
     # Load tables
     PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
-    #STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
     hubheight = ex.read_named_range(excel_caller, "HubHeight", sheet_name="StructureOverview", dtype=float, use_header=False)
     # Use 'Project Settings' as the index
     PROJECT.index = PROJECT["Project Settings"]
