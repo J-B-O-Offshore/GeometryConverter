@@ -1169,9 +1169,4 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_stiff_path, Bladed_pj_export_pat
 
     return
 
-# excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
-# #
-# export_JBOOST(excel_caller, ".")
 
-
-run_JBOOST_excel("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", export_path="")
