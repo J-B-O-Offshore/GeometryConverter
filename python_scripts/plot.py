@@ -5,7 +5,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import pandas as pd
 import misc as mc
-from matplotlib.ticker import FixedLocator, FuncFormatter
+from matplotlib.patches import Rectangle, Arc, FancyArrow
 
 
 def get_JBO_colors(n, fixed_colors=None):
@@ -290,8 +290,11 @@ def plot_cans(Structure, axis, show_section_numbers=False, set_lims=True, **plot
             axis.text(0, (down_left[1] + up_left[1]) / 2, int(can["Section"]),
                       fontsize=8, ha='center', va='center', fontweight='bold')
 
-
-def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height_ref=None):
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle, Arc
+from matplotlib.ticker import FixedLocator, FuncFormatter
+def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height_ref=None, RNA=None):
     fig, axis = plt.subplots(1, 1, figsize=[8, 27])
 
     # -------------------------------------------------
@@ -342,6 +345,141 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height
             boundaries.append(df["Top [m]"].max())
             boundaries.append(df["Bottom [m]"].min())
 
+
+    # -------------------------------------------------
+    # Grid
+    # -------------------------------------------------
+    axis.grid(True, which="minor", axis="both", linewidth=0.3, alpha=0.5)
+    axis.grid(True, which="major", axis="both", linewidth=0.9, alpha=0.8)
+    # -------------------------------------------------
+    # Detect structure top
+    # -------------------------------------------------
+    z_top = WHOLE_STRUCTURE["Top [m]"].max()
+    D_top = WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE.index[0], "D, top [m]"].max()
+
+    # -------------------------------------------------
+    # RNA plotting (optional)
+    # -------------------------------------------------
+    if RNA is not None:
+        # Expected dict keys: dz_com, dz_hub, diameter, color (optional)
+        RNA_COLOR = RNA.get("color", "darkgreen")
+        com_dz = RNA["dz_com"]
+        hub_dz = RNA["dz_hub"]
+        rotor_diameter = RNA["diameter"]
+        text_str = RNA["info"]
+        # Right axis
+        rax = axis.twinx()
+        rax.tick_params(axis="y", colors=RNA_COLOR)
+        rax.spines["right"].set_color(RNA_COLOR)
+        rax.set_ylabel("Relative height to RNA interface [m]", color=RNA_COLOR)
+
+        # RNA positions
+        z_com = z_top + com_dz
+        z_hub = z_top + hub_dz
+        boundaries.append(z_com)
+        boundaries.append(z_hub)
+        boundaries.append(z_top+hub_dz-rotor_diameter/2)
+
+        # Function to map actual height to top-zero axis
+
+        # Right axis ticks
+        rax_ticks = [0, com_dz, hub_dz]
+        rax.set_yticks(rax_ticks)
+        rax.set_yticklabels([f"{z:.2f}" for z in rax_ticks])
+
+        # RNA box (grey)
+        box_w = D_top * 1.4
+        box_h = max(com_dz, hub_dz) * 2
+        axis.add_patch(
+            Rectangle(
+                (-box_w / 2, z_top),
+                box_w,
+                box_h,
+                facecolor="lightgrey",
+                edgecolor=RNA_COLOR,
+                linewidth=1.5,
+                zorder=6,
+                linestyle="--"
+            )
+        )
+
+        # Center of mass
+        axis.scatter(
+            0, z_com,
+            s=160,
+            color=RNA_COLOR,
+            zorder=7,
+            edgecolors="black",
+        )
+
+        # Rotor center (striped cross)
+        cross = rotor_diameter * 0.03
+        axis.plot(
+            [-cross, cross], [z_hub, z_hub],
+            color="red", linestyle=(0, (4, 3)), linewidth=1.8, zorder=7
+        )
+        axis.plot(
+            [0, 0], [z_hub - cross, z_hub + cross],
+            color="red", linestyle=(0, (4, 3)), linewidth=1.8, zorder=7
+        )
+
+        # Rotor diameter (partial circle)
+        axis.add_patch(
+            Arc(
+                (0, z_hub),
+                rotor_diameter,
+                rotor_diameter,
+                theta1=270 - 20 / rotor_diameter * 180 / np.pi,
+                theta2=270 + 20 / rotor_diameter * 180 / np.pi,
+                color="red",
+                linewidth=2.0,
+                zorder=6,
+                linestyle="--"
+            )
+        )
+        # Angle in degrees
+        angle_deg = 8 / rotor_diameter * 180 / np.pi
+        angle_rad = np.deg2rad(angle_deg)
+
+        # Original vector from hub to edge (pointing straight down)
+        dx = 0
+        dy = -rotor_diameter / 2
+
+        # Rotate vector
+        dx_rot = dx * np.cos(angle_rad) - dy * np.sin(angle_rad)
+        dy_rot = dx * np.sin(angle_rad) + dy * np.cos(angle_rad)
+
+        # Draw rotated arrow
+        rax.annotate(
+            "",  # No text
+            xy=(dx_rot, hub_dz + dy_rot),  # Arrow tip (rotated)
+            xytext=(0, hub_dz),  # Arrow start (hub center)
+            arrowprops=dict(arrowstyle="->", color="red", linewidth=1.8),
+            zorder=8
+        )
+
+        # Label the diameter (horizontal text)
+        label_x = dx_rot / 2
+        label_y = hub_dz + dy_rot / 2
+        rax.text(
+            label_x, label_y,
+            f"D = {rotor_diameter:.2f} m",
+            color="red",
+            fontsize=10,
+            ha="center",
+            va="bottom",
+            zorder=9
+        )
+        rax.text(
+            0,  # x-position (centered)
+            box_h,  # y-position (just above the grey box)
+            text_str,
+            fontsize=10,
+            ha="center",
+            va="bottom",
+            zorder=10,
+            fontweight="bold",
+        )
     boundaries = sorted(set(boundaries))
 
     # -------------------------------------------------
@@ -371,8 +509,14 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height
     axis.yaxis.set_major_locator(FixedLocator(y_major_all))
     axis.yaxis.set_minor_locator(FixedLocator(y_minor_all))
 
-    axis.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:.0f}"))
+    # Custom formatter: boundaries .2f, others .0f
+    def y_formatter(y, _):
+        if np.any(np.isclose(y, boundaries, atol=1e-6)):
+            return f"{y:.2f}"
+        else:
+            return f"{y:.0f}"
 
+    axis.yaxis.set_major_formatter(FuncFormatter(y_formatter))
     # ---------------- X axis ----------------
     # Keep symmetric limits
     max_x = max(abs(xmin), abs(xmax))
@@ -396,12 +540,12 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height
     axis.xaxis.set_major_formatter(
         FuncFormatter(lambda x, _: f"{2*x:.0f}" if x >= 0 else "")
     )
+    if RNA is not None:
+        # Get left axis limits
+        left_ymin, left_ymax = axis.get_ylim()
 
-    # -------------------------------------------------
-    # Grid
-    # -------------------------------------------------
-    axis.grid(True, which="minor", axis="both", linewidth=0.3, alpha=0.5)
-    axis.grid(True, which="major", axis="both", linewidth=0.9, alpha=0.8)
+        # Set right axis so top = 0, increase upwards
+        rax.set_ylim(left_ymin - z_top, left_ymax - z_top)
 
     # -------------------------------------------------
     # Boundary lines (striped / dashed, on top)
@@ -411,8 +555,8 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height
             z,
             color="k",
             linestyle=(0, (6, 4)),  # striped
-            linewidth=1.8,
-            zorder=5
+            linewidth=1,
+            zorder=10
         )
 
     return fig
@@ -491,6 +635,7 @@ def plot_Assambly_Overview(excel_caller):
     WHOLE_STRUCTURE = ex.read_excel_table(excel_filename, "StructureOverview", f"WHOLE_STRUCTURE", dropnan=True)
     SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", f"SKIRT", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", f"STRUCTURE_META", dropnan=True)
+    RNA_SORCE = ex.read_excel_table(excel_filename, "StructureOverview", f"RNA", dropnan=True)
 
     water_level = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Water level", "Value"]
     if water_level.empty:
@@ -514,7 +659,15 @@ def plot_Assambly_Overview(excel_caller):
     else:
         height_ref = height_ref.values[0]
 
-    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, waterlevel=water_level, seabed=-seabed_level, height_ref=height_ref)
+    if len(RNA_SORCE) > 0:
+        RNA=dict()
+        RNA["dz_com"] = RNA_SORCE["Vertical Offset TT_COG [m]"].values[0]
+        RNA["dz_hub"] = RNA_SORCE["Vertical Offset TT to HH [m]"].values[0]
+        RNA["diameter"] = RNA_SORCE["Rotor Diameter [m]"].values[0]
+        RNA["info"] = f"{RNA_SORCE['Name'].values[0]}" + "\n" + f"Mass [kg]: {RNA_SORCE['Mass of RNA [kg]'].values[0]}" + "\n" + f"Inertia fore-aft/side-side @COG [kg m^2]:" + "\n" + f"{RNA_SORCE['Inertia of RNA fore-aft @COG [kg m^2]'].values[0]} /  {RNA_SORCE['Inertia of RNA side-side @COG [kg m^2]'].values[0]}"
+    else:
+        RNA = None
+    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, waterlevel=water_level, seabed=-seabed_level, height_ref=height_ref, RNA=RNA)
 
     ex.insert_plot(Fig, excel_filename, "StructureOverview", f"Assambly_plot_Overview2")
 
@@ -701,3 +854,4 @@ def plot_py_curves(data, max_lines=10, crop_symetric=False, loadcase=None):
     fig.tight_layout()
     return fig
 
+plot_Assambly_Overview("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm")
