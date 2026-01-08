@@ -5,6 +5,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import pandas as pd
 import misc as mc
+from matplotlib.ticker import FixedLocator, FuncFormatter
 
 
 def get_JBO_colors(n, fixed_colors=None):
@@ -290,73 +291,132 @@ def plot_cans(Structure, axis, show_section_numbers=False, set_lims=True, **plot
                       fontsize=8, ha='center', va='center', fontweight='bold')
 
 
-def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height_ref=""):
-    """
-    Plots the assembled offshore structure, showing its subcomponents (MP, TP, TOWER) and optionally a skirt.
-
-    Parameters
-    ----------
-    WHOLE_STRUCTURE : pandas.DataFrame
-        Combined structure data with one row per segment. Must include:
-        - "Top [m]": top elevation of the segment.
-        - "Bottom [m]": bottom elevation of the segment.
-        - "D, top [m]": diameter at the top of the segment.
-        - "D, bottom [m]": diameter at the bottom of the segment.
-        - "Affiliation": string column specifying the component ("MP", "TP", or "TOWER").
-
-    SKIRT : pandas.DataFrame, optional
-        Additional structure to plot (e.g., skirt piles). Same structure as `WHOLE_STRUCTURE`.
-
-    seabed : float, optional
-        Elevation of the seabed in meters. If provided, a horizontal brown line will be plotted.
-
-    waterlevel : float, default=0
-        Elevation of the water level in meters. Shown as a dashed blue line.
-
-    height_ref : str, optional
-        Optional height reference string (e.g., " MSL") appended to the y-axis label.
-
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-        The generated Matplotlib figure showing the assembled structure with appropriate annotations.
-
-    Notes
-    -----
-    - MP (monopile), TP (transition piece), and TOWER segments are colored black, blue, and grey respectively.
-    - The skirt (if provided) is colored red with partial transparency.
-    - Diameters are doubled in the x-axis tick labels to represent total width.
-    """
+def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height_ref=None):
     fig, axis = plt.subplots(1, 1, figsize=[8, 27])
 
-    MP_assambled = WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE["Affiliation"] == "MP", :]
-    TP_assambled = WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE["Affiliation"] == "TP", :]
-    TOWER_assambled = WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE["Affiliation"] == "TOWER", :]
+    # -------------------------------------------------
+    # Split structure
+    # -------------------------------------------------
+    MP = WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE["Affiliation"] == "MP", :]
+    TP = WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE["Affiliation"] == "TP", :]
+    TOWER = WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE["Affiliation"] == "TOWER", :]
 
-    if len(MP_assambled) != 0:
-        plot_cans(MP_assambled, axis, show_section_numbers=False, color="k", set_lims=False)
-    if len(TP_assambled) != 0:
-        plot_cans(TP_assambled, axis, show_section_numbers=False, color="blue", set_lims=False)
-    if len(TOWER_assambled) != 0:
-        plot_cans(TOWER_assambled, axis, show_section_numbers=False, color="grey", set_lims=False)
+    # -------------------------------------------------
+    # Plot structure
+    # -------------------------------------------------
+    if len(MP) != 0:
+        plot_cans(MP, axis, show_section_numbers=False, color="k", set_lims=False)
+    if len(TP) != 0:
+        plot_cans(TP, axis, show_section_numbers=False, color="blue", set_lims=False)
+    if len(TOWER) != 0:
+        plot_cans(TOWER, axis, show_section_numbers=False, color="grey", set_lims=False)
     if SKIRT is not None:
-        plot_cans(SKIRT, axis, show_section_numbers=False, color="red", set_lims=False, alpha=0.8)
+        plot_cans(SKIRT, axis, show_section_numbers=False,
+                  color="red", set_lims=False, alpha=0.8)
 
-    ticks = axis.get_xticks()
-    axis.set_xticks(ticks[ticks >= 0])
-    axis.set_xticklabels([f"{2 * t:.0f}" for t in ticks if t >= 0])
+    # -------------------------------------------------
+    # Axis labels
+    # -------------------------------------------------
     axis.set_xlabel("Diameter in [m]")
-    axis.set_ylabel(f"z in m{height_ref}")
-
-    if waterlevel is not None:
-        axis.axhline(waterlevel, color="blue", linestyle="--")
-
+    if height_ref is not None:
+        axis.set_ylabel(f"z in m{height_ref}")
+    else:
+        axis.set_ylabel(f"z in m")
+    # -------------------------------------------------
+    # Reference lines
+    # -------------------------------------------------
     axis.axvline(0, color="grey", linestyle="--", linewidth=1)
 
+    if waterlevel is not None:
+        axis.axhline(waterlevel, color="blue", linestyle="--", linewidth=1.2)
+
     if seabed is not None:
-        axis.axhline(seabed, color="brown", linestyle="-", linewidth=2)
+        axis.axhline(seabed, color="brown", linewidth=2)
+
+    # -------------------------------------------------
+    # Detect MP / TP / TOWER boundaries
+    # -------------------------------------------------
+    boundaries = []
+    for df in (MP, TP, TOWER):
+        if len(df) > 0:
+            boundaries.append(df["Top [m]"].max())
+            boundaries.append(df["Bottom [m]"].min())
+
+    boundaries = sorted(set(boundaries))
+
+    # -------------------------------------------------
+    # Engineering grid + ticks
+    # -------------------------------------------------
+    axis.set_axisbelow(True)
+
+    ymin, ymax = axis.get_ylim()
+    xmin, xmax = axis.get_xlim()
+
+    # ---------------- Y axis ----------------
+    y_major = np.arange(
+        np.floor(ymin / 50) * 50,
+        np.ceil(ymax / 50) * 50 + 1,
+        50
+    )
+    y_minor = np.arange(
+        np.floor(ymin / 10) * 10,
+        np.ceil(ymax / 10) * 10 + 1,
+        10
+    )
+
+    # Boundaries must be MAJOR ticks to get labels
+    y_major_all = sorted(set(y_major) | set(boundaries))
+    y_minor_all = sorted(set(y_minor) | set(boundaries))
+
+    axis.yaxis.set_major_locator(FixedLocator(y_major_all))
+    axis.yaxis.set_minor_locator(FixedLocator(y_minor_all))
+
+    axis.yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:.0f}"))
+
+    # ---------------- X axis ----------------
+    # Keep symmetric limits
+    max_x = max(abs(xmin), abs(xmax))
+    axis.set_xlim(-max_x, max_x)
+
+    x_major = np.arange(
+        np.floor(-max_x / 5) * 5,
+        np.ceil(max_x / 5) * 5 + 1,
+        5
+    )
+    x_minor = np.arange(
+        np.floor(-max_x / 1) * 1,
+        np.ceil(max_x / 1) * 1 + 1,
+        1
+    )
+
+    axis.xaxis.set_major_locator(FixedLocator(x_major))
+    axis.xaxis.set_minor_locator(FixedLocator(x_minor))
+
+    # Label only positive side (diameter = 2 * radius)
+    axis.xaxis.set_major_formatter(
+        FuncFormatter(lambda x, _: f"{2*x:.0f}" if x >= 0 else "")
+    )
+
+    # -------------------------------------------------
+    # Grid
+    # -------------------------------------------------
+    axis.grid(True, which="minor", axis="both", linewidth=0.3, alpha=0.5)
+    axis.grid(True, which="major", axis="both", linewidth=0.9, alpha=0.8)
+
+    # -------------------------------------------------
+    # Boundary lines (striped / dashed, on top)
+    # -------------------------------------------------
+    for z in boundaries:
+        axis.axhline(
+            z,
+            color="k",
+            linestyle=(0, (6, 4)),  # striped
+            linewidth=1.8,
+            zorder=5
+        )
 
     return fig
+
 
 
 def plot_Assambly_Build(excel_caller):
@@ -449,7 +509,7 @@ def plot_Assambly_Overview(excel_caller):
         seabed_level = None
 
     height_ref = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"]
-    if height_ref.empty:
+    if type(height_ref)!=str:
         height_ref = None
     else:
         height_ref = height_ref.values[0]
