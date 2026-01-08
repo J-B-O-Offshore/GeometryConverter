@@ -1,12 +1,13 @@
 import os
 import excel as ex
-import numpy as np
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import pandas as pd
 import misc as mc
 from matplotlib.patches import Rectangle, Arc, FancyArrow
-
+import numpy as np
+from matplotlib.patches import Rectangle, Arc
+from matplotlib.ticker import FixedLocator, FuncFormatter
 
 def get_JBO_colors(n, fixed_colors=None):
     """
@@ -290,11 +291,51 @@ def plot_cans(Structure, axis, show_section_numbers=False, set_lims=True, **plot
             axis.text(0, (down_left[1] + up_left[1]) / 2, int(can["Section"]),
                       fontsize=8, ha='center', va='center', fontweight='bold')
 
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle, Arc
-from matplotlib.ticker import FixedLocator, FuncFormatter
+
 def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height_ref=None, RNA=None):
+    """
+    Plot a vertical assembly of a wind turbine or similar structure, including monopile (MP), transition piece (TP),
+    tower sections, optional skirt, seabed, water level, and optionally RNA (Rotor-Nacelle Assembly) components.
+
+    Parameters
+    ----------
+    WHOLE_STRUCTURE : pandas.DataFrame
+        DataFrame containing the structure sections with at least the following columns:
+        - 'Affiliation': section type ('MP', 'TP', 'TOWER')
+        - 'Top [m]': top elevation of the section
+        - 'Bottom [m]': bottom elevation of the section
+        - 'D, top [m]': diameter at the top of the section
+    SKIRT : pandas.DataFrame, optional
+        DataFrame of skirt elements, plotted in red if provided. Default is None.
+    seabed : float, optional
+        Elevation of the seabed. If provided, a solid brown line is drawn. Default is None.
+    waterlevel : float, optional
+        Elevation of the water level. Drawn as a dashed blue line. Default is 0.
+    height_ref : str, optional
+        Text to append to the y-axis label to indicate reference (e.g., "(LAT)"). Default is None.
+    RNA : dict, optional
+        Dictionary defining the rotor-nacelle assembly (RNA) to be plotted at the top of the structure. Expected keys:
+        - 'dz_com': relative height of the center of mass above top of structure
+        - 'dz_hub': relative height of the hub above top of structure
+        - 'diameter': rotor diameter
+        - 'info': text label for RNA
+        - 'color': optional color for RNA elements (default: 'darkgreen')
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+        The figure object containing the plotted assembly.
+
+    Notes
+    -----
+    - Sections are colored: MP (black), TP (blue), TOWER (grey), SKIRT (red, semi-transparent).
+    - Boundaries between sections are marked with striped horizontal lines.
+    - Major and minor grids are added for clarity, and axes are symmetrically scaled.
+    - If RNA is provided, a secondary right y-axis is created to show relative heights to the RNA interface,
+      including the center of mass, hub, rotor diameter, and label annotation.
+    - X-axis shows diameter (2 × radius) for positive side only; y-axis is elevation in meters.
+    """
+
     fig, axis = plt.subplots(1, 1, figsize=[8, 27])
 
     # -------------------------------------------------
@@ -465,10 +506,11 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height
             label_x, label_y,
             f"D = {rotor_diameter:.2f} m",
             color="red",
-            fontsize=10,
+            fontsize=15,
             ha="center",
             va="bottom",
-            zorder=9
+            zorder=9,
+            fontweight="bold"
         )
         rax.text(
             0,  # x-position (centered)
@@ -562,7 +604,6 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height
     return fig
 
 
-
 def plot_Assambly_Build(excel_caller):
     """
     Reads structural component data from an Excel workbook, assembles the offshore structure,
@@ -607,6 +648,7 @@ def plot_Assambly_Build(excel_caller):
     TP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TP_DATA", dtype=float, dropnan=True)
     TOWER = ex.read_excel_table(excel_filename, "BuildYourStructure", f"TOWER_DATA", dtype=float, dropnan=True)
     META_MP = ex.read_excel_table(excel_filename, "BuildYourStructure", f"MP_META", dropnan=True)
+    RNA_SORCE = ex.read_excel_table(excel_filename, "StructureOverview", f"RNA", dropnan=True)
 
     MP["Affiliation"] = "MP"
     TP["Affiliation"] = "TP"
@@ -624,9 +666,40 @@ def plot_Assambly_Build(excel_caller):
         seabed = None
         height_ref = None
 
+    if len(RNA_SORCE) > 0:
+        RNA = dict()
+
+        # Helper function to safely get a value or a default
+        def safe_value(df, key, default=float('nan'), expected_type=float):
+            val = df.get(key)
+            if val is None or not isinstance(val.values[0], expected_type):
+                return default
+            return val.values[0]
+
+        # Assign values to RNA dictionary
+        RNA["dz_com"] = safe_value(RNA_SORCE, "Vertical Offset TT_COG [m]", 0.0)
+        RNA["dz_hub"] = safe_value(RNA_SORCE, "Vertical Offset TT to HH [m]", 0.0)
+        RNA["diameter"] = safe_value(RNA_SORCE, "Rotor Diameter [m]", 0.0)
+        RNA["power"] = safe_value(RNA_SORCE, "Power [MW]", float("nan"))
+        RNA["mass"] = safe_value(RNA_SORCE, "Mass of RNA [kg]", float("nan"))
+        RNA["inertia_fore"] = safe_value(RNA_SORCE, "Inertia of RNA fore-aft @COG [kg m^2]", float("nan"))
+        RNA["inertia_side"] = safe_value(RNA_SORCE, "Inertia of RNA side-side @COG [kg m^2]", float("nan"))
+        RNA["name"] = safe_value(RNA_SORCE, "Name", "", str)
+
+        # Construct info string
+        RNA["info"] = (
+            f"{RNA['name']}\n"
+            f"Power [MW]: {RNA['power']}\n"
+            f"Mass [kg]: {RNA['mass']}\n"
+            f"Inertia fore-aft/side-side @COG [kg m^2]:\n"
+            f"{RNA['inertia_fore']} / {RNA['inertia_side']}"
+        )
+    else:
+        RNA = None
+
     WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, strict_build=False, overlapp_mode="Skirt")
 
-    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0, height_ref=height_ref)
+    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0, height_ref=height_ref, RNA = RNA)
     ex.insert_plot(Fig, excel_filename, "BuildYourStructure", f"Assambly_plot")
 
 
@@ -660,13 +733,36 @@ def plot_Assambly_Overview(excel_caller):
         height_ref = height_ref.values[0]
 
     if len(RNA_SORCE) > 0:
-        RNA=dict()
-        RNA["dz_com"] = RNA_SORCE["Vertical Offset TT_COG [m]"].values[0]
-        RNA["dz_hub"] = RNA_SORCE["Vertical Offset TT to HH [m]"].values[0]
-        RNA["diameter"] = RNA_SORCE["Rotor Diameter [m]"].values[0]
-        RNA["info"] = f"{RNA_SORCE['Name'].values[0]}" + "\n" + f"Mass [kg]: {RNA_SORCE['Mass of RNA [kg]'].values[0]}" + "\n" + f"Inertia fore-aft/side-side @COG [kg m^2]:" + "\n" + f"{RNA_SORCE['Inertia of RNA fore-aft @COG [kg m^2]'].values[0]} /  {RNA_SORCE['Inertia of RNA side-side @COG [kg m^2]'].values[0]}"
+        RNA = dict()
+
+        # Helper function to safely get a value or a default
+        def safe_value(df, key, default=float('nan'), expected_type=float):
+            val = df.get(key)
+            if val is None or not isinstance(val.values[0], expected_type):
+                return default
+            return val.values[0]
+
+        # Assign values to RNA dictionary
+        RNA["dz_com"] = safe_value(RNA_SORCE, "Vertical Offset TT_COG [m]", 0.0)
+        RNA["dz_hub"] = safe_value(RNA_SORCE, "Vertical Offset TT to HH [m]", 0.0)
+        RNA["diameter"] = safe_value(RNA_SORCE, "Rotor Diameter [m]", 0.0)
+        RNA["power"] = safe_value(RNA_SORCE, "Power [MW]", float("nan"))
+        RNA["mass"] = safe_value(RNA_SORCE, "Mass of RNA [kg]", float("nan"))
+        RNA["inertia_fore"] = safe_value(RNA_SORCE, "Inertia of RNA fore-aft @COG [kg m^2]", float("nan"))
+        RNA["inertia_side"] = safe_value(RNA_SORCE, "Inertia of RNA side-side @COG [kg m^2]", float("nan"))
+        RNA["name"] = safe_value(RNA_SORCE, "Name", "", str)
+
+        # Construct info string
+        RNA["info"] = (
+            f"{RNA['name']}\n"
+            f"Power [MW]: {RNA['power']}\n"
+            f"Mass [kg]: {RNA['mass']}\n"
+            f"Inertia fore-aft/side-side @COG [kg m^2]:\n"
+            f"{RNA['inertia_fore']} / {RNA['inertia_side']}"
+        )
     else:
         RNA = None
+
     Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, waterlevel=water_level, seabed=-seabed_level, height_ref=height_ref, RNA=RNA)
 
     ex.insert_plot(Fig, excel_filename, "StructureOverview", f"Assambly_plot_Overview2")
@@ -854,4 +950,3 @@ def plot_py_curves(data, max_lines=10, crop_symetric=False, loadcase=None):
     fig.tight_layout()
     return fig
 
-plot_Assambly_Overview("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm")

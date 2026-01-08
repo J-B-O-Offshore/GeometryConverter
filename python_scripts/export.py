@@ -530,7 +530,7 @@ def run_JBOOST_excel(excel_caller, export_path=""):
                 modelname=Model_name,
                 write_JBOOST_graph=True
             )
-            JBOOST_OUT = pe.run_JBOOST(jboost_path, proj_text, struct_text, set_calculation={"FEModul": True, "FreqDomain": True, "HindValid": False})
+            JBOOST_OUT = pe.run_JBOOST(jboost_path, proj_text, struct_text, set_calculation=None)
 
             sheet_names = []
             sheets = []
@@ -574,8 +574,6 @@ def run_JBOOST_excel(excel_caller, export_path=""):
         ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW", result_table)
 
         ex.insert_plot(FIG, excel_filename, "ExportStructure", f"FIG_JBOOST_MODESHAPES")
-
-
 
     return
 
@@ -834,7 +832,6 @@ def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=No
         cut_embedded = True
         PY_loadcase_spring_heights = None
 
-
     Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
         Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META,
         cut_embedded=cut_embedded, PY_springs=PY_loadcase_spring_heights, soil_density=soil_density
@@ -871,11 +868,11 @@ def plot_bladed_py(excel_caller, py_path, selected_loadcase):
 
     max_lines = Bladed_Settings.loc[Bladed_Settings["Parameter"] == "py lines per axis", "Value"].values[0]
 
-    basename = STRUCTURE_META.loc[ STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
-    if basename is None:
-        basename = "Bladed_PJ_file"
-
-    Bladed_Settings.loc[Bladed_Settings["Parameter"] == "PJ file name", "Value"] = basename + f"_{selected_loadcase}"
+    basename = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
+    if type(basename)!=str:
+        Bladed_Settings.loc[Bladed_Settings["Parameter"] == "PJ file name", "Value"] = f"{selected_loadcase}"
+    else:
+        Bladed_Settings.loc[Bladed_Settings["Parameter"] == "PJ file name", "Value"] = basename + f"_{selected_loadcase}"
 
     try:
         PY_data = pe.read_geo_py_curves(py_path)
@@ -1175,3 +1172,6 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_stiff_path, Bladed_pj_export_pat
 # excel_caller  = "C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm"
 # #
 # export_JBOOST(excel_caller, ".")
+
+
+run_JBOOST_excel("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", export_path="")
