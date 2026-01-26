@@ -20,6 +20,7 @@ try:
 except Exception:
     pass
 
+
 def check_values(df: pd.DataFrame, columns=None, mode='missing') -> list[str]:
     """
     Check for missing or present values in specified columns of a DataFrame.
@@ -119,7 +120,7 @@ def check_marine_growth(mg: pd.DataFrame, name: str = "MARINE_GROWTH") -> tuple[
     return True, ""
 
 
-def check_appurtenances(apps: pd.DataFrame) -> tuple[bool, str]:
+def check_appurtenances(apps: pd.DataFrame, required_cols=None) -> tuple[bool, str]:
     """
     Validate an appurtenances DataFrame, including mutual exclusivity rules.
 
@@ -136,11 +137,12 @@ def check_appurtenances(apps: pd.DataFrame) -> tuple[bool, str]:
     tuple[bool, str]
         (True, "") if valid, else (False, error_message).
     """
-    required_cols = [
-        "Top [m]", "Bottom [m]", "Mass [kg]",
-        "Diameter [m]", "Orientation [°]", "Surface roughness [m]", "Name",
-        "Distance Axis to Axis [m]", "Gap between surfaces [m]"
-    ]
+    if required_cols is None:
+        required_cols = [
+            "Top [m]", "Bottom [m]", "Mass [kg]",
+            "Diameter [m]", "Orientation [°]", "Name",
+            "Distance Axis to Axis [m]", "Gap between surfaces [m]"
+        ]
 
     # Check required columns
     missing_cols = [col for col in required_cols if col not in apps.columns]
@@ -181,6 +183,7 @@ def check_appurtenances(apps: pd.DataFrame) -> tuple[bool, str]:
         return False, "Geometry specification issues:\n" + "\n".join(err_list)
 
     return True, ""
+
 
 
 def check_added_masses(masses: pd.DataFrame, name: str = "ADDITIONAL_MASSES") -> tuple[bool, str]:
@@ -240,6 +243,7 @@ def export_JBOOST(excel_caller, jboost_path):
     MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
     MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
     PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PARAMETER", dropnan=True)
+    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
     PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
     RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA", dropnan=True)
@@ -257,9 +261,9 @@ def export_JBOOST(excel_caller, jboost_path):
         return
 
     # check Geometry
-    sucess_GEOMETRY = mc.sanity_check_structure(excel_filename, GEOMETRY)
+    sucess_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY)
     if not sucess_GEOMETRY:
-        ex.show_message_box(excel_filename, "Geometry is messed up. Aborting.")
+        ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
         return
 
     Model_name = PARAMETERS.loc[PARAMETERS["Parameter"] == "ModelName", "Value"].values[0]
@@ -300,8 +304,8 @@ def export_JBOOST(excel_caller, jboost_path):
             dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "Steel Density", "Value"].values[0],
             addMass=0,
             member_id=1,
-            create_node_tolerance=PARAMETERS.loc[
-                PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[0],
+            create_node_tolerance=EXPORT_GLOBAL_META.loc[
+                EXPORT_GLOBAL_META["Parameter"] == "Minimal Node distance [m]", "Value"].values[0],
             seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
             waterlevel=config_struct["water_level"],
             return_structure=True
@@ -451,6 +455,7 @@ def run_JBOOST_excel(excel_caller, export_path=""):
         MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
         MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
         PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PARAMETER", dropnan=True)
+        EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
         STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
         PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
         RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA", dropnan=True)
@@ -470,9 +475,9 @@ def run_JBOOST_excel(excel_caller, export_path=""):
             return
 
         # check Geometry
-        sucess_GEOMETRY = mc.sanity_check_structure(excel_filename, GEOMETRY)
+        sucess_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY)
         if not sucess_GEOMETRY:
-            ex.show_message_box(excel_filename, "Geometry is messed up. Aborting.")
+            ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
             return
 
         Model_name = PARAMETERS.loc[PARAMETERS["Parameter"] == "ModelName", "Value"].values[0]
@@ -512,8 +517,8 @@ def run_JBOOST_excel(excel_caller, export_path=""):
                 dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "Steel Density", "Value"].values[0],
                 addMass=0,
                 member_id=1,
-                create_node_tolerance=PARAMETERS.loc[
-                    PARAMETERS["Parameter"] == "Dimensional tolerance for node generating [m]", "Value"].values[0],
+                create_node_tolerance=EXPORT_GLOBAL_META.loc[
+                    EXPORT_GLOBAL_META["Parameter"] == "Minimal Node distance [m]", "Value"].values[0],
                 seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
                 waterlevel=config_struct["water_level"],
                 return_structure=True
@@ -665,31 +670,57 @@ def create_JBOOST_soil_configs(excel_caller):
 def export_WLGen(excel_caller, WLGen_path):
     excel_filename = os.path.basename(excel_caller)
 
+    # ============================================================
+    # Read input tables
+    # ============================================================
     APPURTANCES_MASSES = ex.read_excel_table(excel_filename, "ExportStructure", "APPURTANCES", dropnan=True)
+
     STRUCTURE = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
-    STRUCTURE = STRUCTURE.drop(columns=["Section", "local Section"])
+    STRUCTURE = STRUCTURE.drop(columns=["Section", "local Section"], errors="ignore")
+
     MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
     SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", "SKIRT", dropnan=True)
 
-    APPURTANCES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "WL", :]
-    ADDITIONAL_MASSES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "AM", :]
+    EXPORT_GLOBAL_META = ex.read_excel_table(
+        excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True
+    )
 
-    # check APP
+    # ============================================================
+    # Split appurtances / masses
+    # ============================================================
+    APPURTANCES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "WL", :].copy()
+    ADDITIONAL_MASSES = APPURTANCES_MASSES.loc[APPURTANCES_MASSES.iloc[:, 0] == "AM", :].copy()
 
-    # cut of below waterline
+    # fill missing roughness
+    if "Surface roughness [m]" in APPURTANCES.columns:
+        APPURTANCES.loc[APPURTANCES["Surface roughness [m]"].isna(), "Surface roughness [m]"] = 0
+
+    # ============================================================
+    # Extract key parameters
+    # ============================================================
     z_wl = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0]
-    STRUCTURE = mc.add_element(STRUCTURE, z_new=z_wl)
-    STRUCTURE = STRUCTURE[STRUCTURE["Bottom [m]"] >= z_wl]
+    tol_node = EXPORT_GLOBAL_META.loc[
+        EXPORT_GLOBAL_META["Parameter"] == "Minimal Node distance [m]", "Value"
+    ].values[0]
 
-    # only take MP and TP
-    MP = STRUCTURE.loc[STRUCTURE.loc[:, "Affiliation"] == "MP", :]
-    TP = STRUCTURE.loc[STRUCTURE.loc[:, "Affiliation"] == "TP", :]
+    # ============================================================
+    # Cut structure below waterline
+    # ============================================================
+    STRUCTURE = mc.add_element(STRUCTURE, z_new=z_wl)
+    STRUCTURE = STRUCTURE.loc[STRUCTURE["Bottom [m]"] >= z_wl].copy()
 
     if len(SKIRT) == 0:
         SKIRT = None
 
-    # check
+    # ============================================================
+    # Sanity checks
+    # ============================================================
+    sucess_GEOMETRY, msg = mc.sanity_check_structure(STRUCTURE)
+    if not sucess_GEOMETRY:
+        ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
+        return
+
     ok, err = check_added_masses(ADDITIONAL_MASSES, "ADDITIONAL_MASSES")
     if not ok:
         ex.show_message_box(excel_filename, f"WLGen Structure creation failed, problem with Added masses: {err}")
@@ -705,25 +736,43 @@ def export_WLGen(excel_caller, WLGen_path):
         ex.show_message_box(excel_filename, f"WLGen Structure creation failed, problem with Marine Growth: {err}")
         return
 
-    # run WGEN creation
+    # ============================================================
+    # Create WLGen file content
+    # ============================================================
     try:
-        text = pe.create_WLGen_file(APPURTANCES, ADDITIONAL_MASSES, MP, TP, MARINE_GROWTH, skirt=SKIRT)
+        text = pe.create_WLGen_file(
+            APPURTANCES,
+            ADDITIONAL_MASSES,
+            STRUCTURE,
+            MARINE_GROWTH,
+            skirt=SKIRT,
+            node_tol=tol_node,
+        )
     except Exception as e:
         ex.show_message_box(excel_filename, f"WLGen Structure could not be created: {e}")
         return
 
+    # ============================================================
+    # Resolve output filename
+    # ============================================================
     model_name = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
-    if model_name is None:
-        model_name = "input_WLGen.lua"
-        ex.show_message_box(excel_filename, f"No model name defined in Structure Overview. File named {model_name}.")
-    else:
-        model_name = model_name + ".lua"
 
-    WLGen_path = os.path.abspath(os.path.join(WLGen_path, model_name))
+    if not model_name:
+        model_name = "input_WLGen"
+        ex.show_message_box(
+            excel_filename,
+            f"No model name defined in Structure Overview. File named {model_name}.lua.",
+        )
 
-    with open(WLGen_path, 'w') as file:
+    out_path = os.path.abspath(os.path.join(WLGen_path, f"{model_name}.lua"))
+
+    # ============================================================
+    # Write output
+    # ============================================================
+    with open(out_path, "w") as file:
         file.write(text)
-    ex.show_message_box(excel_filename, f"WLGen Structure created successfully and saved at {WLGen_path}.")
+
+    ex.show_message_box(excel_filename, f"WLGen Structure created successfully and saved at {out_path}.")
     return
 
 def fill_WLGenMasses(excel_caller):
@@ -780,64 +829,124 @@ def fill_WLGenMasses(excel_caller):
 def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=None, py_path=None):
     excel_filename = os.path.basename(excel_caller)
     incluce_py_nodes = str_to_bool(incluce_py_nodes)
-    # Read inputs
+
+    # ============================================================
+    # Read input tables
+    # ============================================================
     Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
+    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
     Bladed_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Material", dropnan=True)
+
     GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
     MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
     MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
+
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
 
-    APPURTANCES = MASSES[MASSES["Top [m]"] != MASSES["Bottom [m]"]]
-    ADDITIONAL_MASSES = MASSES[MASSES["Top [m]"] == MASSES["Bottom [m]"]]
+    # ============================================================
+    # Extract key parameters
+    # ============================================================
     soil_density = Bladed_Settings.loc[
         Bladed_Settings["Parameter"] == "Soil density", "Value"
     ].values[0]
 
+    tol_node = EXPORT_GLOBAL_META.loc[
+        EXPORT_GLOBAL_META["Parameter"] == "Minimal Node distance [m]", "Value"
+    ].values[0]
 
-    # check
+    seabed_level = STRUCTURE_META.loc[
+        STRUCTURE_META["Parameter"] == "Seabed level", "Value"
+    ].values[0]
+
+    # ============================================================
+    # Sanity checks
+    # ============================================================
+    sucess_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY)
+    if not sucess_GEOMETRY:
+        ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
+        return
+
+    # seabed must be inside geometry range
+    structure_top = GEOMETRY.loc[GEOMETRY.index[0], "Top [m]"]
+    structure_bottom = GEOMETRY.loc[GEOMETRY.index[-1], "Bottom [m]"]
+
+    if (seabed_level > structure_top) or (seabed_level < structure_bottom):
+        ex.show_message_box(
+            excel_filename,
+            "Seabed level has to be below the structure top and above or at the structure bottom. Aborting",
+        )
+        return
+
+    # ============================================================
+    # Split masses into point masses vs. line masses
+    # ============================================================
+    ADDITIONAL_MASSES = MASSES.loc[MASSES["Top [m]"] == MASSES["Bottom [m]"]].copy()
+    APPURTANCES = MASSES.loc[MASSES["Top [m]"] != MASSES["Bottom [m]"]].copy()
+
     ok, err = check_added_masses(ADDITIONAL_MASSES, "ADDITIONAL_MASSES")
     if not ok:
-        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Added masses: {err}")
+        ex.show_message_box(
+            excel_filename,
+            f"Bladed Structure creation failed, problem with Added masses: {err}",
+        )
         return
 
-    ok, err = check_appurtenances(APPURTANCES)
+    ok, err = check_appurtenances(APPURTANCES, required_cols=["Top [m]", "Bottom [m]", "Mass [kg]",
+            "Diameter [m]"])
     if not ok:
-        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Appurtances definition: {err}")
-        return
+        ex.show_message_box(
+            excel_filename,
+            "Attention! Some added line masses dont have all the information to be used for marine growth calculation: "
+            f"{err}",
+        )
 
     ok, err = check_marine_growth(MARINE_GROWTH, "MARINE_GROWTH")
     if not ok:
-        ex.show_message_box(excel_filename, f"Bladed Structure creation failed, problem with Marine Growth: {err}")
+        ex.show_message_box(
+            excel_filename,
+            f"Bladed Structure creation failed, problem with Marine Growth: {err}",
+        )
         return
 
-    if (STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0] > GEOMETRY.loc[GEOMETRY.index[0], "Top [m]"]) or (STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0] < GEOMETRY.loc[GEOMETRY.index[-1], "Bottom [m]"]):
-        ex.show_message_box(excel_filename,
-                            "Seabed level has to be below the structure top and above or at the structure bottom. Aborting")
-        return
-
+    # ============================================================
+    # Optional: include PY nodes
+    # ============================================================
     if incluce_py_nodes:
         PY_data = pe.read_geo_py_curves(py_path)
+
         if selected_loadcase not in PY_data:
             raise ValueError(f"Selected loadcase '{selected_loadcase}' not found in {py_path}.")
+
         PY_loadcase = PY_data[selected_loadcase]
 
         PY_loadcase_spring_heights = pd.Series(
             np.unique(PY_loadcase["z [m]"]),
-            index=np.unique(PY_loadcase["Spring [-]"])
+            index=np.unique(PY_loadcase["Spring [-]"]),
         )
+
         cut_embedded = False
-
     else:
-        cut_embedded = True
         PY_loadcase_spring_heights = None
+        cut_embedded = True
 
+    # ============================================================
+    # Build Bladed dataframes
+    # ============================================================
     Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
-        Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META,
-        cut_embedded=cut_embedded, PY_springs=PY_loadcase_spring_heights, soil_density=soil_density
+        Bladed_Material,
+        GEOMETRY,
+        MARINE_GROWTH,
+        MASSES,
+        STRUCTURE_META,
+        cut_embedded=cut_embedded,
+        PY_springs=PY_loadcase_spring_heights,
+        soil_density=soil_density,
+        tol_node=tol_node,
     )
 
+    # ============================================================
     # Write outputs
+    # ============================================================
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Elements", Bladed_Elements)
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
 
@@ -846,11 +955,10 @@ def fill_bladed_py_dropdown(excel_caller, py_path):
     py_path = os.path.abspath(py_path)
     excel_filename = os.path.basename(excel_caller)
 
-
     try:
         PY_data = pe.read_geo_py_curves(py_path)
     except ValueError as err:
-        ex.show_message_box(excel_filename, "PY data file could not be read, make sure it is the right format.")
+        ex.show_message_box(excel_filename, f"PY data file could not be read, make sure it is the right format: {err} ")
         ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
         return
 
@@ -869,7 +977,7 @@ def plot_bladed_py(excel_caller, py_path, selected_loadcase):
     max_lines = Bladed_Settings.loc[Bladed_Settings["Parameter"] == "py lines per axis", "Value"].values[0]
 
     basename = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
-    if type(basename)!=str:
+    if type(basename) != str:
         Bladed_Settings.loc[Bladed_Settings["Parameter"] == "PJ file name", "Value"] = f"{selected_loadcase}"
     else:
         Bladed_Settings.loc[Bladed_Settings["Parameter"] == "PJ file name", "Value"] = basename + f"_{selected_loadcase}"
@@ -891,6 +999,7 @@ def plot_bladed_py(excel_caller, py_path, selected_loadcase):
 
 
     return
+
 
 def update_bladed_name(excel_caller, selected_loadcase):
     excel_filename = os.path.basename(excel_caller)
@@ -969,6 +1078,7 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
     try:
         Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
         Bladed_Material = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Material", dropnan=True)
+        EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
         GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
         MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
         MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
@@ -991,9 +1101,13 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
         seabed_level = STRUCTURE_META.loc[
             STRUCTURE_META["Parameter"] == "Seabed level", "Value"
         ].values[0]
+        tol_node = EXPORT_GLOBAL_META.loc[
+            EXPORT_GLOBAL_META["Parameter"] == "Minimal Node distance [m]", "Value"
+        ].values[0]
     except Exception:
-        ex.show_message_box(excel_filename, "Missing or invalid parameters in Bladed_Settings or STRUCTURE_META.")
+        ex.show_message_box(excel_filename, "Missing or invalid parameters in Bladed_Settings or STRUCTURE_META or EXPORT_GLOBAL_META")
         return
+
 
     # --- Path assignmet ---
     if insert_mode:
@@ -1066,8 +1180,8 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
         )
 
         Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
-            Bladed_Settings, Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META,
-            cut_embedded=False, PY_springs=PY_loadcase_spring_heights, soil_density=soil_density
+            Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META,
+            cut_embedded=False, PY_springs=PY_loadcase_spring_heights, soil_density=soil_density, tol_node=tol_node
         )
     except Exception as err:
         ex.show_message_box(excel_filename, f"Error building Bladed dataframes: {err}")
@@ -1170,4 +1284,4 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_stiff_path, Bladed_pj_export_pat
     return
 
 
-fill_Bladed_table("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", incluce_py_nodes=False, selected_loadcase=None, py_path=None)
+export_WLGen("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "")

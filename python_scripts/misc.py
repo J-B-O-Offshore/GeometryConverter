@@ -34,39 +34,41 @@ def valid_data(data):
         return False, data
 
 
-def sanity_check_structure(excel_filename, df):
-    required_cols = ["Top [m]", "Bottom [m]"]
+def sanity_check_structure(df):
+    """
+    Returns
+    -------
+    ok : bool
+        True if sanity check passed, otherwise False
+    error_msg : str or None
+        None if ok=True, otherwise an explanation
+    """
+    try:
+        required_cols = ["Top [m]", "Bottom [m]"]
 
-    if not all(col in df.columns for col in required_cols):
-        ex.show_message_box(excel_filename, "Missing columns: 'Top [m]' or 'Bottom [m]'.")
-        return False
+        missing = [col for col in required_cols if col not in df.columns]
+        if missing:
+            msg = f"Missing columns: {missing}."
+            return False, msg
 
-    # Calculate difference between the bottom of one section and the top of the next
-    height_diff = df["Top [m]"].values[1:] - df["Bottom [m]"].values[:-1]
-    # check, if sections are on top of each other
+        # Calculate difference between the bottom of one section and the top of the next
+        height_diff = df["Top [m]"].values[1:] - df["Bottom [m]"].values[:-1]
 
-    if not np.allclose(height_diff, 0, atol=1e-6):
-        # Get indices of problematic sections (the next section that doesn't align)
-        misaligned_indices = [
-            df.index[i + 1] for i, diff in enumerate(height_diff) if abs(diff) > 1e-6
-        ]
-        ex.show_message_box(
-            excel_filename,
-            f"The sections overlap or have gaps between them at index/indices: {misaligned_indices}."
-        )
-        return False
+        if not np.allclose(height_diff, 0, atol=1e-6):
+            misaligned_indices = [
+                df.index[i + 1] for i, diff in enumerate(height_diff) if abs(diff) > 1e-6
+            ]
+            msg = (
+                "The sections overlap or have gaps between them at "
+                f"index/indices: {misaligned_indices}."
+            )
+            return False, msg
 
-    return True
+        return True, None
 
-
-def check_convert_structure(excel_filename, df: pd.DataFrame, Table):
-    success, df = valid_data(df)
-    if not success:
-        ex.show_message_box(excel_filename, f"The {Table} table contains invalid data (nan or non numerical).")
-        return success, df
-
-    success = sanity_check_structure
-    return success, df
+    except Exception as e:
+        msg = f"Sanity check failed due to an unexpected error: {e}"
+        return False, msg
 
 
 def center_of_mass_hollow_frustum(d1, d2, z_bot, z_top, t):
@@ -558,20 +560,45 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
     TP_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TP_MASSES", dropnan=True)
     TOWER_MASSES = ex.read_excel_table(excel_filename, "BuildYourStructure", "TOWER_MASSES", dropnan=True)
 
-    # Quality Checks/Warings of single datasets, if any fail fataly, abort
-    sucess_MP, MP_DATA = check_convert_structure(excel_filename, MP_DATA, "MP")
-    sucess_TP, TP_DATA = check_convert_structure(excel_filename, TP_DATA, "TP")
-    sucess_TOWER, TOWER_DATA = check_convert_structure(excel_filename, TOWER_DATA, "TOWER")
-    # Read dropdown values of Identifieres
+    # Quality Checks/Warnings of single datasets, if any fail fatally, abort
+    sucess_MP, MP_DATA = valid_data(MP_DATA)
+    if not sucess_MP:
+        ex.show_message_box(excel_filename, "The MP table contains invalid data (nan or non numerical).")
+        return
 
+    sucess_MP, err_MP = sanity_check_structure(MP_DATA)
+    if not sucess_MP:
+        ex.show_message_box(excel_filename, f"MP sanity check failed: {err_MP}")
+        return
+
+    sucess_TP, TP_DATA = valid_data(TP_DATA)
+    if not sucess_TP:
+        ex.show_message_box(excel_filename, "The TP table contains invalid data (nan or non numerical).")
+        return
+
+    sucess_TP, err_TP = sanity_check_structure(TP_DATA)
+    if not sucess_TP:
+        ex.show_message_box(excel_filename, f"TP sanity check failed: {err_TP}")
+        return
+
+    sucess_TOWER, TOWER_DATA = valid_data(TOWER_DATA)
+    if not sucess_TOWER:
+        ex.show_message_box(excel_filename, "The TOWER table contains invalid data (nan or non numerical).")
+        return
+
+    sucess_TOWER, err_TOWER = sanity_check_structure(TOWER_DATA)
+    if not sucess_TOWER:
+        ex.show_message_box(excel_filename, f"TOWER sanity check failed: {err_TOWER}")
+        return
+
+    # Read dropdown values of Identifiers
     Structue_Components.loc[Structue_Components["Component"] == "MP", "Name"] = MP_identifier
     Structue_Components.loc[Structue_Components["Component"] == "TP", "Name"] = TP_identifier
     Structue_Components.loc[Structue_Components["Component"] == "TOWER", "Name"] = TOWER_identifier
     Structue_Components.loc[Structue_Components["Component"] == "RNA", "Name"] = RNA_identifier
 
-
     if len(MP_DATA) == 0:
-        ex.show_message_box(excel_filename, f"Please provide a MP structure to assamble.")
+        ex.show_message_box(excel_filename, "Please provide a MP structure to assamble.")
         return
 
     if len(TP_DATA) == 0:
@@ -582,9 +609,6 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
 
     if len(TOWER_MASSES) == 0:
         TOWER_MASSES = None
-
-    if not all([sucess_MP, sucess_TP, sucess_TOWER]):
-        return
 
     # RNA choosing
     if RNA_identifier == "":

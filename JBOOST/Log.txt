@@ -10,306 +10,306 @@
   ║╠╩╗║ ║  ║ ║╠╣ ╠╣ ╚═╗╠═╣║ ║╠╦╝║╣   ╚═╗╠═╝║╣ ║   ║ ╠╦╝╠═╣║     ║ ║ ║║ ║║  ╚═╗║╣  ║  
  ╚╝╚═╝╚═╝  ╚═╝╚  ╚  ╚═╝╩ ╩╚═╝╩╚═╚═╝  ╚═╝╩  ╚═╝╚═╝ ╩ ╩╚═╩ ╩╩═╝   ╩ ╚═╝╚═╝╩═╝╚═╝╚═╝ ╩  
 
-1/8/2026 2:10:56 PM	Application starts...
-1/8/2026 2:10:56 PM	running in Lua scripting modus...
+1/13/2026 1:22:50 PM	Application starts...
+1/13/2026 1:22:50 PM	running in Lua scripting modus...
 
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE node data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read FE element data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read turbulence data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read weibull data
-1/8/2026 2:10:56 PM	read config data
-1/8/2026 2:10:56 PM	read FE module config data
-1/8/2026 2:10:56 PM	read ocean module config data
-1/8/2026 2:10:56 PM	read marine growth data
-1/8/2026 2:10:56 PM	read marine growth data
-1/8/2026 2:10:56 PM	read marine growth data
-1/8/2026 2:10:56 PM	read marine growth data
-1/8/2026 2:10:56 PM	read FDA module config data
-1/8/2026 2:10:56 PM	running FE Analysis...
-1/8/2026 2:10:57 PM	FE-solution found...
-1/8/2026 2:10:57 PM	FE-solution found...
-1/8/2026 2:10:57 PM	FE-Analysis running...
-1/8/2026 2:10:57 PM	Saving data in text files...
-1/8/2026 2:10:57 PM	... saving results in: C:\Users\aaron.lange\Desktop\Projekte\Geometrie_Converter\GeometryConverter\JBOOST\Results_JBOOST_Text
-1/8/2026 2:10:57 PM	Start writing output ASCII file...
-1/8/2026 2:10:57 PM	Start writing output Excel file...
-1/8/2026 2:11:02 PM	...generate relevant plots...
-1/8/2026 2:11:03 PM	FDA data is not available!
-1/8/2026 2:11:03 PM	Weibull tables not available
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE node data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read FE element data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read turbulence data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read weibull data
+1/13/2026 1:22:50 PM	read config data
+1/13/2026 1:22:50 PM	read FE module config data
+1/13/2026 1:22:50 PM	read ocean module config data
+1/13/2026 1:22:50 PM	read marine growth data
+1/13/2026 1:22:50 PM	read marine growth data
+1/13/2026 1:22:50 PM	read marine growth data
+1/13/2026 1:22:50 PM	read marine growth data
+1/13/2026 1:22:50 PM	read FDA module config data
+1/13/2026 1:22:50 PM	running FE Analysis...
+1/13/2026 1:22:51 PM	FE-solution found...
+1/13/2026 1:22:51 PM	FE-solution found...
+1/13/2026 1:22:51 PM	FE-Analysis running...
+1/13/2026 1:22:51 PM	Saving data in text files...
+1/13/2026 1:22:51 PM	... saving results in: C:\Users\aaron.lange\Desktop\Projekte\Geometrie_Converter\GeometryConverter\JBOOST\Results_JBOOST_Text
+1/13/2026 1:22:51 PM	Start writing output ASCII file...
+1/13/2026 1:22:51 PM	Start writing output Excel file...
+1/13/2026 1:22:52 PM	...generate relevant plots...
+1/13/2026 1:22:52 PM	FDA data is not available!
+1/13/2026 1:22:52 PM	Weibull tables not available
