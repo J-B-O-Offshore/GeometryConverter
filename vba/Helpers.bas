@@ -712,20 +712,24 @@ Sub ShowOnlySelectedColumns(rngAllCols As String, rngVisibleCols As String)
     Application.EnableEvents = True
     Application.Calculation = xlCalculationAutomatic
 End Sub
-
 Sub toggle_folding()
-    Dim groupRow As Integer
-    groupRow = 28 ' ?? Change to the row ABOVE the group
 
-    With Rows(groupRow)
-        If .OutlineLevel > 1 Then
-            .ShowDetail = Not .ShowDetail ' ? Toggle (fold/unfold)
-        Else
-            MsgBox "Row " & groupRow & " is not grouped.", vbExclamation
-        End If
-    End With
+    Dim groupRow As Long
+    groupRow = 26  ' row where you EXPECT the +/- to be
+
+    Dim r As Range
+    Set r = Rows(groupRow).EntireRow
+
+    On Error GoTo fail
+
+    ' Toggle
+    r.ShowDetail = Not r.ShowDetail
+    Exit Sub
+
+fail:
+    MsgBox "Cannot toggle folding at row " & groupRow & "." & vbCrLf & _
+           "Make sure this row is the OUTLINE SUMMARY row (the one with the +/- symbol).", vbExclamation
 End Sub
-
 Sub DeleteNamedRange_AllScopes()
     Dim nm As name
     For Each nm In ThisWorkbook.Names

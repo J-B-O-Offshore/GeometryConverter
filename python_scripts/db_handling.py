@@ -13,6 +13,14 @@ from ALaPy import misc as mc
 
 
 META_dtypes = [str, str, str, str, str, float, str, str]
+META_dtpes_dict = {"Name":str,
+                   "Project ID":str,
+                   "Phase":str,
+                   "Structure ID":str,
+                   "Author":str,
+                   "Water Depth [m]":float,
+                   "Height Reference":str,
+                   "Comments":str}
 
 class ConciveError(Exception):
     """
@@ -207,8 +215,10 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
         Path to the SQLite database file (supports UNC paths).
     Identifier : str
         Name of the table to load.
-    dtype : dict, optional
+    dtype : dict or type, optional
         Column types to enforce.
+        - If dict, keys are column names and values are the types.
+        - If a single type, it will be applied to all columns.
 
     Returns
     -------
@@ -227,7 +237,7 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
 
     try:
         conn = sqlite3.connect(f"file:{db_path}?mode=rw", uri=True)
-    except sqlite3.Error as e:
+    except sqlite3.Error:
         ex.show_message_box(
             excel_filename,
             f"The path '{db_path}' does not lead to a valid SQLite database. Try reloading the database."
@@ -277,16 +287,24 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
     if 'index' in df.columns:
         df = df.drop(columns=['index'])
 
+    # Apply dtype
+    # Convert dtype="str" to empty string
+    if dtype == "str":
+        dtype = ""
+
     if dtype is not None:
         try:
-            df = df.astype(dtype)
+            if isinstance(dtype, dict):
+                df = df.astype(dtype)
+            else:
+                # Single type applied to all columns
+                df = df.astype({col: dtype for col in df.columns})
         except Exception as e:
             ex.show_message_box(
                 excel_filename,
                 f"Failed to apply data types {dtype} to table '{Identifier}'.\nPython Error: {e}"
             )
             return None
-
     return df
 
 
@@ -318,7 +336,7 @@ def add_db_element(excel_filename, db_path, Structure_data, added_masses_data, M
     """
 
     # --- 1. Load existing META table and validate ---
-    META = load_db_table(excel_filename, db_path, "META")
+    META = load_db_table(excel_filename, db_path, "META", dtype=META_dtpes_dict)
     if META is None:
         # Exit early if META table could not be loaded
         return False, None
@@ -418,7 +436,7 @@ def delete_db_element(excel_filename, db_path, Identifier):
         - '{Identifier}__ADDED_MASSES'
     - If any step fails, an error message is shown and the operation is aborted.
     """
-    META = load_db_table(excel_filename, db_path, "META")
+    META = load_db_table(excel_filename, db_path, "META", dtype=META_dtpes_dict)
     if META is None:
         return False
 
@@ -472,7 +490,7 @@ def replace_db_element(excel_filename, db_path, Structure_data, added_masses_dat
     - The function checks for duplicate identifiers before proceeding.
     """
 
-    META = load_db_table(excel_filename, db_path, "META", dtype=str)
+    META = load_db_table(excel_filename, db_path, "META", dtype=META_dtpes_dict)
     if META is None:
         return False, None
 
@@ -592,7 +610,7 @@ def load_META(excel_filename, Structure, db_path):
     """
     sheet_name_structure_loading = "BuildYourStructure"
 
-    META = load_db_table(excel_filename, db_path, "META")
+    META = load_db_table(excel_filename, db_path, "META", dtype=META_dtpes_dict)
     if META is None:
         return
 
@@ -608,7 +626,10 @@ def load_META(excel_filename, Structure, db_path):
         f"Dropdown_{Structure}_Structures2",
         META_sorted["Name"].values.tolist()
     )
-    ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_FULL", META_sorted)
+
+    success = ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_FULL", META_sorted)
+    if not success:
+        ex.show_message_box(excel_filename, f"Full {Structure} Meta table could not be loaded, as there is not enough space. Please insert rows to see the overview.")
     return
 
 
@@ -633,7 +654,9 @@ def load_DATA(excel_filename, Structure, Structure_name, db_path):
 
     sheet_name_structure_loading = "BuildYourStructure"
 
-    META = load_db_table(excel_filename, db_path, "META")
+    META = load_db_table(excel_filename, db_path, "META", dtype=META_dtpes_dict)
+    META["Water Depth [m]"]=META["Water Depth [m]"].astype("float")
+
     if META is None:
         return
 
@@ -650,6 +673,8 @@ def load_DATA(excel_filename, Structure, Structure_name, db_path):
 
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_TRUE", META_relevant)
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META", META_relevant)
+
+
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_DATA_TRUE", DATA)
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_DATA", DATA)
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_MASSES_TRUE", MASSES)
@@ -762,11 +787,15 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
         _ = ex.show_message_box(excel_filename, f"No changes detected.")
         return False, _
 
-    META_FULL = load_db_table(excel_filename, db_path, "META")
+    META_FULL = load_db_table(excel_filename, db_path, "META", dtype=META_dtpes_dict)
     if META_FULL is None:
         return
 
     META_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META", dtype=META_dtypes, dropnan=True)
+
+    if (Structure == "TP") or (Structure == "TOWER"):
+        META_CURR["Water Depth [m]"] = float("nan")
+
 
     META_CURR_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META_NEW", dtype=META_dtypes, dropnan=True)
 

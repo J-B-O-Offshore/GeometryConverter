@@ -161,13 +161,13 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     """
     Replace the contents of an existing Excel table with a pandas DataFrame using xlwings.
 
-    If the DataFrame is empty, the table is cleared but not resized or filled with rows.
+    SAFETY FEATURE:
+    - Before writing/resizing, checks if the resized table would overlap another table.
+    - If overlap is detected, NOTHING is written/cleared/resized and the function returns False.
 
-    Parameters:
-    - workbook_name: str, name of the open Excel workbook (no path needed if open).
-    - sheet_name: str, name of the sheet containing the table.
-    - table_name: str, name of the Excel table (ListObject) to manipulate.
-    - dataframe: pandas DataFrame to replace the table's data (same number of columns).
+    Returns:
+    - True  -> written successfully
+    - False -> aborted due to overlap
     """
     # Connect to the open workbook
     wb = xw.books[workbook_name]
@@ -179,9 +179,53 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     except Exception as e:
         raise ValueError(f"Table '{table_name}' not found in sheet '{sheet_name}'.") from e
 
-    # Get the header range and data body range
+    # Get header range (COM)
     header_range = table.HeaderRowRange
 
+    # If DataFrame is empty: clear contents only (NO resize)
+    if dataframe.empty:
+        try:
+            data_body_range = table.DataBodyRange
+            if data_body_range:
+                data_body_range.ClearContents()
+        except Exception:
+            pass
+        return True
+
+    # Clean DataFrame to avoid writing the index
+    df_clean = dataframe.reset_index(drop=True)
+
+    # Compute the new table range (xlwings Range + COM Range)
+    last_row = header_range.Row + df_clean.shape[0]
+    last_col = header_range.Column + df_clean.shape[1] - 1
+
+    new_range = ws.range(
+        (header_range.Row, header_range.Column),
+        (last_row, last_col)
+    )
+
+    # ------------------------------------------------------------
+    # OVERLAP CHECK (abort early, do NOT write anything)
+    # ------------------------------------------------------------
+    for other in ws.api.ListObjects:
+        if other.Name == table_name:
+            continue
+
+        other_range = other.Range  # COM Range
+
+        if _ranges_intersect(new_range.api, other_range):
+            # Abort: do not clear old table, do not write, do not resize
+            print(
+                f"[ABORT] Table '{table_name}' would overlap table '{other.Name}'. "
+                f"New range: {new_range.address}, Other range: {other_range.Address}"
+            )
+            return False
+
+    # ------------------------------------------------------------
+    # Safe to write now
+    # ------------------------------------------------------------
+
+    # Clear old data body contents (keep headers)
     try:
         data_body_range = table.DataBodyRange
         if data_body_range:
@@ -189,26 +233,14 @@ def write_df_to_table(workbook_name, sheet_name, table_name, dataframe):
     except Exception as e:
         print("No DataBodyRange to clear:", e)
 
-
-    # If the DataFrame is empty, return early after clearing
-    if dataframe.empty:
-        return
-
-    # Clean DataFrame to avoid writing the index
-    df_clean = dataframe.reset_index(drop=True)
-
     # Write the new DataFrame below the headers
     start_cell = ws.range((header_range.Row + 1, header_range.Column))
     start_cell.options(index=False, header=False).value = df_clean
 
     # Resize the table to match the new data
-    last_row = header_range.Row + df_clean.shape[0]
-    last_col = header_range.Column + df_clean.shape[1] - 1
-    new_range = ws.range(
-        (header_range.Row, header_range.Column),
-        (last_row, last_col)
-    )
     table.Resize(new_range.api)
+
+    return True
 
 
 def write_df_to_table_flexible(workbook_name, sheet_name, table_name, dataframe, headers=None):
@@ -413,6 +445,11 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=
 
     df = pd.DataFrame(raw_data, columns=headers)
 
+    if dropnan:
+        df = df.replace({"": np.nan, 'None': np.nan, 'NaN': np.nan})
+        df = df.infer_objects(copy=False)
+        df = df.dropna(how='all')
+
     # Apply dtype conversions
     if dtype is not None and dtype != str and not isinstance(dtype, list):
         df = df.astype(dtype)
@@ -433,11 +470,6 @@ def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=
     # Strip whitespace from string values if enabled
     if strip:
         df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
-
-    if dropnan:
-        df = df.replace({"": np.nan, 'None': np.nan, 'NaN': np.nan})
-        df = df.infer_objects(copy=False)
-        df = df.dropna(how='all')
 
     return df
 
@@ -730,6 +762,7 @@ def delete_figure(workbook_name, sheet_name, named_range):
     except Exception as e:
         print(f"⚠️ Could not delete picture {pic_name}: {e}")
 
+
 def read_named_range(path, name, sheet_name=None, dtype=None, use_header=True):
     """
     Read a named range from an Excel file (supports workbook-level and sheet-level names).
@@ -848,6 +881,7 @@ def save_excel_picture_as_png(workbook_path, sheet_name, picture_name, output_pa
     img.save(output_path, 'PNG')
     print(f"Saved picture as: {output_path}")
 
+
 def activate_sheet(workbook_name, sheet_name):
     """
     Activate a sheet in an already-open Excel workbook.
@@ -866,3 +900,16 @@ def activate_sheet(workbook_name, sheet_name):
     except Exception as e:
         print(f"⚠️ Could not activate sheet '{sheet_name}': {e}")
         return None
+
+
+def _ranges_intersect(r1, r2):
+    """Return True if two Excel ranges overlap."""
+    a1, a2 = r1.Row, r1.Row + r1.Rows.Count - 1
+    b1, b2 = r1.Column, r1.Column + r1.Columns.Count - 1
+
+    c1, c2 = r2.Row, r2.Row + r2.Rows.Count - 1
+    d1, d2 = r2.Column, r2.Column + r2.Columns.Count - 1
+
+    rows_overlap = not (a2 < c1 or c2 < a1)
+    cols_overlap = not (b2 < d1 or d2 < b1)
+    return rows_overlap and cols_overlap
