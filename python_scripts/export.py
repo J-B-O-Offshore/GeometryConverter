@@ -583,11 +583,15 @@ def run_JBOOST_excel(excel_caller, export_path=""):
     return
 
 
-def load_JBOOST_soil_file(excel_caller, path):
+def load_JBOOST_soil_file(excel_caller):
     excel_filename = os.path.basename(excel_caller)
+    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
+    soil_stiff_path = EXPORT_GLOBAL_META.loc[
+        EXPORT_GLOBAL_META["Parameter"] == "Soil Stiffness (Lateral Stiffness.csv)", "Value"
+    ].values[0]
 
     try:
-        _, sparse,_ = pe.read_soil_stiffness_matrix_csv(path)
+        _, sparse,_ = pe.read_soil_stiffness_matrix_csv(soil_stiff_path)
         sparse = sparse.T
 
         # Set default value for all columns
@@ -951,9 +955,13 @@ def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=No
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Nodes", Bladed_Nodes)
 
 
-def fill_bladed_py_dropdown(excel_caller, py_path):
-    py_path = os.path.abspath(py_path)
+def fill_bladed_py_dropdown(excel_caller):
     excel_filename = os.path.basename(excel_caller)
+    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
+
+    py_path = EXPORT_GLOBAL_META.loc[
+        EXPORT_GLOBAL_META["Parameter"] == "PY-path (Springs_(L).csv)", "Value"
+    ].values[0]
 
     try:
         PY_data = pe.read_geo_py_curves(py_path)
@@ -967,16 +975,20 @@ def fill_bladed_py_dropdown(excel_caller, py_path):
     return
 
 
-def plot_bladed_py(excel_caller, py_path, selected_loadcase):
-    py_path = os.path.abspath(py_path)
-    excel_filename = os.path.basename(excel_caller)
+def plot_bladed_py(excel_caller, selected_loadcase):
 
+    excel_filename = os.path.basename(excel_caller)
+    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
     Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
 
-    max_lines = Bladed_Settings.loc[Bladed_Settings["Parameter"] == "py lines per axis", "Value"].values[0]
+    py_path = EXPORT_GLOBAL_META.loc[
+        EXPORT_GLOBAL_META["Parameter"] == "PY-path (Springs_(L).csv)", "Value"
+    ].values[0]
 
+    max_lines = Bladed_Settings.loc[Bladed_Settings["Parameter"] == "py lines per axis", "Value"].values[0]
     basename = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
+
     if type(basename) != str:
         Bladed_Settings.loc[Bladed_Settings["Parameter"] == "PJ file name", "Value"] = f"{selected_loadcase}"
     else:
@@ -1015,7 +1027,7 @@ def update_bladed_name(excel_caller, selected_loadcase):
     return
 
 
-def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadcase, insert_mode=False, fig_path=None, update_tables=True):
+def apply_bladed_py_curves(excel_caller, Bladed_pj_path, selected_loadcase, insert_mode=False, fig_path=None, update_tables=True):
     """
     Apply p–y curves to a Bladed project by generating and inserting corresponding PJ files,
     figures, and updated structural data.
@@ -1055,6 +1067,12 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
         If the p–y curve data or required Excel fields are missing or malformed.
         :param update_tables:
     """
+    excel_filename = os.path.basename(excel_caller)
+    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
+
+    py_path = EXPORT_GLOBAL_META.loc[
+        EXPORT_GLOBAL_META["Parameter"] == "PY-path (Springs_(L).csv)", "Value"
+    ].values[0]
 
     insert_mode = str_to_bool(insert_mode)
     update_tables = str_to_bool(update_tables)
@@ -1107,7 +1125,6 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
     except Exception:
         ex.show_message_box(excel_filename, "Missing or invalid parameters in Bladed_Settings or STRUCTURE_META or EXPORT_GLOBAL_META")
         return
-
 
     # --- Path assignmet ---
     if insert_mode:
@@ -1227,11 +1244,14 @@ def apply_bladed_py_curves(excel_caller, py_path, Bladed_pj_path, selected_loadc
         return
 
 
-def load_Bladed_soil_file_mat(excel_caller, path):
+def load_Bladed_soil_file_mat(excel_caller):
     excel_filename = os.path.basename(excel_caller)
-
+    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
+    soil_stiff_path = EXPORT_GLOBAL_META.loc[
+        EXPORT_GLOBAL_META["Parameter"] == "Soil Stiffness (Lateral Stiffness.csv)", "Value"
+    ].values[0]
     try:
-        _, sparse, _ = pe.read_soil_stiffness_matrix_csv(path)
+        _, sparse, _ = pe.read_soil_stiffness_matrix_csv(soil_stiff_path)
         sparse = sparse.T
 
         sparse.insert(0, "Stiffness", sparse.index)
@@ -1247,17 +1267,21 @@ def load_Bladed_soil_file_mat(excel_caller, path):
     return
 
 
-def apply_bladed_stiff_mat(excel_caller, Bladed_stiff_path, Bladed_pj_export_path, config_name):
+def apply_bladed_stiff_mat(excel_caller, Bladed_pj_export_path, config_name):
     excel_filename = os.path.basename(excel_caller)
     Bladed_Nodes = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Nodes", dropnan=True)
     Bladed_Elements = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Elements", dropnan=True)
+    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    soil_stiff_path = EXPORT_GLOBAL_META.loc[
+        EXPORT_GLOBAL_META["Parameter"] == "Soil Stiffness (Lateral Stiffness.csv)", "Value"
+    ].values[0]
     seabed_level = STRUCTURE_META.loc[
         STRUCTURE_META["Parameter"] == "Seabed level", "Value"
     ].values[0]
 
     try:
-        _, _, stiff_mat  = pe.read_soil_stiffness_matrix_csv(Bladed_stiff_path)
+        _, _, stiff_mat  = pe.read_soil_stiffness_matrix_csv(soil_stiff_path)
 
         config_data = stiff_mat[config_name]
 
@@ -1284,4 +1308,3 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_stiff_path, Bladed_pj_export_pat
     return
 
 
-export_WLGen("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", "")
