@@ -9,6 +9,8 @@ import shutil
 from ALaPy import periphery as pe
 import itertools
 
+from collections import defaultdict
+
 import plot as plt
 # %% helpers
 os.environ["MPLBACKEND"] = "Agg"  # kein GUI nötig
@@ -95,7 +97,6 @@ def str_to_bool(s):
         return False
     else:
         raise ValueError(f"Invalid boolean value: {s}")
-
 
 # %% checks:
 def check_marine_growth(mg: pd.DataFrame, name: str = "MARINE_GROWTH") -> tuple[bool, str]:
@@ -227,128 +228,6 @@ def check_added_masses(masses: pd.DataFrame, name: str = "ADDITIONAL_MASSES") ->
 
 
 # %% JBOOST
-def export_JBOOST(excel_caller, jboost_path):
-    success = fill_JBOOST_auto_excel(excel_caller)
-
-    if not success:
-        return
-
-    excel_filename = os.path.basename(excel_caller)
-    jboost_path = os.path.abspath(jboost_path)
-
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    jboost_exe_path = os.path.join(os.path.dirname(script_dir), "JBOOST\\JBOOST.exe")
-
-    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
-    GEOMETRY = GEOMETRY.drop(columns=["Section", "local Section"])
-    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
-    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
-    PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PARAMETER", dropnan=True)
-    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
-    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
-    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
-    RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA", dropnan=True)
-
-    if len(RNA) == 0:
-        ex.show_message_box(excel_filename, "Please define RNA parameters. Aborting")
-        return
-
-    if PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "fore-aft":
-        RNA["Inertia"] = RNA["Inertia of RNA fore-aft @COG [kg m^2]"]
-    elif PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "side-side":
-        RNA["Inertia"] = RNA["Inertia of RNA side-side @COG [kg m^2]"]
-    else:
-        ex.show_message_box(excel_filename, "Please define 'side-side' or 'fore-aft' for RNA Inertia. Aborting")
-        return
-
-    # check Geometry
-    sucess_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY)
-    if not sucess_GEOMETRY:
-        ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
-        return
-
-    Model_name = PARAMETERS.loc[PARAMETERS["Parameter"] == "ModelName", "Value"].values[0]
-
-    # proj file
-    PROJECT = PROJECT.set_index("Project Settings")
-    default = PROJECT.loc[:, "default"]
-    proj_configs = PROJECT.iloc[:, 3:]
-
-    # --- fill defaults ---
-    proj_configs = fill_dataframe_with_defaults(proj_configs, default)
-    # -------------------------------------
-
-    # iterate through configs
-    for config_name, config_data in proj_configs.items():
-        config_struct = {row: data for row, data in config_data.items()}
-        config_struct.pop("runFEModul", None)
-        config_struct.pop("runFrequencyModul", None)
-
-        runFEModul = str_to_bool(config_data["runFEModul"])
-        runFrequencyModul = str_to_bool(config_data["runFrequencyModul"])
-
-        struct_text, NODES, _ = pe.create_JBOOST_struct(
-            GEOMETRY,
-            RNA,
-            (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Value"].values[0],
-             PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Unit"].values[0]),
-            (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Value"].values[0],
-             PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Unit"].values[0]),
-            MASSES=MASSES,
-            MARINE_GROWTH=MARINE_GROWTH,
-            defl_TP=(PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Value"].values[0],
-                     PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Unit"].values[0]),
-            ModelName=Model_name,
-            EModul=PARAMETERS.loc[PARAMETERS["Parameter"] == "EModul", "Value"].values[0],
-            fyk="355",
-            poisson="0.3",
-            dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "Steel Density", "Value"].values[0],
-            addMass=0,
-            member_id=1,
-            create_node_tolerance=EXPORT_GLOBAL_META.loc[
-                EXPORT_GLOBAL_META["Parameter"] == "Minimal Node distance [m]", "Value"].values[0],
-            seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
-            waterlevel=config_struct["water_level"],
-            return_structure=True
-        )
-
-        if config_struct["res_Nodes"] == 'auto':
-            idx_BORDER = NODES.loc[NODES["Affiliation"] == "BORDER"].index[-1]
-            nodes = NODES.loc[NODES.index<=idx_BORDER, "node"].values
-            config_struct["res_Nodes"] = "{" + ", ".join([f"{node:.1f}" for node in nodes]) + "}"
-
-        proj_text = pe.create_JBOOST_proj(
-            config_struct,
-            MARINE_GROWTH,
-            modelname=Model_name,
-            runFEModul=runFEModul,
-            runFrequencyModul=runFrequencyModul,
-            runHindcastValidation=False,
-            wavefile="wave.lua",
-            windfile="wind.lua",
-            write_JBOOST_graph=True
-        )
-
-        path_config = os.path.join(jboost_path, config_name)
-        os.makedirs(path_config, exist_ok=True)
-
-        path_proj = os.path.join(path_config, "proj.lua")
-        path_struct = os.path.join(path_config, Model_name + ".lua")
-
-        with open(path_proj, 'w') as file:
-            file.write(proj_text)
-        with open(path_struct, 'w') as file:
-            file.write(struct_text)
-
-    ex.show_message_box(
-        excel_filename,
-        f"JBOOST Structure {PARAMETERS.loc[PARAMETERS['Parameter'] == 'ModelName', 'Value'].values[0]} "
-        f"saved successfully at {jboost_path}"
-    )
-
-    return
-
-
 def fill_JBOOST_auto_excel(excel_caller):
     """
     Fills missing or automatically assigned values in the `JBOOST_PROJECT` Excel table
@@ -439,150 +318,207 @@ def fill_JBOOST_auto_excel(excel_caller):
     return True
 
 
-def run_JBOOST_excel(excel_caller, export_path=""):
+def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False):
+    """
+    Export JBOOST structure files and optionally run JBOOST from Excel data.
+
+    Parameters:
+    - excel_caller: str, path to the Excel file
+    - jboost_export_path: str, folder to save exported structure/proj files and results.
+                          If empty, defaults to the folder containing the Excel file.
+    - run_jboost: bool, if True, run JBOOST and export results
+    """
     success = fill_JBOOST_auto_excel(excel_caller)
+    run_jboost = str_to_bool(run_jboost)
 
-    if success:
-        excel_filename = os.path.basename(excel_caller)
+    if not success:
+        return
 
-        if len(export_path) > 0:
-            export_path = os.path.abspath(export_path)
+    excel_filename = os.path.basename(excel_caller)
+    if not jboost_export_path:
+        jboost_export_path = os.path.dirname(os.path.abspath(excel_caller))
+    else:
+        jboost_export_path = os.path.abspath(jboost_export_path)
 
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        jboost_path = os.path.join(os.path.dirname(script_dir), "JBOOST\\JBOOST.exe")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    jboost_exe_path = os.path.join(os.path.dirname(script_dir), "JBOOST", "JBOOST.exe")
 
-        GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
-        GEOMETRY = GEOMETRY.drop(columns=["Section", "local Section"])
-        MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
-        MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
-        PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PARAMETER", dropnan=True)
-        EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
-        STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
-        PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
-        RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA", dropnan=True)
+    # --- Read tables ---
+    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True).drop(columns=["Section", "local Section"])
+    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
+    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
+    PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PARAMETER", dropnan=True)
+    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
+    RNA = ex.read_excel_table(excel_filename, "StructureOverview", "RNA", dropnan=True)
 
+    if len(RNA) == 0:
+        ex.show_message_box(excel_filename, "Please define RNA parameters. Aborting")
+        return
+
+    # --- Set RNA inertia ---
+    inertia_type = PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0]
+    if inertia_type == "fore-aft":
+        RNA["Inertia"] = RNA["Inertia of RNA fore-aft @COG [kg m^2]"]
+    elif inertia_type == "side-side":
+        RNA["Inertia"] = RNA["Inertia of RNA side-side @COG [kg m^2]"]
+    else:
+        ex.show_message_box(excel_filename, "Please define 'side-side' or 'fore-aft' for RNA Inertia. Aborting")
+        return
+
+    # --- Check geometry ---
+    success_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY)
+    if not success_GEOMETRY:
+        ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
+        return
+
+    Model_name = PARAMETERS.loc[PARAMETERS["Parameter"] == "ModelName", "Value"].values[0]
+
+    JBOOST_bat_path = PARAMETERS.loc[PARAMETERS["Parameter"] == "JBOOST exe path", "Value"].values[0]
+    if JBOOST_bat_path is None:
+        JBOOST_bat_path = ""
+
+    # ----- create folders -----
+    folder_hierachy = PARAMETERS.loc[PARAMETERS["Parameter"] == "Folder Hierachy", "Value"].values[0]
+    folder_hierachy = str_to_bool(folder_hierachy)
+
+    configs = list(PROJECT.columns[4:])
+    if folder_hierachy:
+        config_paths = [os.path.join(jboost_export_path, path.replace("__", r"\\")) for path in configs]
+    else:
+        config_paths = [os.path.join(jboost_export_path, config) for config in configs]
+
+    # --- Project configurations ---
+    PROJECT = PROJECT.set_index("Project Settings")
+    default = PROJECT.loc[:, "default"]
+    proj_configs = fill_dataframe_with_defaults(PROJECT.iloc[:, 3:], default)
+
+    # --- Clear previous results if running JBOOST ---
+    if run_jboost:
         ex.clear_excel_table_contents(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW")
 
-        if len(RNA) == 0:
-            ex.show_message_box(excel_filename, "Please define RNA parameters. Aborting")
-            return
+    Modeshapes = {}
+    waterlevels = {}
 
-        if PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "fore-aft":
-            RNA["Inertia"] = RNA["Inertia of RNA fore-aft @COG [kg m^2]"]
-        elif PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0] == "side-side":
-            RNA["Inertia"] = RNA["Inertia of RNA side-side @COG [kg m^2]"]
-        else:
-            ex.show_message_box(excel_filename, "Please define 'side-side' or 'fore-aft' for RNA Inertia. Aborting")
-            return
+    # --- Iterate through configs ---
+    for (config_name, config_data), config_path in zip(proj_configs.items(), config_paths):
+        config_struct = {row: data for row, data in config_data.items()}
+        runFEModul = str_to_bool(config_struct.pop("runFEModul", "True"))
+        runFrequencyModul = str_to_bool(config_struct.pop("runFrequencyModul", "False"))
 
-        # check Geometry
-        sucess_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY)
-        if not sucess_GEOMETRY:
-            ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
-            return
+        # --- Create structure ---
+        struct_text, NODES, _ = pe.create_JBOOST_struct(
+            GEOMETRY,
+            RNA,
+            (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Value"].values[0],
+             PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Unit"].values[0]),
+            (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Value"].values[0],
+             PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Unit"].values[0]),
+            MASSES=MASSES,
+            MARINE_GROWTH=MARINE_GROWTH,
+            defl_TP=(PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Value"].values[0],
+                     PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Unit"].values[0]),
+            ModelName=Model_name,
+            EModul=PARAMETERS.loc[PARAMETERS["Parameter"] == "EModul", "Value"].values[0],
+            fyk="355",
+            poisson="0.3",
+            dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "Steel Density", "Value"].values[0],
+            addMass=0,
+            member_id=1,
+            create_node_tolerance=EXPORT_GLOBAL_META.loc[EXPORT_GLOBAL_META["Parameter"] == "Minimal Node distance [m]", "Value"].values[0],
+            seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
+            waterlevel=config_struct["water_level"],
+            return_structure=True
+        )
 
-        Model_name = PARAMETERS.loc[PARAMETERS["Parameter"] == "ModelName", "Value"].values[0]
+        # --- Auto nodes ---
+        if config_struct["res_Nodes"] == 'auto':
+            idx_BORDER = NODES.loc[NODES["Affiliation"] == "BORDER"].index[-1]
+            nodes = NODES.loc[NODES.index <= idx_BORDER, "node"].values
+            config_struct["res_Nodes"] = "{" + ", ".join([f"{node:.1f}" for node in nodes]) + "}"
 
-        # proj file
-        PROJECT = PROJECT.set_index("Project Settings")
-        default = PROJECT.loc[:, "default"]
-        proj_configs = PROJECT.iloc[:, 3:]
+        # --- Create proj text ---
+        proj_text = pe.create_JBOOST_proj(
+            config_struct,
+            MARINE_GROWTH,
+            modelname=Model_name,
+            runFEModul=runFEModul,
+            runFrequencyModul=runFrequencyModul,
+            runHindcastValidation=False,
+            wavefile="wave.lua",
+            windfile="wind.lua",
+            write_JBOOST_graph=True
+        )
 
-        # --- fill defaults ---
-        proj_configs = fill_dataframe_with_defaults(proj_configs, default)
-        # -------------------------------------
+        # -- Export
+        os.makedirs(config_path, exist_ok=True)
 
-        # iterate through configs
-        Modeshapes = {}
-        waterlevels = {}
-        for config_name, config_data in proj_configs.items():
-            config_struct = {row: data for row, data in config_data.items()}
-            config_struct.pop("runFEModul", None)
-            config_struct.pop("runFrequencyModul", None)
+        # --- Export proj and structure files ---
+        with open(os.path.join(config_path, "proj.lua"), 'w') as f:
+            f.write(proj_text)
+        with open(os.path.join(config_path, f"{Model_name}.lua"), 'w') as f:
+            f.write(struct_text)
+        with open(os.path.join(config_path, "wave.lua"), 'w') as f:
+            f.write("")
+        with open(os.path.join(config_path, "wind.lua"), 'w') as f:
+            f.write("")
+        # write JBOOST.bat file
+        with open(os.path.join(config_path, "run.bat"), 'w') as f:
+            # Get the folder of the JBOOST bat file
+            folder = os.path.dirname(JBOOST_bat_path)
 
-            struct_text, NODES, _ = pe.create_JBOOST_struct(
-                GEOMETRY,
-                RNA,
-                (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Value"].values[0],
-                 PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection MP", "Unit"].values[0]),
-                (PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Value"].values[0],
-                 PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TOWER", "Unit"].values[0]),
-                MASSES=MASSES,
-                MARINE_GROWTH=MARINE_GROWTH,
-                defl_TP=(PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Value"].values[0],
-                         PARAMETERS.loc[PARAMETERS["Parameter"] == "deflection TP", "Unit"].values[0]),
-                ModelName=Model_name,
-                EModul=PARAMETERS.loc[PARAMETERS["Parameter"] == "EModul", "Value"].values[0],
-                fyk="355",
-                poisson="0.3",
-                dens=PARAMETERS.loc[PARAMETERS["Parameter"] == "Steel Density", "Value"].values[0],
-                addMass=0,
-                member_id=1,
-                create_node_tolerance=EXPORT_GLOBAL_META.loc[
-                    EXPORT_GLOBAL_META["Parameter"] == "Minimal Node distance [m]", "Value"].values[0],
-                seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0],
-                waterlevel=config_struct["water_level"],
-                return_structure=True
-            )
+            # Build bat content with full paths
+            bat_content = f"""@echo off
+REM Start JBOOST
+RMDIR /S /Q "{os.path.join(folder, 'Result_JBOOST_Graph')}"
+RMDIR /S /Q "{os.path.join(folder, 'Results_JBOOST_Text')}"
+DEL /S /Q "{os.path.join(folder, 'Log.txt')}"
+"{JBOOST_bat_path}" proj.lua
+pause"""
+            f.write(bat_content)
+        # --- Run JBOOST and save results ---
+        if run_jboost:
+            JBOOST_OUT = pe.run_JBOOST(jboost_exe_path, proj_text, struct_text, set_calculation=None)
 
-            if config_struct["res_Nodes"] == 'auto':
-                idx_BORDER = NODES.loc[NODES["Affiliation"] == "BORDER"].index[-1]
-                nodes = NODES.loc[NODES.index <= idx_BORDER, "node"].values
-                config_struct["res_Nodes"] = "{" + ", ".join([f"{node:.1f}" for node in nodes]) + "}"
+            # Save Excel results
+            path_out = os.path.join(config_path, "JBOOST_OUT.xlsx")
+            sheet_names, sheets = [], []
+            for key, value in JBOOST_OUT.items():
+                if value is not None:
+                    sheet_names.append(key)
+                    sheets.append(value)
+            if sheets:
+                pe.save_df_list_to_excel(path_out, sheets, sheet_names=sheet_names)
 
-            proj_text = pe.create_JBOOST_proj(
-                config_struct,
-                MARINE_GROWTH,
-                modelname=Model_name,
-                write_JBOOST_graph=True
-            )
-            JBOOST_OUT = pe.run_JBOOST(jboost_path, proj_text, struct_text, set_calculation=None)
+            # Copy result files
+            try:
+                shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Results_JBOOST_Text/JBOOST.out"),
+                             os.path.join(config_path, "JBOOST.out"))
+                for img in ["Inclination.png", "Inclination_Moment.png", "mode_shapes.png"]:
+                    shutil.copy2(os.path.join(os.path.dirname(script_dir), f"JBOOST/Result_JBOOST_Graph/{img}"),
+                                 os.path.join(config_path, img))
+            except Exception as e:
+                print(f"Pictures could not be copied: {e}")
 
-            sheet_names = []
-            sheets = []
+            # Store mode shapes
+            Modeshapes[config_name] = JBOOST_OUT.get("Mode_shapes", None)
 
-            if len(export_path) > 0:
+        # Save water level
+        waterlevels[config_name] = config_struct["water_level"]
 
-                path_config = os.path.join(export_path, config_name)
-                path_struct = os.path.join(path_config, Model_name + ".lua")
-                path_proj = os.path.join(path_config, "proj.lua")
-                path_out = os.path.join(path_config, "JBOOST_OUT.xlsx")
-
-                os.makedirs(path_config, exist_ok=True)
-
-                with open(path_proj, 'w') as file:
-                    file.write(proj_text)
-                with open(path_struct, 'w') as file:
-                    file.write(struct_text)
-
-                for key, value in JBOOST_OUT.items():
-                    if value is not None:
-                        sheet_names.append(key)
-                        sheets.append(value)
-                        pe.save_df_list_to_excel(path_out, sheets, sheet_names=sheet_names)
-
-                shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Results_JBOOST_Text/JBOOST.out"), os.path.join(path_config, "JBOOST.out"))
-
-                try:
-                    shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Result_JBOOST_Graph/Inclination.png"), os.path.join(path_config, "Inclination.png"))
-                    shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Result_JBOOST_Graph/Inclination_Moment.png"), os.path.join(path_config, "Inclination_Moment.png"))
-                    shutil.copy2(os.path.join(os.path.dirname(script_dir), "JBOOST/Result_JBOOST_Graph/mode_shapes.png"), os.path.join(path_config, "mode_shapes.png"))
-                except Exception as e:
-                    print(f"pictures could not be copied: {e}, {os.path.join(os.path.dirname(script_dir), 'JBOOST/Result_JBOOST_Graph/mode_shapes.png')}")
-
-            Modeshapes[config_name] = JBOOST_OUT["Mode_shapes"]
-            waterlevels[config_name] = config_struct["water_level"]
-
+    # --- Plot modeshapes if JBOOST ran ---
+    if run_jboost and Modeshapes:
         reversed_dfs = {k: df.iloc[::-1].reset_index(drop=True) for k, df in Modeshapes.items()}
-
         FIG, result_table = plt.plot_modeshapes(reversed_dfs, order=(1, 2, 3), waterlevels=waterlevels)
-
         ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW", result_table)
+        ex.insert_plot(FIG, excel_filename, "ExportStructure", "FIG_JBOOST_MODESHAPES")
 
-        ex.insert_plot(FIG, excel_filename, "ExportStructure", f"FIG_JBOOST_MODESHAPES")
-
-    return
-
+    ex.show_message_box(
+        excel_filename,
+        f"JBOOST structure '{Model_name}' exported successfully at {jboost_export_path}"
+        + (". JBOOST run completed." if run_jboost else " JBOOST was not run.")
+    )
 
 def load_JBOOST_soil_file(excel_caller):
     excel_filename = os.path.basename(excel_caller)
@@ -728,6 +664,11 @@ def create_JBOOST_configs(excel_caller, use_stiff, use_grouping):
     #ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_PROJECT")
     ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
 
+def clear_JBOOST_configs(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
+    ex.clear_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", keep_columns=PROJECT.columns[:4].tolist())
+    return
 
 def create_JBOOST_grouping(excel_caller):
     excel_filename = os.path.basename(excel_caller)
@@ -1505,4 +1446,4 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_pj_export_path, config_name):
 
 
 
-create_JBOOST_configs("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", True, True)
+#export_and_run_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", jboost_export_path="", run_jboost=False)

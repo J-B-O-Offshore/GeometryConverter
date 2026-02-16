@@ -184,18 +184,27 @@ Sub export_JBOOST()
     
     
     args.Add jboost_path
-
-    RunPythonWrapper "export", "export_JBOOST", args
+    args.Add "FALSE"
+    
+    RunPythonWrapper "export", "export_and_run_JBOOST", args
 End Sub
 
 
 Sub export_run_JBOOST()
-    Dim jboost_path As Variant
+    Dim jboost_path As String
     Dim args As New Collection
-    
+
     jboost_path = Range("JBOOST_Path").Value
+    ' --- File existence checks ---
+    success = FolderExists(jboost_path)
+    If Not success Then
+        MsgBox "JBOOST folder does not exist or is not reachable: " & jboost_path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    args.Add jboost_path
+    args.Add "TRUE"
+    RunPythonWrapper "export", "export_and_run_JBOOST", args
     
-    RunPythonWrapper "export", "run_JBOOST_excel", jboost_path
 End Sub
 
 
@@ -215,17 +224,30 @@ Sub fill_JBOOST_configs()
     RunPythonWrapper "export", "create_JBOOST_configs", args
 End Sub
 
+Sub clear_JBOOST_configs()
+
+    RunPythonWrapper "export", "clear_JBOOST_configs"
+End Sub
+
 
 Sub run_JBOOST()
-    Dim lua_path As Variant
-    Dim run As Boolean
+    Dim jboost_path As String
     Dim args As New Collection
-    
-    
-    jboost_path = ""
+
+    jboost_path = Range("JBOOST_Path").Value
+    ' --- File existence checks ---
+    success = FolderExists(jboost_path)
+    If Not success Then
+        MsgBox "JBOOST folder does not exist or is not reachable: " & jboost_path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    args.Add jboost_path
+    args.Add "TRUE"
     DeleteFigure "ExportStrucure", "Fig_FIG_JBOOST_MODESHAPES"
-    RunPythonWrapper "export", "run_JBOOST_excel", jboost_path
+    RunPythonWrapper "export", "export_and_run_JBOOST", args
+    
 End Sub
+
 
 Sub create_JBOOST_grouping()
     
