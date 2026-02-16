@@ -124,21 +124,22 @@ def check_marine_growth(mg: pd.DataFrame, name: str = "MARINE_GROWTH") -> tuple[
 
 def check_appurtenances(apps: pd.DataFrame, required_cols=None) -> tuple[bool, str]:
     """
-    Validate an appurtenances DataFrame, including mutual exclusivity rules.
+    Validate an appurtenances DataFrame.
 
     Parameters
     ----------
     apps : pd.DataFrame
-        Appurtenance data. Required columns:
-        'Top [m]', 'Bottom [m]', 'Mass [kg]', 'Diameter [m]',
-        'Orientation [°]', 'Surface roughness [m]', 'Name',
-        'Distance Axis to Axis [m]', 'Gap between surfaces [m]'.
+        Appurtenance data.
+
+    required_cols : list[str] | None
+        Columns that must be present and validated.
 
     Returns
     -------
     tuple[bool, str]
         (True, "") if valid, else (False, error_message).
     """
+
     if required_cols is None:
         required_cols = [
             "Top [m]", "Bottom [m]", "Mass [kg]",
@@ -146,13 +147,23 @@ def check_appurtenances(apps: pd.DataFrame, required_cols=None) -> tuple[bool, s
             "Distance Axis to Axis [m]", "Gap between surfaces [m]"
         ]
 
-    # Check required columns
+    # --------------------------------------------------
+    # 1) Check required columns exist
+    # --------------------------------------------------
     missing_cols = [col for col in required_cols if col not in apps.columns]
     if missing_cols:
         return False, "Missing required columns:\n" + "\n".join(missing_cols)
 
-    # Check for missing values (excluding mutually exclusive pair)
-    check_cols = [c for c in required_cols if c not in ["Distance Axis to Axis [m]", "Gap between surfaces [m]"]]
+    # --------------------------------------------------
+    # 2) Check for missing values (excluding geometry pair)
+    # --------------------------------------------------
+    geometry_cols = [
+        "Distance Axis to Axis [m]",
+        "Gap between surfaces [m]"
+    ]
+
+    check_cols = [c for c in required_cols if c not in geometry_cols]
+
     missing_info = []
     for col in check_cols:
         mask = apps[col].isnull()
@@ -163,30 +174,33 @@ def check_appurtenances(apps: pd.DataFrame, required_cols=None) -> tuple[bool, s
     if missing_info:
         return False, "Missing values found:\n" + "\n".join(missing_info)
 
-    # Mutual exclusivity check
-    err_list = []
-    for idx, row in apps.iterrows():
-        axis_to_axis = row["Distance Axis to Axis [m]"]
-        gap_between = row["Gap between surfaces [m]"]
-        name = row["Name"]
+    # --------------------------------------------------
+    # 3) Geometry checks ONLY if geometry columns required
+    # --------------------------------------------------
+    geometry_required = all(col in required_cols for col in geometry_cols)
 
-        if pd.isna(axis_to_axis) and pd.isna(gap_between):
-            err_list.append(
-                f"'{name}': Define either 'Distance Axis to Axis [m]' "
-                f"or 'Gap between surfaces [m]'."
-            )
-        elif pd.notna(axis_to_axis) and pd.notna(gap_between):
-            err_list.append(
-                f"'{name}': Define only one of 'Distance Axis to Axis [m]' "
-                f"or 'Gap between surfaces [m]', not both."
-            )
+    if geometry_required:
+        err_list = []
+        for _, row in apps.iterrows():
+            axis_to_axis = row["Distance Axis to Axis [m]"]
+            gap_between = row["Gap between surfaces [m]"]
+            name = row["Name"]
 
-    if err_list:
-        return False, "Geometry specification issues:\n" + "\n".join(err_list)
+            if pd.isna(axis_to_axis) and pd.isna(gap_between):
+                err_list.append(
+                    f"'{name}': Define either 'Distance Axis to Axis [m]' "
+                    f"or 'Gap between surfaces [m]'."
+                )
+            elif pd.notna(axis_to_axis) and pd.notna(gap_between):
+                err_list.append(
+                    f"'{name}': Define only one of 'Distance Axis to Axis [m]' "
+                    f"or 'Gap between surfaces [m]', not both."
+                )
+
+        if err_list:
+            return False, "Geometry specification issues:\n" + "\n".join(err_list)
 
     return True, ""
-
-
 
 def check_added_masses(masses: pd.DataFrame, name: str = "ADDITIONAL_MASSES") -> tuple[bool, str]:
     """
@@ -317,7 +331,6 @@ def fill_JBOOST_auto_excel(excel_caller):
 
     return True
 
-
 def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False):
     """
     Export JBOOST structure files and optionally run JBOOST from Excel data.
@@ -394,6 +407,9 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
     default = PROJECT.loc[:, "default"]
     proj_configs = fill_dataframe_with_defaults(PROJECT.iloc[:, 3:], default)
 
+    # --- cut marine growth
+    MARINE_GROWTH = pe.clip_marine_growth(GEOMETRY, MARINE_GROWTH, seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0])
+    print(MARINE_GROWTH)
     # --- Clear previous results if running JBOOST ---
     if run_jboost:
         ex.clear_excel_table_contents(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW")
@@ -519,6 +535,7 @@ pause"""
         f"JBOOST structure '{Model_name}' exported successfully at {jboost_export_path}"
         + (". JBOOST run completed." if run_jboost else " JBOOST was not run.")
     )
+
 
 def load_JBOOST_soil_file(excel_caller):
     excel_filename = os.path.basename(excel_caller)
@@ -664,11 +681,13 @@ def create_JBOOST_configs(excel_caller, use_stiff, use_grouping):
     #ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_PROJECT")
     ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
 
+
 def clear_JBOOST_configs(excel_caller):
     excel_filename = os.path.basename(excel_caller)
     PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
     ex.clear_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", keep_columns=PROJECT.columns[:4].tolist())
     return
+
 
 def create_JBOOST_grouping(excel_caller):
     excel_filename = os.path.basename(excel_caller)

@@ -872,8 +872,7 @@ def calculate_MarineGrowth_excel(excel_caller):
         ex.show_message_box(excel_filename, "Seabed level must be below the structure top and above or at the structure bottom")
         return
 
-    MARINE_GROWTH = mc.calculate_MarineGrowth(global_area, MSL_difference, seabed_level, GEOMETRY.loc[GEOMETRY.index[0], "Top [m]"], GEOMETRY.loc[GEOMETRY.index[-1], "Bottom [m]"],   MG_dens=1325, surf_rought=0)
-
+    MARINE_GROWTH = mc.calculate_MarineGrowth(global_area, MSL_difference, seabed_level, GEOMETRY.loc[GEOMETRY.index[0], "Top [m]"], GEOMETRY.loc[GEOMETRY.index[-1], "Bottom [m]"],  MG_dens=1325, surf_rought=0)
     ex.clear_excel_table_contents(excel_filename, "StructureOverview", "MARINE_GROWTH")
     ex.write_df_to_table(excel_filename, "StructureOverview", "MARINE_GROWTH", MARINE_GROWTH)
 
