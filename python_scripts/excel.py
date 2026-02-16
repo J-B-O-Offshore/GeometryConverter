@@ -248,12 +248,13 @@ def write_df_to_table_flexible(workbook_name, sheet_name, table_name, dataframe,
     Replace the contents of an existing Excel table with a pandas DataFrame using xlwings,
     allowing for variable number of columns and custom headers.
 
-    Parameters:
-    - workbook_name: str, name of the open Excel workbook (no path needed if open).
-    - sheet_name: str, name of the sheet containing the table.
-    - table_name: str, name of the Excel table (ListObject) to manipulate.
-    - dataframe: pandas DataFrame to replace the table's data.
-    - headers: list of str, optional custom header names. If None, dataframe.columns are used.
+    SAFETY FEATURE:
+    - Before writing/resizing, checks if the resized table would overlap another table.
+    - If overlap is detected, NOTHING is written/cleared/resized and the function returns False.
+
+    Returns:
+    - True  -> written successfully
+    - False -> aborted due to overlap
     """
     # Connect to the open workbook
     wb = xw.books[workbook_name]
@@ -265,16 +266,63 @@ def write_df_to_table_flexible(workbook_name, sheet_name, table_name, dataframe,
     except Exception as e:
         raise ValueError(f"Table '{table_name}' not found in sheet '{sheet_name}'.") from e
 
-    # Use provided headers or DataFrame headers
+    # ------------------------------------------------------------
+    # Prepare DataFrame + headers
+    # ------------------------------------------------------------
     if headers is not None:
         if len(headers) != dataframe.shape[1]:
             raise ValueError("Length of custom headers must match number of DataFrame columns")
-        df_clean = dataframe.copy()
+        df_clean = dataframe.reset_index(drop=True).copy()
         df_clean.columns = headers
     else:
-        df_clean = dataframe.copy()
+        df_clean = dataframe.reset_index(drop=True).copy()
 
-    # Clear existing data
+    header_range = table.HeaderRowRange
+
+    # ------------------------------------------------------------
+    # EMPTY DATAFRAME: clear body only, NO resize
+    # ------------------------------------------------------------
+    if df_clean.empty:
+        try:
+            data_body_range = table.DataBodyRange
+            if data_body_range:
+                data_body_range.ClearContents()
+        except Exception:
+            pass
+        return True
+
+    # ------------------------------------------------------------
+    # Compute proposed new table range
+    # ------------------------------------------------------------
+    last_row = header_range.Row + df_clean.shape[0]
+    last_col = header_range.Column + df_clean.shape[1] - 1
+
+    new_range = ws.range(
+        (header_range.Row, header_range.Column),
+        (last_row, last_col)
+    )
+
+    # ------------------------------------------------------------
+    # OVERLAP CHECK (abort early)
+    # ------------------------------------------------------------
+    for other in ws.api.ListObjects:
+        if other.Name == table_name:
+            continue
+
+        other_range = other.Range  # COM Range
+
+        if _ranges_intersect(new_range.api, other_range):
+            print(
+                f"[ABORT] Table '{table_name}' would overlap table '{other.Name}'. "
+                f"New range: {new_range.address}, Other range: {other_range.Address}"
+            )
+            return False
+
+    # ------------------------------------------------------------
+    # Safe to write now
+    # ------------------------------------------------------------
+
+    # Clear old data body contents (keep headers)
     try:
         data_body_range = table.DataBodyRange
         if data_body_range:
@@ -282,26 +330,17 @@ def write_df_to_table_flexible(workbook_name, sheet_name, table_name, dataframe,
     except Exception as e:
         print("No DataBodyRange to clear:", e)
 
-    # If the DataFrame is empty, clear table data and return
-    if df_clean.empty:
-        return
-
     # Write headers explicitly
-    header_range = table.HeaderRowRange
     ws.range((header_range.Row, header_range.Column)).value = df_clean.columns.tolist()
 
     # Write the new DataFrame values (without headers)
     start_cell = ws.range((header_range.Row + 1, header_range.Column))
     start_cell.options(index=False, header=False).value = df_clean
 
-    # Resize the table to match the new shape
-    last_row = header_range.Row + df_clean.shape[0]
-    last_col = header_range.Column + df_clean.shape[1] - 1
-    new_range = ws.range(
-        (header_range.Row, header_range.Column),
-        (last_row, last_col)
-    )
+    # Resize the table
     table.Resize(new_range.api)
+
+    return True
 
 
 def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation",
@@ -405,69 +444,97 @@ def show_message_box(workbook_name, message, buttons="vbOK", icon="vbInformation
     return response_map.get(result, f"Unknown ({result})")
 
 
-def read_excel_table(workbook_name, sheet_name, table_name, dtype=None, dropnan=False, strip=True):
+def read_excel_table(workbook_name, sheet_name, table_name,
+                     dtype=None, dropnan=False, strip=True):
     """
     Read an Excel Table into a Pandas DataFrame, using the Table's header as column names.
-
-    Parameters:
-        workbook_name (str): The name of the workbook
-        sheet_name (str): The name of the sheet containing the table.
-        table_name (str): The name of the Excel Table (not the range name).
-        dtype (type or dict): Optional dtype to cast columns to.
-        dropnan (bool): Whether to drop rows that are completely NaN.
-        strip (bool): Whether to strip whitespace from string cells.
-
-    Returns:
-        pd.DataFrame: DataFrame containing the table data with correct headers.
     """
 
     wb = xw.Book(workbook_name)
     sheet = wb.sheets[sheet_name]
     table = sheet.tables[table_name]
 
+    # ---------------------------
+    # Headers (xlwings-safe)
+    # ---------------------------
+    headers_raw = table.header_row_range.value
+
+    if isinstance(headers_raw, str):
+        headers = [headers_raw.strip()]
+    else:
+        headers = [
+            h.strip() if isinstance(h, str) else str(h)
+            for h in headers_raw
+        ]
+
+    # ---------------------------
+    # Data body
+    # ---------------------------
     data_range = table.data_body_range
-    headers = [h.strip() if isinstance(h, str) else str(h) for h in table.header_row_range.value]
 
     if data_range is None:
         return pd.DataFrame(columns=headers)
 
+    # ---------------------------
+    # Read data
+    # ---------------------------
     if dtype == str:
+        # Preserve row/column structure
         raw_data = [
             [cell.api.Text for cell in row]
             for row in data_range.rows
         ]
     else:
         raw_data = data_range.value
-        if not isinstance(raw_data, (list, tuple)):
-            raw_data = [raw_data]
-        if not isinstance(raw_data[0], (list, tuple)):
-            raw_data = [raw_data]
+
+    # ---------------------------
+    # Normalize to list-of-lists
+    # ---------------------------
+    if raw_data is None:
+        raw_data = []
+
+    elif not isinstance(raw_data, (list, tuple)):
+        # single cell
+        raw_data = [[raw_data]]
+
+    elif raw_data and not isinstance(raw_data[0], (list, tuple)):
+        # single column OR single row
+        if len(headers) == 1:
+            raw_data = [[v] for v in raw_data]
+        else:
+            raw_data = [list(raw_data)]
 
     df = pd.DataFrame(raw_data, columns=headers)
 
+    # ---------------------------
+    # Drop NaN rows
+    # ---------------------------
     if dropnan:
-        df = df.replace({"": np.nan, 'None': np.nan, 'NaN': np.nan})
+        df = df.replace({"": np.nan, "None": np.nan, "NaN": np.nan})
         df = df.infer_objects(copy=False)
-        df = df.dropna(how='all')
+        df = df.dropna(how="all")
 
+    # ---------------------------
     # Apply dtype conversions
+    # ---------------------------
     if dtype is not None and dtype != str and not isinstance(dtype, list):
         df = df.astype(dtype)
+
     elif isinstance(dtype, list):
         for col_index, col_type in enumerate(dtype):
             if col_index < df.shape[1]:
                 col_name = df.columns[col_index]
 
-                # Handle string conversion with None → ""
                 if col_type is str:
-                    df[col_name] = df[col_name].where(df[col_name].notna(), "")
-                    df[col_name] = df[col_name].astype(str)
-
-                # For all other types: cast directly
+                    df[col_name] = df[col_name].where(
+                        df[col_name].notna(), ""
+                    ).astype(str)
                 else:
                     df[col_name] = df[col_name].astype(col_type)
 
-    # Strip whitespace from string values if enabled
+    # ---------------------------
+    # Strip whitespace
+    # ---------------------------
     if strip:
         df = df.map(lambda x: x.strip() if isinstance(x, str) else x)
 
@@ -592,6 +659,48 @@ def clear_excel_table_contents(workbook_name, sheet_name, table_name):
     if table.data_body_range:
         table.data_body_range.clear_contents()
 
+
+def clear_excel_table(workbook_name, sheet_name, table_name, keep_columns):
+    """
+    Keeps only the specified columns in an Excel Table.
+    Deletes all other columns including headers and data, but keeps the table object.
+
+    Parameters:
+        workbook_name (str): Excel workbook path or name
+        sheet_name (str): Sheet containing the table
+        table_name (str): Table to update
+        keep_columns (list[str]): Columns to keep
+    """
+    wb = xw.Book(workbook_name)
+    sheet = wb.sheets[sheet_name]
+    table = sheet.tables[table_name]
+
+    headers = table.header_row_range.value
+    data_range = table.data_body_range
+
+    # Columns to remove
+    remove_columns = [col for col in headers if col not in keep_columns]
+
+    # Delete values of columns to remove
+    for col_name in remove_columns:
+        col_index = headers.index(col_name)
+        # Clear header
+        table.header_row_range[0, col_index].clear_contents()
+        # Clear body
+        if data_range:
+            data_range.columns[col_index].clear_contents()
+
+    # After clearing, resize table to only keep the columns you want
+    keep_indices = [headers.index(col) for col in keep_columns if col in headers]
+    if not keep_indices:
+        raise ValueError("None of the keep_columns exist in the table.")
+
+    first_row = table.range.row
+    first_col = table.range.column + min(keep_indices)
+    last_row = first_row + table.range.rows.count - 1
+    last_col = table.range.column + max(keep_indices)
+
+    table.api.Resize(sheet.range((first_row, first_col), (last_row, last_col)).api)
 
 def add_unique_row(df1, df2, exclude_columns=None):
     """

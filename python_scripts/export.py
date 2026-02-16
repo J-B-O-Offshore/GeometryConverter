@@ -7,6 +7,7 @@ from pandas.api.types import CategoricalDtype
 import os
 import shutil
 from ALaPy import periphery as pe
+import itertools
 
 import plot as plt
 # %% helpers
@@ -643,31 +644,225 @@ def load_JBOOST_soil_file(excel_caller):
     return
 
 
-def create_JBOOST_soil_configs(excel_caller):
+def create_JBOOST_configs(excel_caller, use_stiff, use_grouping):
     excel_filename = os.path.basename(excel_caller)
+
+    use_stiff = str_to_bool(use_stiff)
+    use_grouping = str_to_bool(use_grouping)
+
     PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
     PROJECT = PROJECT.iloc[:, 0:4]
 
+    JBOOST_GROUPING = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_GROUPING", dtype=str, dropnan=True)
+
     JBOOST_soil_stiffness = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_soil_stiffness", dtype=str, dropnan=True)
     JBOOST_soil_stiffness.set_index("Stiffness", inplace=True)
-
     mask = JBOOST_soil_stiffness.loc["Use for JBOOST config? (Y/N)"] == "Y"
     JBOOST_soil_stiffness = JBOOST_soil_stiffness.loc[:, mask]
 
-    if len(JBOOST_soil_stiffness) == 0:
-        ex.show_message_box(excel_filename, "Please fill Soil Stiffness table or toggle some configs, aborting.")
-        return
+    # check, if grouping is ignored
+    if use_grouping:
+        if len(JBOOST_GROUPING.index) == 0:
+            ex.show_message_box(excel_filename,
+                                f"Grouping table empty. Aborting.")
+            return
+        if len(JBOOST_GROUPING.dropna(how="any").index)!=len(JBOOST_GROUPING.index):
+            ex.show_message_box(excel_filename,
+                                f"Grouping table not compleatly filled. Aborting.")
+            return
+        Configs_grouping = JBOOST_GROUPING["Config Name"].tolist()
+    else:
+        Configs_grouping = [None]
 
-    for col_name, values in JBOOST_soil_stiffness.items():
-        Short_name = values["Short name"]
-        PROJECT.loc[:, Short_name] = ""
-        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_trans", Short_name] = values["found_stiff_trans [N/m]"]
-        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_rotat", Short_name] = values["found_stiff_rotat [Nm/rad]"]
-        PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_coupl", Short_name] = values["found_stiff_coupl [Nm/m]"]
+    if use_stiff:
+        if len(JBOOST_soil_stiffness.index) == 0:
+            ex.show_message_box(excel_filename,
+                                f"Stiffness table empty. Aborting.")
+            return
 
-    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_PROJECT")
+        Configs_soil = list(JBOOST_soil_stiffness.loc[
+                                JBOOST_soil_stiffness.index=="Short name",
+                                JBOOST_soil_stiffness.columns[1:]
+                            ].values[0])
+    else:
+        Configs_soil = [None]
+    #
+    for i, values in enumerate(itertools.product(Configs_soil, Configs_grouping)):
+        values_valid = [v for v in values if v is not None]
+        colname_config = "__".join(values_valid)
+
+        PROJECT[colname_config] = None
+
+        # assign group values
+        if values[1] is not None:
+            row_curr = JBOOST_GROUPING.loc[JBOOST_GROUPING["Config Name"]==values[1]]
+
+            for parameter_name_orig in row_curr.columns[1:]:
+                parameter_name = parameter_name_orig.replace("%", "")
+                try:
+                    PROJECT.loc[PROJECT["Project Settings"] == parameter_name, colname_config] = row_curr[parameter_name_orig].iloc[0]
+                except Exception:
+                    ex.show_message_box(excel_filename,
+                                        f"Parameter {parameter_name} not in Project Setting table. Aborting")
+                    return
+
+        # assign stiffness values
+        if values[0] is not None:
+            PROJECT.loc[PROJECT["Project Settings"]=="found_stiff_trans", colname_config] = \
+                JBOOST_soil_stiffness.loc[
+                    "found_stiff_trans [N/m]",
+                    JBOOST_soil_stiffness.loc["Short name"] == values[0]
+                ].iloc[0]
+            PROJECT.loc[PROJECT["Project Settings"]=="found_stiff_rotat", colname_config] = \
+                JBOOST_soil_stiffness.loc[
+                    "found_stiff_rotat [Nm/rad]",
+                    JBOOST_soil_stiffness.loc["Short name"] == values[0]
+                ].iloc[0]
+            PROJECT.loc[PROJECT["Project Settings"]=="found_stiff_coupl", colname_config] = \
+                JBOOST_soil_stiffness.loc[
+                    "found_stiff_coupl [Nm/m]",
+                    JBOOST_soil_stiffness.loc["Short name"] == values[0]
+                ].iloc[0]
+
+    ex.clear_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", keep_columns=PROJECT.columns[:4].tolist())
+    #ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_PROJECT")
     ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
 
+
+def create_JBOOST_grouping(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    JBOOST_GROUPING_PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_GROUPING_PARAMETERS", dropnan=True)
+    JBOOST_GROUPING = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_GROUPING", dropnan=True)
+    JBOOST_PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dropnan=True)
+    # checks an assignment
+    group_params = JBOOST_GROUPING_PARAMETERS.loc[
+        JBOOST_GROUPING_PARAMETERS["Parameter"] == "grouping variables", "Value"
+    ].values[0]
+    try:
+        group_params = pe.parse_mixed_list(group_params)
+    except Exception as e:
+        ex.show_message_box(excel_filename, f"Parsing of grouping variables failed. Please make sure, you inserted comma seperated values or string without free spaces, and square brackets, also that the list makes sense. Empty lists possible. Error: {e}")
+        return
+
+    # check if params are in the project settings
+    project_params = set(JBOOST_PROJECT.loc[:, "Project Settings"].to_list())
+    group_params_set = set(group_params)
+    missing = group_params_set - project_params
+    if missing:
+        ex.show_message_box(
+            excel_filename,
+            "Please make sure all parameters are in the Project settings table.\n\n"
+            f"The following parameters were not found:\n"
+            f"{', '.join(sorted(missing))}\n\n"
+            "Grouping cannot be applied. Aborting."
+        )
+        return
+
+
+    group_values = JBOOST_GROUPING_PARAMETERS.loc[
+        JBOOST_GROUPING_PARAMETERS["Parameter"] == "group values", "Value"
+    ].values[0]
+    try:
+        group_values = pe.parse_mixed_list(group_values)
+    except Exception as e:
+        ex.show_message_box(excel_filename,
+                            f"Parsing of grouping values failed. Please make sure, you inserted comma seperated values or string without free spaces, and square brackets, also that the list makes sense. Empty lists possible. Error: {e}")
+        return
+
+    group_labels = JBOOST_GROUPING_PARAMETERS.loc[
+        JBOOST_GROUPING_PARAMETERS["Parameter"] == "group labels", "Value"
+    ].values[0]
+    try:
+        group_labels = pe.parse_mixed_list(group_labels)
+    except Exception as e:
+        ex.show_message_box(excel_filename,
+                            f"Parsing of grouping labels failed. Please make sure, you inserted comma seperated values or string without free spaces, and square brackets, also that the list makes sense. Empty lists possible. Error: {e}")
+        return
+
+    if not (len(group_labels) == len(group_values) == len(group_params)):
+        ex.show_message_box(excel_filename,
+                            f"the lists in group_labels, group_values and group_params must have the same length! If you want to leave out labels for a certain parameter, please type [] as a placeholder" )
+        return
+
+    for i, (v, l) in enumerate(zip(group_values, group_labels)):
+
+        if len(l) == 0:
+            group_labels[i] = v
+        elif len(v) != len(l):
+            ex.show_message_box(
+                excel_filename,
+                f"Length mismatch of input parameters:\n"
+                f"values={len(v)}, labels={len(l)}\n\n"
+                "Please make sure that labels either have the same length "
+                "as values or are set to [] if you don't want to specify "
+                "custom labels."
+            )
+            return  # or raise / break, depending on your flow
+
+    # calculation
+    # add auto grop param identifier
+    group_params = ["%" + param for param in group_params]
+    GROUPING = pd.DataFrame(columns=["Config Name"] + group_params)
+
+    for i, values in enumerate(itertools.product(*group_values)):
+        label_list = []
+
+        for j, (p, vals, labs) in enumerate(zip(group_params, group_values, group_labels)):
+            value = values[j]
+
+            label_idx = vals.index(value)
+            label_for_value = labs[label_idx]
+
+            label_list.append(f"{p[1:]}={label_for_value}")
+            GROUPING.loc[i, p] = value
+
+        GROUPING.loc[i, "Config Name"] = "__".join(label_list)
+
+    # check, if this is just an update of some parameters or a new Grouping
+    cols_on_sheet = JBOOST_GROUPING.columns.tolist()
+    ident_cols_on_sheet = [col for col in cols_on_sheet if col[0]=="%"]
+    cols_calculated = GROUPING.columns[1:].tolist()
+
+    added_cols = list(set(cols_on_sheet)-set(cols_calculated))
+    added_cols = [col for col in added_cols if col!="Config Name"]
+
+    rows_on_sheet = JBOOST_GROUPING.index.tolist()
+    rows_calculated = GROUPING.index.tolist()
+
+    askBefore = False
+    if len(ident_cols_on_sheet) == len(cols_calculated):
+        # same number of created cols
+        if (ident_cols_on_sheet == cols_calculated):
+            # same col names => so same setup
+            if (len(rows_on_sheet) == len(rows_calculated)):
+                # same number of rows => preserve added headders and values of them
+                message = "Same number of rows and column names detected, preserving values of any additional columns."
+                for col in added_cols:
+                    GROUPING[col] = JBOOST_GROUPING[col]
+            else:
+                # different number of rows => more combinations but same setup, delete the values of the added cols as they are not sorted right anymore
+                message = "Same number of columns but different number of rows detected. Preserving any additional columns but without the values as they dont fit anymore."
+                for col in added_cols:
+                    GROUPING[col] = None
+        else:
+            askBefore = True
+            message = "Differning parameter setup detected. Overwrite table? All additional columns will be lost."
+    else:
+        askBefore = True
+        message = "Differning parameter setup detected. Overwrite table? All additional columns will be lost."
+
+    if askBefore:
+        accepted = ex.show_message_box(excel_filename,
+                                       message,
+                                       buttons="vbYesNo")
+        if not accepted:
+            return
+    else:
+        ex.show_message_box(excel_filename,
+                            message)
+    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_GROUPING")
+    ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_GROUPING", GROUPING)
+    return
 
 # %% WLGEN
 
@@ -1308,3 +1503,6 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_pj_export_path, config_name):
     return
 
 
+
+
+create_JBOOST_configs("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", True, True)

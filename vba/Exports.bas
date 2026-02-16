@@ -203,8 +203,16 @@ Sub fill_JBOOST_auto_values()
     RunPythonWrapper "export", "fill_JBOOST_auto_excel"
 End Sub
 
-Sub fill_JBOOST_soil_configs()
-    RunPythonWrapper "export", "create_JBOOST_soil_configs"
+Sub fill_JBOOST_configs()
+    Dim UseStiff As Boolean
+    Dim UseGroup As Boolean
+    Dim args As New Collection
+    UseStiff = Range("CheckBox_JBOOST_UseStiff_field").Value
+    UseGroup = Range("CheckBox_JBOOST_UseGroup_field").Value
+    
+    args.Add UseStiff
+    args.Add UseGroup
+    RunPythonWrapper "export", "create_JBOOST_configs", args
 End Sub
 
 
@@ -213,9 +221,15 @@ Sub run_JBOOST()
     Dim run As Boolean
     Dim args As New Collection
     
+    
     jboost_path = ""
     DeleteFigure "ExportStrucure", "Fig_FIG_JBOOST_MODESHAPES"
     RunPythonWrapper "export", "run_JBOOST_excel", jboost_path
+End Sub
+
+Sub create_JBOOST_grouping()
+    
+    RunPythonWrapper "export", "create_JBOOST_grouping"
 End Sub
 
 Sub export_Modeshapes()
