@@ -309,7 +309,7 @@ Sub fill_Bladed_table_py()
     Dim Bladed_py_path As String
     Dim config_name As String
     
-    Bladed_py_path = Range("Bladed_py_path").Value
+    Bladed_py_path = Range("path_soil_py").Value
     config_name = get_dropdown_value("ExportStructure", "Dropdown_Bladed_py_loadcase")
     
     success = FileExists(Bladed_py_path)
