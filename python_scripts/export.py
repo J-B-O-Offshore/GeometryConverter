@@ -384,7 +384,15 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
         return
 
     # --- Check geometry ---
-    success_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY)
+    success_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY,             required_cols = [
+                "Affiliation",
+                "Top [m]",
+                "Bottom [m]",
+                "D, top [m]",
+                "D, bottom [m]",
+                "t [mm]",
+            ])
+
     if not success_GEOMETRY:
         ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
         return
@@ -883,7 +891,14 @@ def export_WLGen(excel_caller, WLGen_path):
     # ============================================================
     # Sanity checks
     # ============================================================
-    sucess_GEOMETRY, msg = mc.sanity_check_structure(STRUCTURE)
+    sucess_GEOMETRY, msg = mc.sanity_check_structure(STRUCTURE,            required_cols = [
+                "Affiliation",
+                "Top [m]",
+                "Bottom [m]",
+                "D, top [m]",
+                "D, bottom [m]",
+                "t [mm]",
+            ])
     if not sucess_GEOMETRY:
         ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
         return
@@ -1011,6 +1026,9 @@ def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=No
     SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", "SKIRT", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
 
+    if len(SKIRT.index) == 0:
+        SKIRT = None
+
     # ============================================================
     # Extract key parameters
     # ============================================================
@@ -1029,7 +1047,14 @@ def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=No
     # ============================================================
     # Sanity checks
     # ============================================================
-    sucess_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY)
+    sucess_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY,             required_cols = [
+                "Affiliation",
+                "Top [m]",
+                "Bottom [m]",
+                "D, top [m]",
+                "D, bottom [m]",
+                "t [mm]",
+            ])
     if not sucess_GEOMETRY:
         ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
         return
@@ -1236,6 +1261,9 @@ def apply_bladed_py_curves(excel_caller, Bladed_pj_path, selected_loadcase, inse
     EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
     SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", "SKIRT", dropnan=True)
 
+    if len(SKIRT.index) == 0:
+        SKIRT = None
+
     py_path = EXPORT_GLOBAL_META.loc[
         EXPORT_GLOBAL_META["Parameter"] == "PY-path (Springs_(L).csv)", "Value"
     ].values[0]
@@ -1356,19 +1384,19 @@ def apply_bladed_py_curves(excel_caller, Bladed_pj_path, selected_loadcase, inse
             return
 
     # --- Build Bladed structure data ---
-    try:
-        PY_loadcase_spring_heights = pd.Series(
-            np.unique(PY_loadcase["z [m]"]),
-            index=np.unique(PY_loadcase["Spring [-]"])
-        )
+    # try:
+    PY_loadcase_spring_heights = pd.Series(
+        np.unique(PY_loadcase["z [m]"]),
+        index=np.unique(PY_loadcase["Spring [-]"])
+    )
 
-        Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
-            Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META, SKIRT=SKIRT,
-            cut_embedded=False, PY_springs=PY_loadcase_spring_heights, soil_density=soil_density, tol_node=tol_node
-        )
-    except Exception as err:
-        ex.show_message_box(excel_filename, f"Error building Bladed dataframes: {err}")
-        return
+    Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
+        Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META, SKIRT=SKIRT,
+        cut_embedded=False, PY_springs=PY_loadcase_spring_heights, soil_density=soil_density, tol_node=tol_node
+    )
+    # except Exception as err:
+    #     ex.show_message_box(excel_filename, f"Error building Bladed dataframes: {err}")
+    #     return
 
     # --- Generate node definitions and save PJ file ---
     try:

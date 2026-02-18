@@ -63,7 +63,6 @@ def sanity_check_structure(
         # Default required columns (extended set)
         if required_cols is None:
             required_cols = [
-                "Affiliation",
                 "Top [m]",
                 "Bottom [m]",
                 "D, top [m]",
