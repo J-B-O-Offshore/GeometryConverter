@@ -11,16 +11,16 @@ import misc as geomc
 import plot as ex_plt
 from ALaPy import misc as mc
 
-
 META_dtypes = [str, str, str, str, str, float, str, str]
-META_dtpes_dict = {"Name":str,
-                   "Project ID":str,
-                   "Phase":str,
-                   "Structure ID":str,
-                   "Author":str,
-                   "Water Depth [m]":float,
-                   "Height Reference":str,
-                   "Comments":str}
+META_dtpes_dict = {"Name": str,
+                   "Project ID": str,
+                   "Phase": str,
+                   "Structure ID": str,
+                   "Author": str,
+                   "Water Depth [m]": float,
+                   "Height Reference": str,
+                   "Comments": str}
+
 
 class ConciveError(Exception):
     """
@@ -655,7 +655,7 @@ def load_DATA(excel_filename, Structure, Structure_name, db_path):
     sheet_name_structure_loading = "BuildYourStructure"
 
     META = load_db_table(excel_filename, db_path, "META", dtype=META_dtpes_dict)
-    META["Water Depth [m]"]=META["Water Depth [m]"].astype("float")
+    META["Water Depth [m]"] = META["Water Depth [m]"].astype("float")
 
     if META is None:
         return
@@ -673,7 +673,6 @@ def load_DATA(excel_filename, Structure, Structure_name, db_path):
 
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META_TRUE", META_relevant)
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_META", META_relevant)
-
 
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_DATA_TRUE", DATA)
     ex.write_df_to_table(excel_filename, sheet_name_structure_loading, f"{Structure}_DATA", DATA)
@@ -796,9 +795,7 @@ def save_data(excel_filename, Structure, db_path, selected_structure):
     if (Structure == "TP") or (Structure == "TOWER"):
         META_CURR["Water Depth [m]"] = float("nan")
 
-
     META_CURR_NEW = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_META_NEW", dtype=META_dtypes, dropnan=True)
-
 
     DATA_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_DATA")
     MASSES_CURR = ex.read_excel_table(excel_filename, "BuildYourStructure", f"{Structure}_MASSES")

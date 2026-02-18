@@ -1,16 +1,17 @@
 import logging
-from datetime import datetime
-import numpy as np
-import textwrap
 import os
-import tempfile
-import xlwings as xw
-import pandas as pd
-from pathlib import Path
 import re
-from openpyxl import load_workbook
-import win32clipboard
+import tempfile
+import textwrap
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import xlwings as xw
 from PIL import ImageGrab
+from openpyxl import load_workbook
+
 
 def setup_logger():
     logger = logging.getLogger()
@@ -634,7 +635,7 @@ def read_static_excel_range(path, sheet_name, cell_range, dtype=None, use_header
             df = pd.DataFrame(rows[1:], columns=header)
         else:
             df = pd.DataFrame(rows)
-            df.columns = [f"Column{i+1}" for i in range(df.shape[1])]
+            df.columns = [f"Column{i + 1}" for i in range(df.shape[1])]
 
         if dtype is not None and not df.empty:
             df = df.astype(dtype)
@@ -701,6 +702,7 @@ def clear_excel_table(workbook_name, sheet_name, table_name, keep_columns):
     last_col = table.range.column + max(keep_indices)
 
     table.api.Resize(sheet.range((first_row, first_col), (last_row, last_col)).api)
+
 
 def add_unique_row(df1, df2, exclude_columns=None):
     """
@@ -776,7 +778,7 @@ def call_vba_dropdown_macro(workbook_name: str, sheet_name: str, dropdown_name: 
     wb = xw.Book(workbook_name)  # Adjust path or use xw.Book.caller()
     wb.macro('set_dropdown_value')(sheet_name, dropdown_name, new_value)
 
-    
+
 def insert_plot(fig, workbook_name, sheet_name, named_range, replace=False):
     """
     Insert a Matplotlib Figure into an already open Excel workbook at the named range,

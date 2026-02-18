@@ -34,24 +34,56 @@ def valid_data(data):
         return False, data
 
 
-def sanity_check_structure(df):
+def sanity_check_structure(
+    df,
+    required_cols=None,
+):
     """
+    Parameters
+    ----------
+    df : pandas.DataFrame
+    required_cols : list of str, optional
+        Columns that must exist in df and have non-empty values.
+        Default:
+        ["Affiliation",
+         "Top [m]",
+         "Bottom [m]",
+         "D, top [m]",
+         "D, bottom [m]",
+         "t [mm]"]
+
     Returns
     -------
-    ok : bool
+    success_Geometry : bool
         True if sanity check passed, otherwise False
     error_msg : str or None
-        None if ok=True, otherwise an explanation
+        None if success_Geometry=True, otherwise an explanation
     """
     try:
-        required_cols = ["Top [m]", "Bottom [m]"]
+        # Default required columns (extended set)
+        if required_cols is None:
+            required_cols = [
+                "Affiliation",
+                "Top [m]",
+                "Bottom [m]",
+                "D, top [m]",
+                "D, bottom [m]",
+                "t [mm]",
+            ]
 
+        # --- Column check ---
         missing = [col for col in required_cols if col not in df.columns]
         if missing:
             msg = f"Missing columns: {missing}."
-            return False, msg
+            return False, msg  # success_Geometry = False
 
-        # Calculate difference between the bottom of one section and the top of the next
+        # --- Empty / NaN check ---
+        empty_cols = [col for col in required_cols if df[col].isnull().any()]
+        if empty_cols:
+            msg = f"Columns contain missing values: {empty_cols}."
+            return False, msg  # success_Geometry = False
+
+        # --- Continuity check ---
         height_diff = df["Top [m]"].values[1:] - df["Bottom [m]"].values[:-1]
 
         if not np.allclose(height_diff, 0, atol=1e-6):
@@ -62,14 +94,14 @@ def sanity_check_structure(df):
                 "The sections overlap or have gaps between them at "
                 f"index/indices: {misaligned_indices}."
             )
-            return False, msg
+            return False, msg  # success_Geometry = False
 
-        return True, None
+        # --- Everything ok ---
+        return True, None  # success_Geometry = True
 
     except Exception as e:
         msg = f"Sanity check failed due to an unexpected error: {e}"
         return False, msg
-
 
 def center_of_mass_hollow_frustum(d1, d2, z_bot, z_top, t):
     """
@@ -649,7 +681,8 @@ def assemble_structure_excel(excel_caller, rho, MP_identifier, TP_identifier, TO
         STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"] = - float(MP_META.loc[0, "Water Depth [m]"])
         if (STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0] > WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE.index[0], "Top [m]"]) or (
                 STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0] < WHOLE_STRUCTURE.loc[WHOLE_STRUCTURE.index[-1], "Bottom [m]"]):
-            ex.show_message_box(excel_filename, "Warning! Seabed level taken from MP water depth should be below the structure top and above or at the structure bottom for future calculations.")
+            ex.show_message_box(excel_filename,
+                                "Warning! Seabed level taken from MP water depth should be below the structure top and above or at the structure bottom for future calculations.")
     else:
         STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"] = float("nan")
         ex.show_message_box(excel_filename, "Warning! Water Depth not provided in databases, has to be set for future calculations.")
@@ -872,7 +905,8 @@ def calculate_MarineGrowth_excel(excel_caller):
         ex.show_message_box(excel_filename, "Seabed level must be below the structure top and above or at the structure bottom")
         return
 
-    MARINE_GROWTH = mc.calculate_MarineGrowth(global_area, MSL_difference, seabed_level, GEOMETRY.loc[GEOMETRY.index[0], "Top [m]"], GEOMETRY.loc[GEOMETRY.index[-1], "Bottom [m]"],  MG_dens=1325, surf_rought=0)
+    MARINE_GROWTH = mc.calculate_MarineGrowth(global_area, MSL_difference, seabed_level, GEOMETRY.loc[GEOMETRY.index[0], "Top [m]"], GEOMETRY.loc[GEOMETRY.index[-1], "Bottom [m]"],
+                                              MG_dens=1325, surf_rought=0)
     ex.clear_excel_table_contents(excel_filename, "StructureOverview", "MARINE_GROWTH")
     ex.write_df_to_table(excel_filename, "StructureOverview", "MARINE_GROWTH", MARINE_GROWTH)
 

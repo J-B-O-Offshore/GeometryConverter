@@ -1,17 +1,17 @@
+import itertools
+import os
 import os.path
+import shutil
+
+import numpy as np
 import pandas as pd
+from pandas.api.types import CategoricalDtype
+
 import excel as ex
 import misc as mc
-import numpy as np
-from pandas.api.types import CategoricalDtype
-import os
-import shutil
-from ALaPy import periphery as pe
-import itertools
-
-from collections import defaultdict
-
 import plot as plt
+from ALaPy import periphery as pe
+
 # %% helpers
 os.environ["MPLBACKEND"] = "Agg"  # kein GUI nötig
 
@@ -97,6 +97,7 @@ def str_to_bool(s):
         return False
     else:
         raise ValueError(f"Invalid boolean value: {s}")
+
 
 # %% checks:
 def check_marine_growth(mg: pd.DataFrame, name: str = "MARINE_GROWTH") -> tuple[bool, str]:
@@ -201,6 +202,7 @@ def check_appurtenances(apps: pd.DataFrame, required_cols=None) -> tuple[bool, s
             return False, "Geometry specification issues:\n" + "\n".join(err_list)
 
     return True, ""
+
 
 def check_added_masses(masses: pd.DataFrame, name: str = "ADDITIONAL_MASSES") -> tuple[bool, str]:
     """
@@ -330,6 +332,7 @@ def fill_JBOOST_auto_excel(excel_caller):
     ex.write_df_to_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
 
     return True
+
 
 def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False):
     """
@@ -527,8 +530,12 @@ pause"""
     if run_jboost and Modeshapes:
         reversed_dfs = {k: df.iloc[::-1].reset_index(drop=True) for k, df in Modeshapes.items()}
         FIG, result_table = plt.plot_modeshapes(reversed_dfs, order=(1, 2, 3), waterlevels=waterlevels)
-        ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW", result_table)
+
+        ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW", result_table[0])
         ex.insert_plot(FIG, excel_filename, "ExportStructure", "FIG_JBOOST_MODESHAPES")
+
+        pe.save_df_list_to_excel(os.path.join(jboost_export_path, "Modeshape_overview.csv"), result_table, sheet_names=["Overview"]+ [f"f_{n}_modeshapes" for n in range(len(result_table)-1)])
+        pe.save_figs_as_png([FIG], os.path.join(jboost_export_path, "Modeshape_overview"))
 
     ex.show_message_box(
         excel_filename,
@@ -545,7 +552,7 @@ def load_JBOOST_soil_file(excel_caller):
     ].values[0]
 
     try:
-        _, sparse,_ = pe.read_soil_stiffness_matrix_csv(soil_stiff_path)
+        _, sparse, _ = pe.read_soil_stiffness_matrix_csv(soil_stiff_path)
         sparse = sparse.T
 
         # Set default value for all columns
@@ -619,7 +626,7 @@ def create_JBOOST_configs(excel_caller, use_stiff, use_grouping):
             ex.show_message_box(excel_filename,
                                 f"Grouping table empty. Aborting.")
             return
-        if len(JBOOST_GROUPING.dropna(how="any").index)!=len(JBOOST_GROUPING.index):
+        if len(JBOOST_GROUPING.dropna(how="any").index) != len(JBOOST_GROUPING.index):
             ex.show_message_box(excel_filename,
                                 f"Grouping table not compleatly filled. Aborting.")
             return
@@ -634,7 +641,7 @@ def create_JBOOST_configs(excel_caller, use_stiff, use_grouping):
             return
 
         Configs_soil = list(JBOOST_soil_stiffness.loc[
-                                JBOOST_soil_stiffness.index=="Short name",
+                                JBOOST_soil_stiffness.index == "Short name",
                                 JBOOST_soil_stiffness.columns[1:]
                             ].values[0])
     else:
@@ -648,7 +655,7 @@ def create_JBOOST_configs(excel_caller, use_stiff, use_grouping):
 
         # assign group values
         if values[1] is not None:
-            row_curr = JBOOST_GROUPING.loc[JBOOST_GROUPING["Config Name"]==values[1]]
+            row_curr = JBOOST_GROUPING.loc[JBOOST_GROUPING["Config Name"] == values[1]]
 
             for parameter_name_orig in row_curr.columns[1:]:
                 parameter_name = parameter_name_orig.replace("%", "")
@@ -661,24 +668,24 @@ def create_JBOOST_configs(excel_caller, use_stiff, use_grouping):
 
         # assign stiffness values
         if values[0] is not None:
-            PROJECT.loc[PROJECT["Project Settings"]=="found_stiff_trans", colname_config] = \
+            PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_trans", colname_config] = \
                 JBOOST_soil_stiffness.loc[
                     "found_stiff_trans [N/m]",
                     JBOOST_soil_stiffness.loc["Short name"] == values[0]
                 ].iloc[0]
-            PROJECT.loc[PROJECT["Project Settings"]=="found_stiff_rotat", colname_config] = \
+            PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_rotat", colname_config] = \
                 JBOOST_soil_stiffness.loc[
                     "found_stiff_rotat [Nm/rad]",
                     JBOOST_soil_stiffness.loc["Short name"] == values[0]
                 ].iloc[0]
-            PROJECT.loc[PROJECT["Project Settings"]=="found_stiff_coupl", colname_config] = \
+            PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_coupl", colname_config] = \
                 JBOOST_soil_stiffness.loc[
                     "found_stiff_coupl [Nm/m]",
                     JBOOST_soil_stiffness.loc["Short name"] == values[0]
                 ].iloc[0]
 
     ex.clear_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", keep_columns=PROJECT.columns[:4].tolist())
-    #ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_PROJECT")
+    # ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_PROJECT")
     ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_PROJECT", PROJECT)
 
 
@@ -701,7 +708,8 @@ def create_JBOOST_grouping(excel_caller):
     try:
         group_params = pe.parse_mixed_list(group_params)
     except Exception as e:
-        ex.show_message_box(excel_filename, f"Parsing of grouping variables failed. Please make sure, you inserted comma seperated values or string without free spaces, and square brackets, also that the list makes sense. Empty lists possible. Error: {e}")
+        ex.show_message_box(excel_filename,
+                            f"Parsing of grouping variables failed. Please make sure, you inserted comma seperated values or string without free spaces, and square brackets, also that the list makes sense. Empty lists possible. Error: {e}")
         return
 
     # check if params are in the project settings
@@ -717,7 +725,6 @@ def create_JBOOST_grouping(excel_caller):
             "Grouping cannot be applied. Aborting."
         )
         return
-
 
     group_values = JBOOST_GROUPING_PARAMETERS.loc[
         JBOOST_GROUPING_PARAMETERS["Parameter"] == "group values", "Value"
@@ -741,7 +748,7 @@ def create_JBOOST_grouping(excel_caller):
 
     if not (len(group_labels) == len(group_values) == len(group_params)):
         ex.show_message_box(excel_filename,
-                            f"the lists in group_labels, group_values and group_params must have the same length! If you want to leave out labels for a certain parameter, please type [] as a placeholder" )
+                            f"the lists in group_labels, group_values and group_params must have the same length! If you want to leave out labels for a certain parameter, please type [] as a placeholder")
         return
 
     for i, (v, l) in enumerate(zip(group_values, group_labels)):
@@ -780,11 +787,11 @@ def create_JBOOST_grouping(excel_caller):
 
     # check, if this is just an update of some parameters or a new Grouping
     cols_on_sheet = JBOOST_GROUPING.columns.tolist()
-    ident_cols_on_sheet = [col for col in cols_on_sheet if col[0]=="%"]
+    ident_cols_on_sheet = [col for col in cols_on_sheet if col[0] == "%"]
     cols_calculated = GROUPING.columns[1:].tolist()
 
-    added_cols = list(set(cols_on_sheet)-set(cols_calculated))
-    added_cols = [col for col in added_cols if col!="Config Name"]
+    added_cols = list(set(cols_on_sheet) - set(cols_calculated))
+    added_cols = [col for col in added_cols if col != "Config Name"]
 
     rows_on_sheet = JBOOST_GROUPING.index.tolist()
     rows_calculated = GROUPING.index.tolist()
@@ -823,6 +830,7 @@ def create_JBOOST_grouping(excel_caller):
     ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_GROUPING")
     ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_GROUPING", GROUPING)
     return
+
 
 # %% WLGEN
 
@@ -934,6 +942,7 @@ def export_WLGen(excel_caller, WLGen_path):
     ex.show_message_box(excel_filename, f"WLGen Structure created successfully and saved at {out_path}.")
     return
 
+
 def fill_WLGenMasses(excel_caller):
     excel_filename = os.path.basename(excel_caller)
     MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES")
@@ -999,7 +1008,7 @@ def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=No
     GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True)
     MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
     MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
-
+    SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", "SKIRT", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
 
     # ============================================================
@@ -1051,7 +1060,7 @@ def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=No
         return
 
     ok, err = check_appurtenances(APPURTANCES, required_cols=["Top [m]", "Bottom [m]", "Mass [kg]",
-            "Diameter [m]"])
+                                                              "Diameter [m]"])
     if not ok:
         ex.show_message_box(
             excel_filename,
@@ -1088,6 +1097,8 @@ def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=No
         PY_loadcase_spring_heights = None
         cut_embedded = True
 
+
+
     # ============================================================
     # Build Bladed dataframes
     # ============================================================
@@ -1097,6 +1108,7 @@ def fill_Bladed_table(excel_caller, incluce_py_nodes=False, selected_loadcase=No
         MARINE_GROWTH,
         MASSES,
         STRUCTURE_META,
+        SKIRT=SKIRT,
         cut_embedded=cut_embedded,
         PY_springs=PY_loadcase_spring_heights,
         soil_density=soil_density,
@@ -1131,7 +1143,6 @@ def fill_bladed_py_dropdown(excel_caller):
 
 
 def plot_bladed_py(excel_caller, selected_loadcase):
-
     excel_filename = os.path.basename(excel_caller)
     EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
     Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
@@ -1164,7 +1175,6 @@ def plot_bladed_py(excel_caller, selected_loadcase):
 
     ex.write_df_to_table(excel_filename, "ExportStructure", "Bladed_Settings", Bladed_Settings)
 
-
     return
 
 
@@ -1172,7 +1182,7 @@ def update_bladed_name(excel_caller, selected_loadcase):
     excel_filename = os.path.basename(excel_caller)
     Bladed_Settings = ex.read_excel_table(excel_filename, "ExportStructure", "Bladed_Settings", dropnan=True)
     STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
-    basename = STRUCTURE_META.loc[ STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
+    basename = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Model Name", "Value"].values[0]
     if basename is None:
         basename = "Bladed_PJ_file"
     Bladed_Settings.loc[Bladed_Settings["Parameter"] == "PJ file name", "Value"] = basename + f"_{selected_loadcase}"
@@ -1224,6 +1234,7 @@ def apply_bladed_py_curves(excel_caller, Bladed_pj_path, selected_loadcase, inse
     """
     excel_filename = os.path.basename(excel_caller)
     EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
+    SKIRT = ex.read_excel_table(excel_filename, "StructureOverview", "SKIRT", dropnan=True)
 
     py_path = EXPORT_GLOBAL_META.loc[
         EXPORT_GLOBAL_META["Parameter"] == "PY-path (Springs_(L).csv)", "Value"
@@ -1262,8 +1273,8 @@ def apply_bladed_py_curves(excel_caller, Bladed_pj_path, selected_loadcase, inse
     # --- Extract basic configuration values ---
     try:
         PJ_file_name = Bladed_Settings.loc[
-            Bladed_Settings["Parameter"] == "PJ file name", "Value"
-        ].values[0] + ".$PJ"
+                           Bladed_Settings["Parameter"] == "PJ file name", "Value"
+                       ].values[0] + ".$PJ"
         soil_density = Bladed_Settings.loc[
             Bladed_Settings["Parameter"] == "Soil density", "Value"
         ].values[0]
@@ -1303,8 +1314,8 @@ def apply_bladed_py_curves(excel_caller, Bladed_pj_path, selected_loadcase, inse
         PJ_txt, Interpol_control_FIGs = pe.create_bladed_PJ_py_file(PY_loadcase, pile_end=pile_end, make_plots=print_figs)
     except Exception as err:
         ex.show_message_box(excel_filename,
-            f"PY data file could not be read or loadcase '{selected_loadcase}' not found.\nError: {err}"
-        )
+                            f"PY data file could not be read or loadcase '{selected_loadcase}' not found.\nError: {err}"
+                            )
         ex.set_dropdown_values(excel_filename, "ExportStructure", "Dropdown_Bladed_py_loadcase", [""])
         return
 
@@ -1352,7 +1363,7 @@ def apply_bladed_py_curves(excel_caller, Bladed_pj_path, selected_loadcase, inse
         )
 
         Bladed_Elements, Bladed_Nodes = pe.build_Bladed_dataframes(
-            Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META,
+            Bladed_Material, GEOMETRY, MARINE_GROWTH, MASSES, STRUCTURE_META, SKIRT=SKIRT,
             cut_embedded=False, PY_springs=PY_loadcase_spring_heights, soil_density=soil_density, tol_node=tol_node
         )
     except Exception as err:
@@ -1367,7 +1378,7 @@ def apply_bladed_py_curves(excel_caller, Bladed_pj_path, selected_loadcase, inse
         ].values
         node_def_lines = pe.create_bladed_PJ_node_defnition(Nodes_with_spring)
 
-        TP_top_node_value = Bladed_Elements.loc[(Bladed_Elements["Affiliation [-]"]=="TP") | (Bladed_Elements["Affiliation [-]"]=="MP"), "Node [-]"].values[0]
+        TP_top_node_value = Bladed_Elements.loc[(Bladed_Elements["Affiliation [-]"] == "TP") | (Bladed_Elements["Affiliation [-]"] == "MP"), "Node [-]"].values[0]
         TP_top_NODE_idx = Bladed_Nodes.loc[Bladed_Nodes["Node [-]"] == TP_top_node_value, "Node [-]"].index[0]
         seabed_NODE_idx = Bladed_Nodes.loc[Bladed_Nodes["Elevation [m]"] == seabed_level, "Node [-]"].index[0]
         Nodes_interface_mudline = Bladed_Nodes.loc[TP_top_NODE_idx:seabed_NODE_idx, "Node [-]"].values
@@ -1436,7 +1447,7 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_pj_export_path, config_name):
     ].values[0]
 
     try:
-        _, _, stiff_mat  = pe.read_soil_stiffness_matrix_csv(soil_stiff_path)
+        _, _, stiff_mat = pe.read_soil_stiffness_matrix_csv(soil_stiff_path)
 
         config_data = stiff_mat[config_name]
 
@@ -1445,7 +1456,7 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_pj_export_path, config_name):
         Nodes_with_spring = Bladed_Nodes.loc[Bladed_Nodes["Elevation [m]"] == seabed_level, "Node [-]"].values
         node_def_lines = pe.create_bladed_PJ_node_defnition(Nodes_with_spring)
 
-        TP_top_node_value = Bladed_Elements.loc[(Bladed_Elements["Affiliation"]=="TP") | (Bladed_Elements["Affiliation"]=="MP"), "Node [-]"].values[0]
+        TP_top_node_value = Bladed_Elements.loc[(Bladed_Elements["Affiliation"] == "TP") | (Bladed_Elements["Affiliation"] == "MP"), "Node [-]"].values[0]
         TP_top_NODE_idx = Bladed_Nodes.loc[Bladed_Nodes["Node [-]"] == TP_top_node_value, "Node [-]"].index[0]
         seabed_NODE_idx = Bladed_Nodes.loc[Bladed_Nodes["Elevation [m]"] == seabed_level, "Node [-]"].index[0]
         Nodes_interface_mudline = Bladed_Nodes.loc[TP_top_NODE_idx:seabed_NODE_idx, "Node [-]"].values
@@ -1453,7 +1464,7 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_pj_export_path, config_name):
 
         output_node_lines = pe.create_bladed_PJ_output_definition(Nodes_interface_mudline)
 
-        pe.replace_pj_blocks(Bladed_pj_export_path, MFONDS_str, node_def_lines[0], node_def_lines[1],  output_node_lines)
+        pe.replace_pj_blocks(Bladed_pj_export_path, MFONDS_str, node_def_lines[0], node_def_lines[1], output_node_lines)
 
     except Exception as e:
         ex.show_message_box(excel_filename, f"Failed to write PJ file: {e}")
@@ -1462,7 +1473,4 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_pj_export_path, config_name):
 
     return
 
-
-
-
-#export_and_run_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", jboost_export_path="", run_jboost=False)
+#export_and_run_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", jboost_export_path="", run_jboost=True)

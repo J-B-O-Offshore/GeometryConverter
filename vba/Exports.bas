@@ -219,13 +219,16 @@ Sub fill_JBOOST_configs()
     UseStiff = Range("CheckBox_JBOOST_UseStiff_field").Value
     UseGroup = Range("CheckBox_JBOOST_UseGroup_field").Value
     
+    ClearTableContents "ExportStructure", "MODESHAPE_OVERVIEW"
+    DeleteFigure "ExportStructure", "Fig_FIG_JBOOST_MODESHAPES"
     args.Add UseStiff
     args.Add UseGroup
     RunPythonWrapper "export", "create_JBOOST_configs", args
 End Sub
 
 Sub clear_JBOOST_configs()
-
+    ClearTableContents "ExportStructure", "MODESHAPE_OVERVIEW"
+    DeleteFigure "ExportStructure", "Fig_FIG_JBOOST_MODESHAPES"
     RunPythonWrapper "export", "clear_JBOOST_configs"
 End Sub
 

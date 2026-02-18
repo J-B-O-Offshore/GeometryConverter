@@ -1,13 +1,15 @@
 import os
-import excel as ex
 from collections import defaultdict
+
 import matplotlib.pyplot as plt
-import pandas as pd
-import misc as mc
-from matplotlib.patches import Rectangle, Arc, FancyArrow
 import numpy as np
+import pandas as pd
 from matplotlib.patches import Rectangle, Arc
 from matplotlib.ticker import FixedLocator, FuncFormatter
+
+import excel as ex
+import misc as mc
+
 
 def get_JBO_colors(n, fixed_colors=None):
     """
@@ -60,7 +62,6 @@ def get_JBO_colors(n, fixed_colors=None):
 
 
 def plot_Structure(Structure, Added_Masses, waterdepth=None, height_ref="", waterlevel=0, show_section_numbers=True):
-
     fig, ax = plt.subplots(1, 3, figsize=[22, 6])
 
     # Check if Structure is empty
@@ -386,7 +387,6 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height
             boundaries.append(df["Top [m]"].max())
             boundaries.append(df["Bottom [m]"].min())
 
-
     # -------------------------------------------------
     # Grid
     # -------------------------------------------------
@@ -419,7 +419,7 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height
         z_hub = z_top + hub_dz
         boundaries.append(z_com)
         boundaries.append(z_hub)
-        boundaries.append(z_top+hub_dz-rotor_diameter/2)
+        boundaries.append(z_top + hub_dz - rotor_diameter / 2)
 
         # Function to map actual height to top-zero axis
 
@@ -580,7 +580,7 @@ def plot_Assambly(WHOLE_STRUCTURE, SKIRT=None, seabed=None, waterlevel=0, height
 
     # Label only positive side (diameter = 2 * radius)
     axis.xaxis.set_major_formatter(
-        FuncFormatter(lambda x, _: f"{2*x:.0f}" if x >= 0 else "")
+        FuncFormatter(lambda x, _: f"{2 * x:.0f}" if x >= 0 else "")
     )
     if RNA is not None:
         # Get left axis limits
@@ -699,7 +699,7 @@ def plot_Assambly_Build(excel_caller):
 
     WHOLE_STRUCTURE, _, SKIRT, _ = mc.assemble_structure(MP, TP, TOWER, interactive=False, strict_build=False, overlapp_mode="Skirt")
 
-    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0, height_ref=height_ref, RNA = RNA)
+    Fig = plot_Assambly(WHOLE_STRUCTURE, SKIRT=SKIRT, seabed=seabed, waterlevel=0, height_ref=height_ref, RNA=RNA)
     ex.insert_plot(Fig, excel_filename, "BuildYourStructure", f"Assambly_plot")
 
 
@@ -727,7 +727,7 @@ def plot_Assambly_Overview(excel_caller):
         seabed_level = None
 
     height_ref = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Height Reference", "Value"]
-    if type(height_ref)!=str:
+    if type(height_ref) != str:
         height_ref = None
     else:
         height_ref = height_ref.values[0]
@@ -837,57 +837,185 @@ def plot_TOWER(excel_caller):
     return
 
 
-def plot_modeshapes(data, order=(1, 2), waterlevels=None):
+def plot_modeshapes(
+    data,
+    order=(1, 2),
+    waterlevels=None,
+    max_lines=10,
+    max_label_length=100,
+):
 
-    columns = [item for o in order for item in (f"f order {o} [Hz]", f"alpha order {o} [%]")]
-    columns = ["config"] + columns
-    result_table = pd.DataFrame(columns=columns)
+    # ---------------------------------------------------------
+    # Overview table (first DF)
+    # ---------------------------------------------------------
+    columns = ["config Nr.", "config"]
+    columns += [
+        item
+        for o in order
+        for item in (f"f order {o} [Hz]", f"alpha order {o} [%]")
+    ]
 
-    fig, axis = plt.subplots(1, len(order), figsize=[6*len(order), 8])
+    overview_df = pd.DataFrame(columns=columns)
+
+    # ---------------------------------------------------------
+    # Prepare figure
+    # ---------------------------------------------------------
+    fig, axis = plt.subplots(1, len(order), figsize=[6 * len(order), 8])
+
+    if len(order) == 1:
+        axis = [axis]
 
     if waterlevels is not None:
         if len(waterlevels) != len(data):
             raise ValueError("Waterlevels must have same length as data")
 
-    for n, ax in zip(order, axis):
+    # ---------------------------------------------------------
+    # Determine if short labels should be used
+    # ---------------------------------------------------------
+    test_labels = []
+    first_order = order[0]
+
+    for config, values in data.items():
+        freq_str = values.columns[first_order + 1]
+        for r in ["Mode shape", "(", ")", "f", "=", "Hz"]:
+            freq_str = freq_str.replace(r, "")
+        frequency = np.round(float(freq_str), 4)
+
+        if waterlevels is not None:
+            test_labels.append(f"{config} ({frequency}), alpha(WL)")
+        else:
+            test_labels.append(f"{config} ({frequency})")
+
+    use_short_labels = any(len(lbl) > max_label_length for lbl in test_labels)
+
+    # ---------------------------------------------------------
+    # Prepare modeshape tables (one per order)
+    # ---------------------------------------------------------
+    modeshape_tables = []
+
+    for n in order:
+        first_config_df = next(iter(data.values()))
+        z_values = first_config_df["z"].values
+
+        df_mode = pd.DataFrame()
+        df_mode["z [m]"] = z_values
+
+        modeshape_tables.append(df_mode)
+
+    # ---------------------------------------------------------
+    # Plotting + Table Filling
+    # ---------------------------------------------------------
+    suppress_plot = len(data) > max_lines
+
+    for mode_index, (n, ax) in enumerate(zip(order, axis)):
 
         ax.set_title(f"Modeshapes of order {n}")
         ax.set_ylabel("z in m")
         ax.set_xlabel("normalised displacement [-]")
         ax.grid(True)
 
-        i = 0
         colors = get_JBO_colors(len(data))
 
-        for config, values in data.items():
-            shape = values.iloc[:, n+1]
-            shape = shape * np.sign(shape[0])
+        for i, (config, values) in enumerate(data.items()):
 
+            # -----------------------------
+            # Extract modeshape
+            # -----------------------------
+            shape = values.iloc[:, n + 1]
+            shape = shape * np.sign(shape.iloc[0])
+
+            # -----------------------------
+            # Extract frequency
+            # -----------------------------
             freq_str = values.columns[n + 1]
-            remove = ["Mode shape", "(", ")", "f", "=", "Hz"]
-
-            for r in remove:
+            for r in ["Mode shape", "(", ")", "f", "=", "Hz"]:
                 freq_str = freq_str.replace(r, "")
 
-            frequency = np.round(float(freq_str),4)
+            frequency = np.round(float(freq_str), 4)
+
+            # -----------------------------
+            # Alpha at waterlevel
+            # -----------------------------
             if waterlevels is not None:
                 level = float(waterlevels[config])
-                alpha_value = abs(np.round(shape.loc[values["z"]==level].iloc[0] * 100,2))
-                label = f'{config} ({frequency}), $\\alpha(WL) = {alpha_value}\\%$'
-                result_table.loc[config, f"alpha order {n} [%]"] = alpha_value
+                alpha_value = abs(
+                    np.round(
+                        shape.loc[values["z"] == level].iloc[0] * 100,
+                        2,
+                    )
+                )
+                overview_df.loc[config, f"alpha order {n} [%]"] = alpha_value
             else:
-                label = f'{config} ({frequency})'
+                alpha_value = None
 
+            # -----------------------------
+            # Fill overview table
+            # -----------------------------
+            overview_df.loc[config, "config Nr."] = i + 1
+            overview_df.loc[config, "config"] = config
+            overview_df.loc[config, f"f order {n} [Hz]"] = frequency
+
+            # -----------------------------
+            # Fill modeshape table
+            # -----------------------------
+            column_name = f"{i+1}: {config}"
+            modeshape_tables[mode_index][column_name] = shape.values
+
+            # -----------------------------
+            # Skip plotting if too many lines
+            # -----------------------------
+            if suppress_plot:
+                continue
+
+            # -----------------------------
+            # Legend label handling
+            # -----------------------------
+            if use_short_labels:
+                label = f"config {i+1}"
+            else:
+                if waterlevels is not None:
+                    label = (
+                        f"{config} ({frequency}), "
+                        f"$\\alpha(WL) = {alpha_value}\\%$"
+                    )
+                else:
+                    label = f"{config} ({frequency})"
+
+            # -----------------------------
+            # Plot
+            # -----------------------------
             ax.plot(shape, values["z"], label=label, color=colors[i])
-            result_table.loc[config, f"f order {n} [Hz]"] = frequency
-            result_table.loc[config, f"config"] = config
 
-            i += 1
+        # -------------------------------------------------
+        # Plot decorations
+        # -------------------------------------------------
+        if suppress_plot:
+            ax.text(
+                0.5,
+                0.5,
+                f"Too many lines to display\n"
+                f"(current lines: {len(data)}, max lines: {max_lines})",
+                ha="center",
+                va="center",
+                transform=ax.transAxes,
+                fontsize=12,
+            )
+            ax.set_xticks([])
+            ax.set_yticks([])
+        else:
+            ax.axvline(0, linewidth=1.5, color="k", linestyle="--")
+            ax.legend(loc="lower right")
 
-        ax.legend(loc="lower right")
-    print(result_table)
     fig.tight_layout()
-    return fig, result_table
+
+    # ---------------------------------------------------------
+    # Return list of DataFrames
+    # ---------------------------------------------------------
+    result_tables = [overview_df] + modeshape_tables
+
+    return fig, result_tables
+
+
 
 def export_Modeshapes(excel_caller, jboost_path):
     excel_filename = os.path.basename(excel_caller)
@@ -903,14 +1031,15 @@ def export_Modeshapes(excel_caller, jboost_path):
     ex.show_message_box(excel_filename, f"Modeshapes exported successfully at {jboost_path}")
 
     return
-def plot_py_curves(data, max_lines=10, crop_symetric=False, loadcase=None):
 
+
+def plot_py_curves(data, max_lines=10, crop_symetric=False, loadcase=None):
     Springs = list(np.unique(data["Spring [-]"].values))
     heights = list(np.unique(data["z [m]"].values))
 
     NPlot = int(np.ceil(len(Springs) / max_lines))
 
-    fig, axis = plt.subplots(1, NPlot, figsize=[5*NPlot, 6], dpi=800)
+    fig, axis = plt.subplots(1, NPlot, figsize=[5 * NPlot, 6], dpi=800)
 
     if len(axis) == 0:
         axis = [axis]
@@ -920,7 +1049,7 @@ def plot_py_curves(data, max_lines=10, crop_symetric=False, loadcase=None):
 
     for Spring_group, height_group, ax in zip(Springs_group, heights_group, axis):
 
-        ax.set_title(f"py-curves for springs: {Spring_group[0]} ({round(height_group[0],2)}m) to {Spring_group[-1]} ({round(height_group[-1],2)}m)")
+        ax.set_title(f"py-curves for springs: {Spring_group[0]} ({round(height_group[0], 2)}m) to {Spring_group[-1]} ({round(height_group[-1], 2)}m)")
 
         ax.set_xlabel("y [m]")
         ax.set_ylabel("p [KN/m]")
@@ -932,10 +1061,10 @@ def plot_py_curves(data, max_lines=10, crop_symetric=False, loadcase=None):
             y = data.loc[data["Spring [-]"] == Spring, "y [m]"].values
 
             if crop_symetric:
-                p = p[p>=0]
-                y = y[y>=0]
+                p = p[p >= 0]
+                y = y[y >= 0]
 
-            ax.plot(y, p, color=color, label=f"Spring {str(Spring).zfill(2)} at {round(height,2):.2f}m b. SB")
+            ax.plot(y, p, color=color, label=f"Spring {str(Spring).zfill(2)} at {round(height, 2):.2f}m b. SB")
 
         ax.legend(loc="lower right")
 
@@ -949,4 +1078,3 @@ def plot_py_curves(data, max_lines=10, crop_symetric=False, loadcase=None):
     )
     fig.tight_layout()
     return fig
-
