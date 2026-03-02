@@ -53,6 +53,65 @@ class MetaValueError(Exception):
     pass
 
 
+def safe_cast_dataframe(df, dtype, report=False):
+    """
+    Safely cast DataFrame columns to given dtype(s).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+    dtype : dict or single type
+        Dict: {column: dtype}
+        Single type: applied to all columns
+    report : bool
+        If True, prints conversion warnings
+
+    Returns
+    -------
+    pd.DataFrame
+    """
+
+    if dtype is None:
+        return df
+
+    df = df.copy()
+
+    # Normalize dtype definition
+    if not isinstance(dtype, dict):
+        dtype = {col: dtype for col in df.columns}
+
+    for col, target_type in dtype.items():
+        if col not in df.columns:
+            continue
+
+        try:
+            # ---- Numeric Handling ----
+            if target_type in [int, "int", "Int64"]:
+                df[col] = pd.to_numeric(df[col], errors="coerce").astype("Int64")
+
+            elif target_type in [float, "float", "Float64"]:
+                df[col] = pd.to_numeric(df[col], errors="coerce").astype("Float64")
+
+            # ---- Boolean Handling ----
+            elif target_type in [bool, "bool", "boolean"]:
+                df[col] = df[col].astype("boolean")
+
+            # ---- String Handling ----
+            elif target_type in [str, "str", "string"]:
+                df[col] = df[col].astype("string")
+
+            # ---- Everything Else ----
+            else:
+                df[col] = df[col].astype(target_type)
+
+        except Exception as e:
+            # Fallback: column becomes NaN
+            df[col] = pd.Series([np.nan] * len(df), dtype="Float64")
+            if report:
+                print(f"[safe_cast_dataframe] Failed casting column '{col}' to {target_type}: {e}")
+
+    return df
+
 def check_meta_values(Meta_values):
     """
     Validates the Meta_values list and converts numeric strings to float.
@@ -288,23 +347,8 @@ def load_db_table(excel_filename, db_path, Identifier, dtype=None):
         df = df.drop(columns=['index'])
 
     # Apply dtype
-    # Convert dtype="str" to empty string
-    if dtype == "str":
-        dtype = ""
+    df = safe_cast_dataframe(df, dtype, report=True)
 
-    if dtype is not None:
-        try:
-            if isinstance(dtype, dict):
-                df = df.astype(dtype)
-            else:
-                # Single type applied to all columns
-                df = df.astype({col: dtype for col in df.columns})
-        except Exception as e:
-            ex.show_message_box(
-                excel_filename,
-                f"Failed to apply data types {dtype} to table '{Identifier}'.\nPython Error: {e}"
-            )
-            return None
     return df
 
 
@@ -660,6 +704,10 @@ def load_DATA(excel_filename, Structure, Structure_name, db_path):
     if META is None:
         return
 
+    if "Water Depth [m]" in META.columns:
+        META["Water Depth [m]"] = pd.to_numeric(
+            META["Water Depth [m]"], errors="coerce"
+        )
     DATA = load_db_table(excel_filename, db_path, Structure_name)
 
     if DATA is None:

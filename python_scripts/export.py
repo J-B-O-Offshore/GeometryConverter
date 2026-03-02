@@ -373,6 +373,9 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
         ex.show_message_box(excel_filename, "Please define RNA parameters. Aborting")
         return
 
+    if len(MARINE_GROWTH.index)==0:
+        MARINE_GROWTH = None
+
     # --- Set RNA inertia ---
     inertia_type = PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0]
     if inertia_type == "fore-aft":
@@ -419,8 +422,8 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
     proj_configs = fill_dataframe_with_defaults(PROJECT.iloc[:, 3:], default)
 
     # --- cut marine growth
-    MARINE_GROWTH = pe.clip_marine_growth(GEOMETRY, MARINE_GROWTH, seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0])
-    print(MARINE_GROWTH)
+    if MARINE_GROWTH is not None:
+        MARINE_GROWTH = pe.clip_marine_growth(GEOMETRY, MARINE_GROWTH, seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0])
     # --- Clear previous results if running JBOOST ---
     if run_jboost:
         ex.clear_excel_table_contents(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW")
