@@ -386,6 +386,20 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
         ex.show_message_box(excel_filename, "Please define 'side-side' or 'fore-aft' for RNA Inertia. Aborting")
         return
 
+    # --- Check required deflections ---
+
+    for param_name in ["deflection MP", "deflection TOWER", "deflection TP"]:
+        value = PARAMETERS.loc[
+            PARAMETERS["Parameter"] == param_name, "Value"
+        ].values[0]
+
+        if value is None or str(value).strip() == "" or str(value).strip().lower() == "none":
+            ex.show_message_box(
+                excel_filename,
+                f"Please define a value for '{param_name}'. "
+                "If no deflection is required, please set it to 0. Aborting."
+            )
+            return
     # --- Check geometry ---
     success_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY,             required_cols = [
                 "Affiliation",
@@ -411,6 +425,11 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
     folder_hierachy = str_to_bool(folder_hierachy)
 
     configs = list(PROJECT.columns[4:])
+
+    if len(configs) == 0:
+        ex.show_message_box(excel_filename, "Please define some columns as configurations in the Projects Settings, no runs detected. Aborting")
+        return
+
     if folder_hierachy:
         config_paths = [os.path.join(jboost_export_path, path.replace("__", r"\\")) for path in configs]
     else:
