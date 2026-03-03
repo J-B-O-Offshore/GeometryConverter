@@ -375,6 +375,11 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
 
     if len(MARINE_GROWTH.index)==0:
         MARINE_GROWTH = None
+    else:
+        success_MG, msg = check_marine_growth(MARINE_GROWTH)
+    if not success_MG:
+        ex.show_message_box(excel_filename, f"Marine Growth is defined wrong. Aborting. {msg}")
+        return
 
     # --- Set RNA inertia ---
     inertia_type = PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0]
@@ -387,7 +392,6 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
         return
 
     # --- Check required deflections ---
-
     for param_name in ["deflection MP", "deflection TOWER", "deflection TP"]:
         value = PARAMETERS.loc[
             PARAMETERS["Parameter"] == param_name, "Value"
@@ -400,6 +404,7 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
                 "If no deflection is required, please set it to 0. Aborting."
             )
             return
+
     # --- Check geometry ---
     success_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY,             required_cols = [
                 "Affiliation",
@@ -649,7 +654,7 @@ def create_JBOOST_configs(excel_caller, use_stiff, use_grouping):
     JBOOST_soil_stiffness.set_index("Stiffness", inplace=True)
     mask = JBOOST_soil_stiffness.loc["Use for JBOOST config? (Y/N)"] == "Y"
     JBOOST_soil_stiffness = JBOOST_soil_stiffness.loc[:, mask]
-
+    print(JBOOST_soil_stiffness)
     # check, if grouping is ignored
     if use_grouping:
         if len(JBOOST_GROUPING.index) == 0:
@@ -672,8 +677,9 @@ def create_JBOOST_configs(excel_caller, use_stiff, use_grouping):
 
         Configs_soil = list(JBOOST_soil_stiffness.loc[
                                 JBOOST_soil_stiffness.index == "Short name",
-                                JBOOST_soil_stiffness.columns[1:]
+                                JBOOST_soil_stiffness.columns
                             ].values[0])
+        print(Configs_soil)
     else:
         Configs_soil = [None]
     #
