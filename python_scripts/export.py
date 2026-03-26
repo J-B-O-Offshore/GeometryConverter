@@ -377,9 +377,9 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
         MARINE_GROWTH = None
     else:
         success_MG, msg = check_marine_growth(MARINE_GROWTH)
-    if not success_MG:
-        ex.show_message_box(excel_filename, f"Marine Growth is defined wrong. Aborting. {msg}")
-        return
+        if not success_MG:
+            ex.show_message_box(excel_filename, f"Marine Growth is defined wrong. Aborting. {msg}")
+            return
 
     # --- Set RNA inertia ---
     inertia_type = PARAMETERS.loc[PARAMETERS["Parameter"] == "RNA Inertia", "Value"].values[0]
