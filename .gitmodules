@@ -1,3 +1,6 @@
 [submodule "python_scripts/ALaPy"]
 	path = python_scripts/ALaPy
 	url = https://github.com/J-B-O-Offshore/ALaPy
+[submodule "JBOOSTReloaded"]
+	path = JBOOSTReloaded
+	url = https://github.com/J-B-O-Offshore/JBOOSTReloaded
