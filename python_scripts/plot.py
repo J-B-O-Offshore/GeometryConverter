@@ -8,7 +8,7 @@ from matplotlib.patches import Rectangle, Arc
 from matplotlib.ticker import FixedLocator, FuncFormatter
 
 import excel as ex
-import misc as mc
+import ALaPy.src.alapy as mc
 
 
 def get_JBO_colors(n, fixed_colors=None):

@@ -10,7 +10,7 @@ from pandas.api.types import CategoricalDtype
 import excel as ex
 import misc as mc
 import plot as plt
-from ALaPy import periphery as pe
+from ALaPy.src.alapy import periphery as pe
 
 from JBOOSTReloaded.src.JBOOSTReloaded import connectors as jbr_connectors
 from JBOOSTReloaded.src.JBOOSTReloaded import macro_analysis as jbr_ana

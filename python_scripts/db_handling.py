@@ -9,7 +9,7 @@ import xlwings as xw
 import excel as ex
 import misc as geomc
 import plot as ex_plt
-from ALaPy import misc as mc
+from ALaPy.src.alapy import misc as mc
 
 META_dtypes = [str, str, str, str, str, float, str, str]
 META_dtpes_dict = {"Name": str,

@@ -5,7 +5,7 @@ import pandas as pd
 
 import excel as ex
 import plot as GCplt
-from ALaPy import misc as mc
+from ALaPy.src.alapy import misc as mc
 
 
 def find_duplicate_masses(df: pd.DataFrame) -> list[list[int]]:
