@@ -10,6 +10,15 @@ Sub select_JBOOST_out()
     
 End Sub
 
+Sub select_JBOOSTReloaded_out()
+    Dim prevValue As Variant
+    
+    PickFolderDialog "JBOOST_Reloaded"
+    
+End Sub
+
+
+
 Sub select_Bladad_py_curves()
     Dim prevValue As Variant
     
@@ -76,6 +85,14 @@ Sub load_JBOOST_soil_stiffness()
     RunPythonWrapper "export", "load_JBOOST_soil_file"
 End Sub
 
+
+Sub load_JBOOSTReloaded_soil_stiffness()
+    Dim run As Boolean
+    
+    ClearTableContents "ExportStructure", "JBOOSTReloaded_soil_stiffness"
+
+    RunPythonWrapper "export", "load_JBOOSTReloaded_soil_file"
+End Sub
 
 Sub load_Bladed_soil_stiffness_mat()
 
@@ -208,13 +225,29 @@ Sub export_run_JBOOST()
 End Sub
 
 
+Sub export_run_JBOOSTReloaded()
+    Dim jboost_path As String
+    Dim args As New Collection
+
+    jboost_path = Range("JBOOST_Reloaded").Value
+    ' --- File existence checks ---
+    success = FolderExists(jboost_path)
+    If Not success Then
+        MsgBox "JBOOST folder does not exist or is not reachable: " & jboost_path, vbExclamation, "Error"
+        Exit Sub
+    End If
+    args.Add jboost_path
+    RunPythonWrapper "export", "export_and_run_JBOOSTReloaded", args
+    
+End Sub
+
 Sub fill_JBOOST_auto_values()
     RunPythonWrapper "export", "fill_JBOOST_auto_excel"
 End Sub
 
 Sub fill_JBOOST_configs()
-    Dim UseStiff As Boolean
-    Dim UseGroup As Boolean
+    Dim UseStiff As String
+    Dim UseGroup As String
     Dim args As New Collection
     UseStiff = Range("CheckBox_JBOOST_UseStiff_field").Value
     UseGroup = Range("CheckBox_JBOOST_UseGroup_field").Value
@@ -226,12 +259,31 @@ Sub fill_JBOOST_configs()
     RunPythonWrapper "export", "create_JBOOST_configs", args
 End Sub
 
+Sub fill_JBOOSTReloaded_configs()
+    Dim UseStiff As String
+    Dim UseGroup As String
+    Dim args As New Collection
+    UseStiff = Range("CheckBox_JBOOSReloaded_UseStiff_field").Value
+    UseGroup = Range("CheckBox_JBOOSTReloaded_UseGroup_field").Value
+    
+    ClearTableContents "ExportStructure", "JBOOSTReloaded_MODESHAPE_OVERVIEW"
+    DeleteFigure "ExportStructure", "Fig_FIG_JBOOSTReloaded_MODESHAPES"
+    args.Add UseStiff
+    args.Add UseGroup
+    RunPythonWrapper "export", "create_JBOOSTReloaded_configs", args
+End Sub
+
 Sub clear_JBOOST_configs()
     ClearTableContents "ExportStructure", "MODESHAPE_OVERVIEW"
     DeleteFigure "ExportStructure", "Fig_FIG_JBOOST_MODESHAPES"
     RunPythonWrapper "export", "clear_JBOOST_configs"
 End Sub
 
+Sub clear_JBOOSTReloaded_configs()
+    ClearTableContents "ExportStructure", "JBOOSTReloaded_MODESHAPE_OVERVIEW"
+    DeleteFigure "ExportStructure", "Fig_FIG_JBOOST_MODESHAPES"
+    RunPythonWrapper "export", "clear_JBOOSTReloaded_configs"
+End Sub
 
 Sub run_JBOOST()
     Dim jboost_path As String
@@ -255,6 +307,11 @@ End Sub
 Sub create_JBOOST_grouping()
     
     RunPythonWrapper "export", "create_JBOOST_grouping"
+End Sub
+
+Sub create_JBOOSTReloaded_grouping()
+    
+    RunPythonWrapper "export", "create_JBOOSTReloaded_grouping"
 End Sub
 
 Sub export_Modeshapes()
@@ -331,15 +388,19 @@ End Sub
 
 
 Sub show_WLGen_section()
-    ShowOnlySelectedColumns "E:BW", "E:S"
+    ShowOnlySelectedColumns "E:CK", "E:S"
 End Sub
 
 Sub show_Bladed_section()
-    ShowOnlySelectedColumns "E:BW", "T:AQ"
+    ShowOnlySelectedColumns "E:CK", "T:AQ"
 End Sub
 
 Sub show_JBOOST_section()
-    ShowOnlySelectedColumns "E:BW", "AS:BW"
+    ShowOnlySelectedColumns "E:CK", "AS:CD"
+End Sub
+
+Sub show_JBOOSTReloaded_section()
+    ShowOnlySelectedColumns "E:CK", "CC:CK"
 End Sub
 
 Sub open_BLADED_pj_file_stiff_mat()

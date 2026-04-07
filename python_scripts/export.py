@@ -12,6 +12,9 @@ import misc as mc
 import plot as plt
 from ALaPy import periphery as pe
 
+from JBOOSTReloaded.src.JBOOSTReloaded import connectors as jbr_connectors
+from JBOOSTReloaded.src.JBOOSTReloaded import macro_analysis as jbr_ana
+
 # %% helpers
 os.environ["MPLBACKEND"] = "Agg"  # kein GUI nötig
 
@@ -429,7 +432,7 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
     folder_hierachy = PARAMETERS.loc[PARAMETERS["Parameter"] == "Folder Hierachy", "Value"].values[0]
     folder_hierachy = str_to_bool(folder_hierachy)
 
-    configs = list(PROJECT.columns[4:])
+    configs = list(PROJECT.columns[3:])
 
     if len(configs) == 0:
         ex.show_message_box(excel_filename, "Please define some columns as configurations in the Projects Settings, no runs detected. Aborting")
@@ -444,7 +447,7 @@ def export_and_run_JBOOST(excel_caller, jboost_export_path="", run_jboost=False)
     PROJECT = PROJECT.set_index("Project Settings")
     default = PROJECT.loc[:, "default"]
     proj_configs = fill_dataframe_with_defaults(PROJECT.iloc[:, 3:], default)
-
+    print(proj_configs)
     # --- cut marine growth
     if MARINE_GROWTH is not None:
         MARINE_GROWTH = pe.clip_marine_growth(GEOMETRY, MARINE_GROWTH, seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0])
@@ -865,6 +868,531 @@ def create_JBOOST_grouping(excel_caller):
                             message)
     ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_GROUPING")
     ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOST_GROUPING", GROUPING)
+    return
+
+
+# %% JBOOSTReloaded
+def fill_JBOOSTReloaded_auto_excel(excel_caller):
+    """
+    Fills missing or automatically assigned values in the `JBOOST_PROJECT` Excel table
+    based on defaults and metadata from the `StructureOverview` sheet.
+
+    Reads the `JBOOST_PROJECT` table from the "ExportStructure" sheet
+    and the `STRUCTURE_META` table from the "StructureOverview" sheet. Replaces
+    missing or 'auto' values with either:
+      - defaults from the `default` column, or
+      - values from `STRUCTURE_META` (e.g., water level, seabed level, hub height).
+
+    If a required 'auto' value cannot be resolved from `STRUCTURE_META`, a message box
+    is shown and the function aborts.
+
+    Parameters
+    ----------
+    excel_caller : str
+        Path or filename of the Excel file containing the required tables.
+        Only the basename is used internally.
+
+    Returns
+    -------
+    bool
+        True if all values were successfully filled; False if the process was aborted.
+    """
+
+    excel_filename = os.path.basename(excel_caller)
+
+    # Load tables
+    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_PROJECT", dtype=str)
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    # Use 'Project Settings' as the index
+    PROJECT.index = PROJECT["Project Settings"]
+
+    default_values = PROJECT["default"]
+    proj_configs = PROJECT.iloc[:, 4:]
+
+    def resolve_auto_value(parameter, config_key, description, config_name):
+        """Helper to resolve 'auto' values from STRUCTURE_META."""
+        value = STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == parameter, "Value"].values
+
+        if len(value) > 0:
+            if isinstance(value[0], (int, float)):
+                PROJECT.at[config_key, config_name] = value[0]
+                return True
+            else:
+                # Wrong type in Excel
+                ex.show_message_box(
+                    excel_filename,
+                    f"Invalid type for {description} in StructureOverview.\n"
+                    f"You set {config_key} in {config_name} to 'auto', but the corresponding value "
+                    f"is not a number (found: {value[0]!r}). Aborting."
+                )
+                return False
+
+        # Missing entry in Excel
+        ex.show_message_box(
+            excel_filename,
+            f"Please set {description} in StructureOverview, as you set {config_key} "
+            f"in {config_name} to 'auto'. Aborting."
+        )
+        return False
+
+    # Iterate over project configurations
+    for config_name, config_data in proj_configs.items():
+        # Fill empty cells with defaults
+        config_data = config_data.replace("", np.nan).fillna(default_values)
+
+        # Fill specific 'auto' values
+        if config_data.at["water_level"] == "auto":
+            if not resolve_auto_value("Water level", "water_level", "a water level", config_name):
+                return False
+        if config_data.at["seabed_level"] == "auto":
+            if not resolve_auto_value("Seabed level", "seabed_level", "a seabed level", config_name):
+                return False
+
+    # Restore 'Project Settings' column
+    PROJECT["Project Settings"] = PROJECT.index
+
+    # Write back updated table
+    ex.write_df_to_table(excel_filename, "ExportStructure", "JBOOSTReloaded_PROJECT", PROJECT)
+
+    return True
+
+
+def export_and_run_JBOOSTReloaded(excel_caller, jboost_export_path="", only_excel=False):
+    """
+    Export JBOOST structure files and optionally run JBOOST from Excel data.
+
+    Parameters:
+    - excel_caller: str, path to the Excel file
+    - jboost_export_path: str, folder to save exported structure/proj files and results.
+                          If empty, defaults to the folder containing the Excel file.
+    - run_jboost: bool, if True, run JBOOST and export results
+    """
+    success = fill_JBOOSTReloaded_auto_excel(excel_caller)
+
+    if not success:
+        return
+
+    excel_filename = str(os.path.basename(excel_caller))
+    if not jboost_export_path:
+        jboost_export_path = os.path.dirname(os.path.abspath(excel_caller))
+    else:
+        jboost_export_path = os.path.abspath(jboost_export_path)
+
+    # --- Read tables ---
+    GEOMETRY = ex.read_excel_table(excel_filename, "StructureOverview", "WHOLE_STRUCTURE", dropnan=True).drop(columns=["Section", "local Section"])
+    MASSES = ex.read_excel_table(excel_filename, "StructureOverview", "ALL_ADDED_MASSES", dropnan=True)
+    MARINE_GROWTH = ex.read_excel_table(excel_filename, "StructureOverview", "MARINE_GROWTH", dropnan=True)
+    PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_PARAMETER", dropnan=True)
+    STRUCTURE_META = ex.read_excel_table(excel_filename, "StructureOverview", "STRUCTURE_META")
+    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_PROJECT", dtype=str)
+    rna = ex.read_excel_table(excel_filename, "StructureOverview", "RNA", dropnan=True)
+
+    if len(rna) == 0:
+        ex.show_message_box(excel_filename, "Please define RNA parameters. Aborting")
+        return
+
+    if len(MARINE_GROWTH.index)==0:
+        MARINE_GROWTH = None
+    else:
+        success_MG, msg = check_marine_growth(MARINE_GROWTH)
+        if not success_MG:
+            ex.show_message_box(excel_filename, f"Marine Growth is defined wrong. Aborting. {msg}")
+            return
+
+    # --- Check geometry ---
+    success_GEOMETRY, msg = mc.sanity_check_structure(GEOMETRY,             required_cols = [
+                "Affiliation",
+                "Top [m]",
+                "Bottom [m]",
+                "D, top [m]",
+                "D, bottom [m]",
+                "t [mm]",
+            ])
+
+    if not success_GEOMETRY:
+        ex.show_message_box(excel_filename, f"Geometry is messed up. Aborting. {msg}")
+        return
+
+    # ----- create folders -----
+    folder_hierachy = PARAMETERS.loc[PARAMETERS["Parameter"] == "Folder Hierachy", "Value"].values[0]
+    folder_hierachy = str_to_bool(folder_hierachy)
+
+    export_single = PARAMETERS.loc[PARAMETERS["Parameter"] == "Export single results", "Value"].values[0]
+    export_single = str_to_bool(export_single)
+    only_excel = str_to_bool(only_excel)
+
+    configs = list(PROJECT.columns[3:])
+
+    if len(configs) == 0:
+        ex.show_message_box(excel_filename, "Please define some columns as configurations in the Projects Settings, no runs detected. Aborting")
+        return
+
+    if folder_hierachy:
+        config_paths = [os.path.join(jboost_export_path, path.replace("__", r"\\")) for path in configs[1:]]
+    else:
+        config_paths = [os.path.join(jboost_export_path, config) for config in configs[1:]]
+
+    # --- Project configurations ---
+    PROJECT = PROJECT.set_index("Project Settings")
+    default = PROJECT.loc[:, "default"]
+    proj_configs = fill_dataframe_with_defaults(PROJECT.iloc[:, 3:], default)
+
+    # get deflection units
+    Defl_units = {"MP": PROJECT.loc["deflection_MP", "unit"], "TP": PROJECT.loc["deflection_TP", "unit"], "TOWER": PROJECT.loc["deflection_TOWER", "unit"]}
+
+    # --- cut marine growth
+    if MARINE_GROWTH is not None:
+        MARINE_GROWTH = pe.clip_marine_growth(GEOMETRY, MARINE_GROWTH, seabed_level=STRUCTURE_META.loc[STRUCTURE_META["Parameter"] == "Seabed level", "Value"].values[0])
+
+    # --- Clear previous results if running JBOOST ---
+    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "MODESHAPE_OVERVIEW")
+
+    # --- Iterate through configs ---
+    RESULTS = {}
+
+    for (config_name, config_data), config_path in zip(proj_configs.items(), config_paths):
+        config_struct = {row: data for row, data in config_data.items()}
+
+        if config_struct["RNA_inertia_direction"] not in ["fore-aft", "side-side"]:
+            ex.show_message_box(excel_filename, f"Please set the RNA inertia direction to 'side-side' or 'fore-aft'. Now set to: {config_struct['RNA_inertia_direction']}")
+            return
+
+        result = jbr_connectors.run_from_df(GEOMETRY,
+                                            MASSES,
+                                            MARINE_GROWTH,
+                                            np.array([[config_data["found_stiff_trans"], config_data["found_stiff_coupl"]],
+                                             [config_data["found_stiff_coupl"], config_data["found_stiff_rotat"]]]),
+                                            water_density=config_data["water_density"],
+                                            seabed_level=config_data["seabed_level"],
+                                            water_level=config_data["water_level"],
+                                            RNA_mass=rna["Mass of RNA [kg]"],
+                                            RNA_inertia=rna[f"Inertia of RNA {config_struct['RNA_inertia_direction']} @COG [kg m^2]"],
+                                            COG_offset=rna[f"Vertical Offset TT_COG [m]"],
+                                            deflection={"MP": (config_data["deflection_MP"], Defl_units["MP"]),
+                                                        "TP": (config_data["deflection_TP"], Defl_units["TP"]),
+                                                        "TOWER": (config_data["deflection_TOWER"], Defl_units["TOWER"])})
+
+        if export_single and not only_excel:
+            result.export_results(config_path)
+            result.plot_overview(config_path)
+
+        RESULTS[config_name] = result
+
+    if not only_excel:
+        try:
+            jbr_ana.write_summary_xlsx(RESULTS, jboost_export_path)
+        except PermissionError as e:
+            ex.show_message_box(excel_filename, f"{e}")
+
+        try:
+            jbr_ana.write_modal_results_xlsx(RESULTS, jboost_export_path)
+        except PermissionError as e:
+            ex.show_message_box(excel_filename, f"{e}")
+
+        try:
+            jbr_ana.write_inclination_results_xlsx(RESULTS, jboost_export_path)
+        except PermissionError as e:
+            ex.show_message_box(excel_filename, f"{e}")
+
+        jbr_ana.plot_modal_comparison(RESULTS, jboost_export_path)
+        jbr_ana.plot_inclination_comparison(RESULTS, jboost_export_path)
+
+    else:
+        fig = jbr_ana.plot_modal_comparison(RESULTS, jboost_export_path)
+        ex.insert_plot(fig, excel_filename, "ExportStructure", "FIG_JBOOSTReloaded_MODESHAPES")
+
+    ex.show_message_box(
+        excel_filename,
+        f"JBOOSTReloaded run sucessfull. " + ("Modeshape view refreshed." if only_excel else f"Files exported to {jboost_export_path}.")
+    )
+
+
+def load_JBOOSTReloaded_soil_file(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    EXPORT_GLOBAL_META = ex.read_excel_table(excel_filename, "ExportStructure", "EXPORT_GLOBAL_META", dropnan=True)
+    soil_stiff_path = EXPORT_GLOBAL_META.loc[
+        EXPORT_GLOBAL_META["Parameter"] == "Soil Stiffness (Lateral Stiffness.csv)", "Value"
+    ].values[0]
+
+    try:
+        _, sparse, _ = pe.read_soil_stiffness_matrix_csv(soil_stiff_path)
+        sparse = sparse.T
+
+        # Set default value for all columns
+        sparse.loc["Use for JBOOST config? (Y/N)", :] = "N"
+        sparse.loc["Short name", :] = sparse.columns
+
+        # Boolean masks for columns
+        reloading_init_col = (sparse.columns.str.contains("reloading")
+                              & sparse.columns.str.contains("init")
+                              & sparse.columns.str.contains("FLS"))
+        reloading_loaded_col = (sparse.columns.str.contains("reloading")
+                                & sparse.columns.str.contains("loaded")
+                                & sparse.columns.str.contains("FLS"))
+        static_red_init_col = (
+                sparse.columns.str.contains("static")
+                & sparse.columns.str.contains("init")
+                & sparse.columns.str.contains("red")
+                & sparse.columns.str.contains("ULS")
+        )
+        static_red_loaded_col = (
+                sparse.columns.str.contains("static")
+                & sparse.columns.str.contains("loaded")
+                & sparse.columns.str.contains("red")
+                & sparse.columns.str.contains("ULS")
+        )
+
+        # Apply changes if there are matches
+        if reloading_init_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", reloading_init_col] = "Y"
+            sparse.loc["Short name", reloading_init_col] = "FLS_reloading_init"
+        if reloading_loaded_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", reloading_loaded_col] = "Y"
+            sparse.loc["Short name", reloading_loaded_col] = "FLS_reloading_loaded"
+        if static_red_init_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", static_red_init_col] = "Y"
+            sparse.loc["Short name", static_red_init_col] = "ULS_static_red_init"
+        if static_red_loaded_col.any():
+            sparse.loc["Use for JBOOST config? (Y/N)", static_red_loaded_col] = "Y"
+            sparse.loc["Short name", static_red_loaded_col] = "ULS_static_red_loaded"
+
+        sparse.insert(0, "Stiffness", sparse.index)
+
+        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOSTReloaded_soil_stiffness")
+        ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOSTReloaded_soil_stiffness", sparse)
+
+    except:
+        ex.show_message_box(excel_filename, f"PY data file could not be read, make sure it is the right format and it is reachable.")
+        ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOSTReloaded_soil_stiffness")
+    return
+
+
+def create_JBOOSTReloaded_configs(excel_caller, use_stiff, use_grouping):
+    excel_filename = os.path.basename(excel_caller)
+
+    use_stiff = str_to_bool(use_stiff)
+    use_grouping = str_to_bool(use_grouping)
+
+    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_PROJECT", dtype=str)
+    PROJECT = PROJECT.iloc[:, 0:4]
+
+    JBOOST_GROUPING = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_GROUPING", dtype=str, dropnan=True)
+
+    JBOOST_soil_stiffness = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_soil_stiffness", dtype=str, dropnan=True)
+    JBOOST_soil_stiffness.set_index("Stiffness", inplace=True)
+    mask = JBOOST_soil_stiffness.loc["Use for JBOOST config? (Y/N)"] == "Y"
+    JBOOST_soil_stiffness = JBOOST_soil_stiffness.loc[:, mask]
+    print(JBOOST_soil_stiffness)
+    # check, if grouping is ignored
+    if use_grouping:
+        if len(JBOOST_GROUPING.index) == 0:
+            ex.show_message_box(excel_filename,
+                                f"Grouping table empty. Aborting.")
+            return
+        if len(JBOOST_GROUPING.dropna(how="any").index) != len(JBOOST_GROUPING.index):
+            ex.show_message_box(excel_filename,
+                                f"Grouping table not compleatly filled. Aborting.")
+            return
+        Configs_grouping = JBOOST_GROUPING["Config Name"].tolist()
+    else:
+        Configs_grouping = [None]
+
+    if use_stiff:
+        if len(JBOOST_soil_stiffness.index) == 0:
+            ex.show_message_box(excel_filename,
+                                f"Stiffness table empty. Aborting.")
+            return
+
+        Configs_soil = list(JBOOST_soil_stiffness.loc[
+                                JBOOST_soil_stiffness.index == "Short name",
+                                JBOOST_soil_stiffness.columns
+                            ].values[0])
+        print(Configs_soil)
+    else:
+        Configs_soil = [None]
+    #
+    for i, values in enumerate(itertools.product(Configs_soil, Configs_grouping)):
+        values_valid = [v for v in values if v is not None]
+        colname_config = "__".join(values_valid)
+
+        PROJECT[colname_config] = None
+
+        # assign group values
+        if values[1] is not None:
+            row_curr = JBOOST_GROUPING.loc[JBOOST_GROUPING["Config Name"] == values[1]]
+
+            for parameter_name_orig in row_curr.columns[1:]:
+                parameter_name = parameter_name_orig.replace("%", "")
+                try:
+                    PROJECT.loc[PROJECT["Project Settings"] == parameter_name, colname_config] = row_curr[parameter_name_orig].iloc[0]
+                except Exception:
+                    ex.show_message_box(excel_filename,
+                                        f"Parameter {parameter_name} not in Project Setting table. Aborting")
+                    return
+
+        # assign stiffness values
+        if values[0] is not None:
+            PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_trans", colname_config] = \
+                JBOOST_soil_stiffness.loc[
+                    "found_stiff_trans [N/m]",
+                    JBOOST_soil_stiffness.loc["Short name"] == values[0]
+                ].iloc[0]
+            PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_rotat", colname_config] = \
+                JBOOST_soil_stiffness.loc[
+                    "found_stiff_rotat [Nm/rad]",
+                    JBOOST_soil_stiffness.loc["Short name"] == values[0]
+                ].iloc[0]
+            PROJECT.loc[PROJECT["Project Settings"] == "found_stiff_coupl", colname_config] = \
+                JBOOST_soil_stiffness.loc[
+                    "found_stiff_coupl [Nm/m]",
+                    JBOOST_soil_stiffness.loc["Short name"] == values[0]
+                ].iloc[0]
+
+    ex.clear_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_PROJECT", keep_columns=PROJECT.columns[:4].tolist())
+    # ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOST_PROJECT")
+    ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOSTReloaded_PROJECT", PROJECT)
+
+
+def clear_JBOOSTReloaded_configs(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOST_PROJECT", dtype=str)
+    ex.clear_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_PROJECT", keep_columns=PROJECT.columns[:4].tolist())
+    return
+
+
+def create_JBOOSTReloaded_grouping(excel_caller):
+    excel_filename = os.path.basename(excel_caller)
+    JBOOST_GROUPING_PARAMETERS = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_GROUPING_PARAMETERS", dropnan=True)
+    JBOOST_GROUPING = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_GROUPING", dropnan=True)
+    JBOOST_PROJECT = ex.read_excel_table(excel_filename, "ExportStructure", "JBOOSTReloaded_PROJECT", dropnan=True)
+    # checks an assignment
+    group_params = JBOOST_GROUPING_PARAMETERS.loc[
+        JBOOST_GROUPING_PARAMETERS["Parameter"] == "grouping variables", "Value"
+    ].values[0]
+    try:
+        group_params = pe.parse_mixed_list(group_params)
+    except Exception as e:
+        ex.show_message_box(excel_filename,
+                            f"Parsing of grouping variables failed. Please make sure, you inserted comma seperated values or string without free spaces, and square brackets, also that the list makes sense. Empty lists possible. Error: {e}")
+        return
+
+    # check if params are in the project settings
+    project_params = set(JBOOST_PROJECT.loc[:, "Project Settings"].to_list())
+    group_params_set = set(group_params)
+    missing = group_params_set - project_params
+    if missing:
+        ex.show_message_box(
+            excel_filename,
+            "Please make sure all parameters are in the Project settings table.\n\n"
+            f"The following parameters were not found:\n"
+            f"{', '.join(sorted(missing))}\n\n"
+            "Grouping cannot be applied. Aborting."
+        )
+        return
+
+    group_values = JBOOST_GROUPING_PARAMETERS.loc[
+        JBOOST_GROUPING_PARAMETERS["Parameter"] == "group values", "Value"
+    ].values[0]
+    try:
+        group_values = pe.parse_mixed_list(group_values)
+    except Exception as e:
+        ex.show_message_box(excel_filename,
+                            f"Parsing of grouping values failed. Please make sure, you inserted comma seperated values or string without free spaces, and square brackets, also that the list makes sense. Empty lists possible. Error: {e}")
+        return
+
+    group_labels = JBOOST_GROUPING_PARAMETERS.loc[
+        JBOOST_GROUPING_PARAMETERS["Parameter"] == "group labels", "Value"
+    ].values[0]
+    try:
+        group_labels = pe.parse_mixed_list(group_labels)
+    except Exception as e:
+        ex.show_message_box(excel_filename,
+                            f"Parsing of grouping labels failed. Please make sure, you inserted comma seperated values or string without free spaces, and square brackets, also that the list makes sense. Empty lists possible. Error: {e}")
+        return
+
+    if not (len(group_labels) == len(group_values) == len(group_params)):
+        ex.show_message_box(excel_filename,
+                            f"the lists in group_labels, group_values and group_params must have the same length! If you want to leave out labels for a certain parameter, please type [] as a placeholder")
+        return
+
+    for i, (v, l) in enumerate(zip(group_values, group_labels)):
+
+        if len(l) == 0:
+            group_labels[i] = v
+        elif len(v) != len(l):
+            ex.show_message_box(
+                excel_filename,
+                f"Length mismatch of input parameters:\n"
+                f"values={len(v)}, labels={len(l)}\n\n"
+                "Please make sure that labels either have the same length "
+                "as values or are set to [] if you don't want to specify "
+                "custom labels."
+            )
+            return  # or raise / break, depending on your flow
+
+    # calculation
+    # add auto grop param identifier
+    group_params = ["%" + param for param in group_params]
+    GROUPING = pd.DataFrame(columns=["Config Name"] + group_params)
+
+    for i, values in enumerate(itertools.product(*group_values)):
+        label_list = []
+
+        for j, (p, vals, labs) in enumerate(zip(group_params, group_values, group_labels)):
+            value = values[j]
+
+            label_idx = vals.index(value)
+            label_for_value = labs[label_idx]
+
+            label_list.append(f"{p[1:]}={label_for_value}")
+            GROUPING.loc[i, p] = value
+
+        GROUPING.loc[i, "Config Name"] = "__".join(label_list)
+
+    # check, if this is just an update of some parameters or a new Grouping
+    cols_on_sheet = JBOOST_GROUPING.columns.tolist()
+    ident_cols_on_sheet = [col for col in cols_on_sheet if col[0] == "%"]
+    cols_calculated = GROUPING.columns[1:].tolist()
+
+    added_cols = list(set(cols_on_sheet) - set(cols_calculated))
+    added_cols = [col for col in added_cols if col != "Config Name"]
+
+    rows_on_sheet = JBOOST_GROUPING.index.tolist()
+    rows_calculated = GROUPING.index.tolist()
+
+    askBefore = False
+    if len(ident_cols_on_sheet) == len(cols_calculated):
+        # same number of created cols
+        if (ident_cols_on_sheet == cols_calculated):
+            # same col names => so same setup
+            if (len(rows_on_sheet) == len(rows_calculated)):
+                # same number of rows => preserve added headders and values of them
+                message = "Same number of rows and column names detected, preserving values of any additional columns."
+                for col in added_cols:
+                    GROUPING[col] = JBOOST_GROUPING[col]
+            else:
+                # different number of rows => more combinations but same setup, delete the values of the added cols as they are not sorted right anymore
+                message = "Same number of columns but different number of rows detected. Preserving any additional columns but without the values as they dont fit anymore."
+                for col in added_cols:
+                    GROUPING[col] = None
+        else:
+            askBefore = True
+            message = "Differning parameter setup detected. Overwrite table? All additional columns will be lost."
+    else:
+        askBefore = True
+        message = "Differning parameter setup detected. Overwrite table? All additional columns will be lost."
+
+    if askBefore:
+        accepted = ex.show_message_box(excel_filename,
+                                       message,
+                                       buttons="vbYesNo")
+        if not accepted:
+            return
+    else:
+        ex.show_message_box(excel_filename,
+                            message)
+    ex.clear_excel_table_contents(excel_filename, "ExportStructure", "JBOOSTReloaded_GROUPING")
+    ex.write_df_to_table_flexible(excel_filename, "ExportStructure", "JBOOSTReloaded_GROUPING", GROUPING)
     return
 
 
@@ -1530,3 +2058,4 @@ def apply_bladed_stiff_mat(excel_caller, Bladed_pj_export_path, config_name):
     return
 
 #export_and_run_JBOOST("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", jboost_export_path="", run_jboost=True)
+#export_and_run_JBOOSTReloaded("C:/Users/aaron.lange/Desktop/Projekte/Geometrie_Converter/GeometryConverter/GeometryConverter.xlsm", jboost_export_path="")

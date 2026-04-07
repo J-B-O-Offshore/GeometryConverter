@@ -647,6 +647,7 @@ InvalidRange:
 End Sub
 
 Sub ShowOnlySelectedColumns(rngAllCols As String, rngVisibleCols As String)
+
     Dim ws As Worksheet
     Dim col As Range
     Dim colNum As Long
@@ -676,41 +677,47 @@ Sub ShowOnlySelectedColumns(rngAllCols As String, rngVisibleCols As String)
         col.EntireColumn.Hidden = Not visibleDict.Exists(colNum)
     Next col
 
-    ' Hide dropdowns in hidden columns
+    ' Handle ALL shapes (FormControls + Pictures)
     For Each shp In ws.Shapes
-        If shp.Type = msoFormControl Then
-            If shp.FormControlType = xlDropDown Then
-                On Error Resume Next ' Prevents crash if TopLeftCell is off-sheet
-                topLeftCol = shp.TopLeftCell.Column
-                On Error GoTo 0
-                If ws.Columns(topLeftCol).Hidden = True And topLeftCol <> 1 Then
-                    shp.Visible = msoFalse
-                Else
-                    shp.Visible = msoTrue
-                End If
-            End If
-        End If
-    Next shp
 
-    ' Hide pictures in hidden columns (PNG, SVG, etc.)
-    For Each shp In ws.Shapes
+        On Error Resume Next ' Prevent crash if TopLeftCell fails
+        topLeftCol = shp.TopLeftCell.Column
+        On Error GoTo 0
+
+        ' Skip invalid shapes
+        If topLeftCol = 0 Then GoTo NextShape
+
         Select Case shp.Type
+
+            ' === Form Controls (Dropdowns, Checkboxes, etc.) ===
+            Case msoFormControl
+                Select Case shp.FormControlType
+                    Case xlDropDown, xlCheckBox, xlOptionButton, xlListBox
+                        If ws.Columns(topLeftCol).Hidden And topLeftCol <> 1 Then
+                            shp.Visible = msoFalse
+                        Else
+                            shp.Visible = msoTrue
+                        End If
+                End Select
+
+            ' === Pictures / Graphics ===
             Case msoPicture, msoLinkedPicture, msoLinkedGraphic, msoGraphic
-                On Error Resume Next ' Prevents crash if TopLeftCell is off-sheet
-                topLeftCol = shp.TopLeftCell.Column
-                On Error GoTo 0
-                If ws.Columns(topLeftCol).Hidden = True And topLeftCol <> 1 Then
+                If ws.Columns(topLeftCol).Hidden And topLeftCol <> 1 Then
                     shp.Visible = msoFalse
                 Else
                     shp.Visible = msoTrue
                 End If
+
         End Select
+
+NextShape:
     Next shp
 
     ' -- Restore application settings
     Application.ScreenUpdating = True
     Application.EnableEvents = True
     Application.Calculation = xlCalculationAutomatic
+
 End Sub
 Sub toggle_folding()
 

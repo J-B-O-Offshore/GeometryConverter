@@ -102,6 +102,7 @@ def sanity_check_structure(
         msg = f"Sanity check failed due to an unexpected error: {e}"
         return False, msg
 
+
 def center_of_mass_hollow_frustum(d1, d2, z_bot, z_top, t):
     """
     Calculates the center of mass (z-coordinate) of a hollow conical frustum
@@ -956,3 +957,6 @@ def check_phases(value, allowed_phases=None):
         return i == len(pattern) and j == len(value)
 
     return any(matches_pattern(value, p) for p in allowed_phases)
+
+
+
